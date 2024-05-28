@@ -53,6 +53,9 @@ func main() {
 		r.Command("/notify-on-warned-user-join/set", commands.AdminNotifyOnWarnedUserJoinSetCommandHandler)
 		r.Command("/notify-on-warned-user-join/get", commands.AdminNotifyOnWarnedUserJoinGetCommandHandler)
 
+		r.Command("/ban/with-message", commands.BanWithMessageHandler)
+		r.Command("/kick/with-message", commands.KickWithMessageHandler)
+
 		r.Route("/gatekeep", func(r handler.Router) {
 			r.Command("/enabled", commands.AdminGatekeepEnabledCommandHandler)
 			r.Command("/info", commands.AdminGatekeepInfoCommandHandler)
@@ -82,6 +85,8 @@ func main() {
 		commands.PingCommand,
 		commands.InfractionsCommand,
 		commands.AdminCommand,
+		commands.BanCommand,
+		commands.KickCommand,
 	}
 
 	client, err := disgo.New(token,
