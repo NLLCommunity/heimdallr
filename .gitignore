@@ -38,3 +38,4 @@ heimdallr
 config.toml
 # Database file
 heimdallr.db
+pb_data/
