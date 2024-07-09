@@ -44,38 +44,22 @@ func main() {
 	})
 	r.Component("/infractions-mod/{userID}/{offset}", commands.InfractionsListComponentHandler)
 	r.Route("/admin", func(r handler.Router) {
-		r.Command("/mod-channel/set", commands.AdminModChannelSetCommandHandler)
-		r.Command("/mod-channel/clear", commands.AdminModChannelClearCommandHandler)
-		r.Command("/mod-channel/get", commands.AdminModChannelGetCommandHandler)
-		r.Command("/infraction-half-life/set", commands.AdminInfractionHalfLifeSetCommandHandler)
-		r.Command("/infraction-half-life/get", commands.AdminInfractionHalfLifeGetCommandHandler)
-		r.Command("/infraction-half-life/clear", commands.AdminInfractionHalfLifeClearCommandHandler)
-		r.Command("/notify-on-warned-user-join/set", commands.AdminNotifyOnWarnedUserJoinSetCommandHandler)
-		r.Command("/notify-on-warned-user-join/get", commands.AdminNotifyOnWarnedUserJoinGetCommandHandler)
+		r.Command("/info", commands.AdminInfoHandler)
+		r.Command("/mod-channel", commands.AdminModChannelHandler)
+		r.Command("/infractions", commands.AdminInfractionsHandler)
+		r.Command("/gatekeep", commands.AdminGatekeepHandler)
+		r.Command("/gatekeep-message", commands.AdminGatekeepMessageHandler)
+		r.Component("/gatekeep-message/button", commands.AdminGatekeepMessageButtonHandler)
+		r.Modal("/gatekeep-message/modal", commands.AdminGatekeepMessageModalHandler)
+		r.Command("/join-leave", commands.AdminJoinLeaveHandler)
 
-		r.Command("/ban/with-message", commands.BanWithMessageHandler)
-		r.Command("/kick/with-message", commands.KickWithMessageHandler)
+		r.Command("/join-message", commands.AdminJoinMessageHandler)
+		r.Component("/join-message/button", commands.AdminJoinMessageButtonHandler)
+		r.Modal("/join-message/modal", commands.AdminJoinMessageModalHandler)
 
-		r.Route("/gatekeep", func(r handler.Router) {
-			r.Command("/enabled", commands.AdminGatekeepEnabledCommandHandler)
-			r.Command("/info", commands.AdminGatekeepInfoCommandHandler)
-			r.Command("/pending-role", commands.AdminGatekeepPendingRoleSetCommandHandler)
-			r.Command("/approved-role", commands.AdminGatekeepApprovedRoleSetCommandHandler)
-			r.Command("/give-pending-role-on-join", commands.AdminGatekeepAddPendingRoleOnJoinSetCommandHandler)
-			r.Command("/approved-message", commands.AdminGatekeepApprovedMessageSetCommandHandler)
-		})
-
-		r.Route("/join-leave", func(r handler.Router) {
-			r.Command("/info", commands.AdminJoinLeaveInfoCommandHandler)
-			r.Command("/join-enabled", commands.AdminJoinLeaveSetJoinEnabledCommandHandler)
-			r.Command("/join-message", commands.AdminJoinLeaveSetJoinMessageCommandHandler)
-			r.Command("/leave-enabled", commands.AdminJoinLeaveSetLeaveEnabledCommandHandler)
-			r.Command("/leave-message", commands.AdminJoinLeaveSetLeaveMessageCommandHandler)
-			r.Command("/channel", commands.AdminJoinLeaveSetChannelCommandHandler)
-
-			r.Modal("/join-message/modal", commands.AdminJoinLeaveJoinMessageModal)
-			r.Modal("/leave-message/modal", commands.AdminJoinLeaveLeaveMessageModal)
-		})
+		r.Command("/leave-message", commands.AdminLeaveMessageHandler)
+		r.Component("/leave-message/button", commands.AdminLeaveMessageButtonHandler)
+		r.Modal("/leave-message/modal", commands.AdminLeaveMessageModalHandler)
 	})
 
 	commandCreates := []discord.ApplicationCommandCreate{
