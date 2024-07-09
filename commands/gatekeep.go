@@ -33,6 +33,8 @@ var ApproveCommand = discord.SlashCommandCreate{
 }
 
 func ApproveUserHandler(e *handler.CommandEvent) error {
+	slog.Info("`approve` user command called.",
+		"guild_id", utils.Iif(e.GuildID() == nil, "<null>", e.GuildID().String()))
 	guild, inGuild := e.Guild()
 	if !inGuild {
 		return nil
@@ -43,6 +45,8 @@ func ApproveUserHandler(e *handler.CommandEvent) error {
 }
 
 func ApproveHandler(e *handler.CommandEvent) error {
+	slog.Info("`approve-user` slash command called.",
+		"guild_id", utils.Iif(e.GuildID() == nil, "<null>", e.GuildID().String()))
 	guild, inGuild := e.Guild()
 	if !inGuild {
 		return nil
@@ -53,31 +57,55 @@ func ApproveHandler(e *handler.CommandEvent) error {
 }
 
 func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member discord.ResolvedMember) error {
-	guildSettings, err := model.GetGuildSettings(member.GuildID)
+	guildSettings, err := model.GetGuildSettings(guild.ID)
 	if err != nil {
+		slog.Error("Failed to get guild settings.",
+			"guild_id", guild.ID,
+			"err", err)
 		return err
 	}
 
+	hasApprovedRole := false
+	hasPendingRole := false
+	for _, roleID := range member.RoleIDs {
+		if roleID == guildSettings.GatekeepApprovedRole {
+			hasApprovedRole = true
+		} else if roleID == guildSettings.GatekeepPendingRole {
+			hasPendingRole = true
+		}
+	}
+
+	if hasApprovedRole && (!hasPendingRole || !guildSettings.GatekeepAddPendingRoleOnJoin) {
+		return e.CreateMessage(discord.NewMessageCreateBuilder().
+			SetContentf("User %s is already approved.", member.Mention()).
+			SetEphemeral(true).
+			Build())
+
+	}
+
 	if guildSettings.GatekeepApprovedRole != 0 {
-		err = e.Client().Rest().AddMemberRole(member.GuildID, member.User.ID, guildSettings.GatekeepApprovedRole)
+		err = e.Client().Rest().AddMemberRole(guild.ID, member.User.ID, guildSettings.GatekeepApprovedRole)
 		if err != nil {
 			slog.Warn("Failed to add approved role to user",
-				"guild_id", member.GuildID,
+				"guild_id", guild.ID,
 				"user_id", member.User.ID,
 				"role_id", guildSettings.GatekeepApprovedRole)
+			return err
 		}
 	}
 	if guildSettings.GatekeepPendingRole != 0 {
-		err = e.Client().Rest().RemoveMemberRole(member.GuildID, member.User.ID, guildSettings.GatekeepPendingRole)
+		err = e.Client().Rest().RemoveMemberRole(guild.ID, member.User.ID, guildSettings.GatekeepPendingRole)
 		if err != nil {
 			slog.Warn("Failed to remove pending role from user",
-				"guild_id", member.GuildID,
+				"guild_id", guild.ID,
 				"user_id", member.User.ID,
 				"role_id", guildSettings.GatekeepPendingRole)
+			return err
 		}
 	}
 
 	if guildSettings.GatekeepApprovedMessage == "" {
+		slog.Info("No approved message set; not sending message.")
 		return nil
 	}
 
@@ -91,6 +119,7 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 	templateData := utils.NewMessageTemplateData(member.Member, guild)
 	contents, err := mustache.RenderRaw(guildSettings.GatekeepApprovedMessage, true, templateData)
 	if err != nil {
+		slog.Warn("Failed to render approved message template.")
 		return err
 	}
 	return e.CreateMessage(discord.NewMessageCreateBuilder().
