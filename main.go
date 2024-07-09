@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
@@ -23,11 +24,22 @@ import (
 	"syscall"
 )
 
+var rmGlobalCommands = flag.Bool("rm-global-commands", false, "Remove global commands")
+var rmGuildCommands = flag.Uint64("rm-guild-commands", 0, "Remove guild commands for guild specified by ID")
+
 func main() {
+	flag.Parse()
 	token := viper.GetString("bot.token")
 	if token == "" {
 		panic("No bot token found in config file. Please set 'bot.token'.")
 	}
+
+	if *rmGlobalCommands || *rmGuildCommands != 0 {
+		slog.Info("Removing commands.")
+		rmCommands(token, *rmGlobalCommands, *rmGuildCommands)
+		return
+	}
+
 	_, err := model.InitDB(viper.GetString("bot.db"))
 	if err != nil {
 		panic(fmt.Errorf("failed to initialize database: %w", err))
