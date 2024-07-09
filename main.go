@@ -62,6 +62,8 @@ func main() {
 		r.Modal("/leave-message/modal", commands.AdminLeaveMessageModalHandler)
 	})
 
+	r.Command("/approve", commands.ApproveUserHandler)
+	r.Command("/approve-user", commands.ApproveHandler)
 	commandCreates := []discord.ApplicationCommandCreate{
 		commands.QuoteCommand,
 		commands.WarnCommand,
@@ -71,6 +73,8 @@ func main() {
 		commands.AdminCommand,
 		commands.BanCommand,
 		commands.KickCommand,
+		commands.ApproveCommand,
+		commands.ApproveUserCommand,
 	}
 
 	client, err := disgo.New(token,
@@ -83,6 +87,7 @@ func main() {
 			fmt.Println("Bot is ready!")
 		}),
 		bot.WithEventListenerFunc(listeners.OnWarnedUserJoin),
+		bot.WithEventListenerFunc(listeners.OnGatekeepUserJoin),
 		bot.WithEventListenerFunc(listeners.TestEvent),
 		bot.WithEventListenerFunc(listeners.OnUserJoin),
 		bot.WithEventListenerFunc(listeners.OnUserLeave),
