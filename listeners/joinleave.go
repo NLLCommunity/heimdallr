@@ -1,14 +1,13 @@
 package listeners
 
 import (
-	"bytes"
+	"github.com/cbroglie/mustache"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/utils"
 	"log/slog"
-	"text/template"
 )
 
 type joinleaveInfo struct {
@@ -74,26 +73,16 @@ func OnUserJoin(e *events.GuildMemberJoin) {
 		},
 	}
 
-	_ = joinleaveInfo
-	tpl, err := template.New("join").Parse(guildSettings.JoinMessage)
+	contents, err := mustache.RenderRaw(guildSettings.JoinMessage, true, joinleaveInfo)
 	if err != nil {
-		slog.Error("Failed to parse join message template.",
-			"err", err,
-			"guild_id", guildID,
-		)
-	}
-
-	buf := bytes.Buffer{}
-	err = tpl.Execute(&buf, joinleaveInfo)
-	if err != nil {
-		slog.Error("Failed to execute join message template.",
+		slog.Error("Failed to render join message template.",
 			"err", err,
 			"guild_id", guildID,
 		)
 		return
 	}
 
-	_, err = e.Client().Rest().CreateMessage(joinLeaveChannel, discord.NewMessageCreateBuilder().SetContent(buf.String()).Build())
+	_, err = e.Client().Rest().CreateMessage(joinLeaveChannel, discord.NewMessageCreateBuilder().SetContent(contents).Build())
 }
 
 func OnUserLeave(e *events.GuildMemberLeave) {
@@ -138,24 +127,14 @@ func OnUserLeave(e *events.GuildMemberLeave) {
 		},
 	}
 
-	_ = joinleaveInfo
-	tpl, err := template.New("leave").Parse(guildSettings.JoinMessage)
+	contents, err := mustache.RenderRaw(guildSettings.LeaveMessage, true, joinleaveInfo)
 	if err != nil {
-		slog.Error("Failed to parse leave message template.",
-			"err", err,
-			"guild_id", guildID,
-		)
-	}
-
-	buf := bytes.Buffer{}
-	err = tpl.Execute(&buf, joinleaveInfo)
-	if err != nil {
-		slog.Error("Failed to execute leave message template.",
+		slog.Error("Failed to render leave message template.",
 			"err", err,
 			"guild_id", guildID,
 		)
 		return
 	}
 
-	_, err = e.Client().Rest().CreateMessage(joinLeaveChannel, discord.NewMessageCreateBuilder().SetContent(buf.String()).Build())
+	_, err = e.Client().Rest().CreateMessage(joinLeaveChannel, discord.NewMessageCreateBuilder().SetContent(contents).Build())
 }
