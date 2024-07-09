@@ -15,6 +15,7 @@ import (
 	_ "github.com/myrkvi/heimdallr/config"
 	"github.com/myrkvi/heimdallr/listeners"
 	"github.com/myrkvi/heimdallr/model"
+	"github.com/myrkvi/heimdallr/scheduled_tasks"
 	"github.com/spf13/viper"
 	"log/slog"
 	"os"
@@ -64,6 +65,10 @@ func main() {
 
 	r.Command("/approve", commands.ApproveUserHandler)
 	r.Command("/approve-user", commands.ApproveHandler)
+
+	r.Command("/kick/with-message", commands.KickWithMessageHandler)
+	r.Command("/ban/with-message", commands.BanWithMessageHandler)
+	r.Command("/ban/until", commands.BanUntilHandler)
 	commandCreates := []discord.ApplicationCommandCreate{
 		commands.QuoteCommand,
 		commands.WarnCommand,
@@ -71,8 +76,8 @@ func main() {
 		commands.PingCommand,
 		commands.InfractionsCommand,
 		commands.AdminCommand,
-		commands.BanCommand,
 		commands.KickCommand,
+		commands.BanCommand,
 		commands.ApproveCommand,
 		commands.ApproveUserCommand,
 	}
@@ -122,7 +127,10 @@ func main() {
 		panic(fmt.Errorf("failed to open gateway: %w", err))
 	}
 
+	removeTempBansTask := scheduled_tasks.RemoveTempBansScheduledTask(client)
+
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	<-s
+	removeTempBansTask.Stop()
 }

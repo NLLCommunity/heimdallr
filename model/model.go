@@ -4,6 +4,7 @@ import (
 	"github.com/glebarez/sqlite"
 	"github.com/sqids/sqids-go"
 	"gorm.io/gorm"
+	"log/slog"
 )
 
 var sqidGen *sqids.Sqids
@@ -27,8 +28,10 @@ func InitDB(path string) (*gorm.DB, error) {
 	err = db.AutoMigrate(
 		&Infraction{},
 		&GuildSettings{},
+		&TempBan{},
 	)
 	if err != nil {
+		slog.Error("failed to migrate database", "error", err)
 		return nil, err
 	}
 
