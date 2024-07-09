@@ -1,0 +1,16 @@
+app = "heimdallr"
+primary_region = "iad"
+
+[build]
+dockerfile = ".fly/Dockerfile"
+
+[[vm]]
+size = "shared-cpu-2x"
+
+[env]
+HEIMDALLR_DEV_MODE_EANBLED = "false"
+HEIMDALLR_BOT_DB = "/litefs/heimdallr.db"
+
+[mounts]
+source = "litefs"
+destination = "/var/lib/litefs"

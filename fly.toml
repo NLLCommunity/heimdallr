@@ -1,0 +1,21 @@
+# fly.toml app configuration file generated for heimdallr-test on 2024-07-09T22:06:33+02:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'heimdallr-test'
+primary_region = 'iad'
+
+[build]
+  dockerfile = ".fly/Dockerfile"
+
+[env]
+  HEIMDALLR_DEV_MODE_EANBLED = "true"
+  HEIMDALLR_BOT_DB = "/litefs/heimdallr-test.db"
+
+[[vm]]
+  size = 'shared-cpu-2x'
+
+[mounts]
+ source = "litefs"
+ destination = "/var/lib/litefs"
