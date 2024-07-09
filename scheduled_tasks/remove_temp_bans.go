@@ -15,7 +15,7 @@ func RemoveTempBansScheduledTask(client bot.Client) task.Task {
 		"client": client,
 	}
 
-	t := task.New("remove-temp-bans", removeTempBans, values, time.Minute)
+	t := task.New("remove-temp-bans", removeTempBans, values, 15*time.Minute)
 	t.StartNoWait()
 
 	return t
