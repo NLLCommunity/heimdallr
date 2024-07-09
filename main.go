@@ -34,15 +34,17 @@ func main() {
 	}
 
 	r := handler.New()
+	r.Command("/ping", commands.PingHandler)
 	r.Command("/quote", commands.QuoteHandler)
+
 	r.Command("/warn", commands.WarnHandler)
 	r.Command("/warnings", commands.UserInfractionsHandler)
-	r.Component("/infractions-user/{offset}", commands.UserInfractionButtonHandler)
-	r.Command("/ping", commands.PingHandler)
 	r.Route("/infractions", func(r handler.Router) {
 		r.Command("/list", commands.InfractionsListHandler)
 		r.Command("/remove", commands.InfractionsRemoveHandler)
 	})
+	r.Component("/infractions-user/{offset}", commands.UserInfractionButtonHandler)
+
 	r.Component("/infractions-mod/{userID}/{offset}", commands.InfractionsListComponentHandler)
 	r.Route("/admin", func(r handler.Router) {
 		r.Command("/info", commands.AdminInfoHandler)
@@ -70,10 +72,10 @@ func main() {
 	r.Command("/ban/with-message", commands.BanWithMessageHandler)
 	r.Command("/ban/until", commands.BanUntilHandler)
 	commandCreates := []discord.ApplicationCommandCreate{
+		commands.PingCommand,
 		commands.QuoteCommand,
 		commands.WarnCommand,
 		commands.UserInfractionsCommand,
-		commands.PingCommand,
 		commands.InfractionsCommand,
 		commands.AdminCommand,
 		commands.KickCommand,
