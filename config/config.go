@@ -4,11 +4,15 @@ import (
 	"errors"
 	"github.com/spf13/viper"
 	"log/slog"
+	"strings"
 )
 
 func init() {
 	viper.SetConfigName("config")
 	viper.SetConfigType("toml")
+
+	viper.SetEnvPrefix("heimdallr")
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
 
 	// CONFIG PATHS
 	viper.AddConfigPath("/etc/heimdallr/")
@@ -24,11 +28,12 @@ func init() {
 	viper.SetDefault("dev_mode.enabled", false)
 	viper.SetDefault("dev_mode.guild_id", 0)
 
+	viper.AutomaticEnv()
+
 	if err := viper.ReadInConfig(); err != nil {
 		var configFileNotFoundError viper.ConfigFileNotFoundError
 		if errors.As(err, &configFileNotFoundError) {
-			// Config file not found; ignore error if desired
-			slog.Warn("Config file not found; using defaults.")
+			slog.Warn("Config file not found; ignore if set using env vars.")
 		} else {
 			slog.Error("Error reading config file.", "error", err)
 			panic(err)
