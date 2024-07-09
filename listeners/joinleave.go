@@ -4,32 +4,10 @@ import (
 	"github.com/cbroglie/mustache"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
-	"github.com/disgoorg/snowflake/v2"
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/utils"
 	"log/slog"
 )
-
-type joinleaveInfo struct {
-	User   joinLeaveUserInfo
-	Server joinLeaveServerInfo
-}
-
-type joinLeaveUserInfo struct {
-	Username      string
-	GlobalName    string
-	ServerName    string
-	ResolvedName  string
-	Mention       string
-	Discriminator uint8
-	IsBot         bool
-	ID            snowflake.ID
-}
-
-type joinLeaveServerInfo struct {
-	Name string
-	ID   snowflake.ID
-}
 
 func OnUserJoin(e *events.GuildMemberJoin) {
 	guildID := e.GuildID
@@ -55,23 +33,7 @@ func OnUserJoin(e *events.GuildMemberJoin) {
 		return
 	}
 
-	joinleaveInfo := joinleaveInfo{
-		User: joinLeaveUserInfo{
-			Username: utils.Iif(
-				e.Member.User.Discriminator == "0",
-				e.Member.User.Username,
-				e.Member.User.Username+"#"+e.Member.User.Discriminator,
-			),
-			GlobalName:   utils.RefDefault(e.Member.User.GlobalName, ""),
-			ServerName:   utils.RefDefault(e.Member.Nick, ""),
-			ResolvedName: e.Member.EffectiveName(),
-			Mention:      e.Member.Mention(),
-		},
-		Server: joinLeaveServerInfo{
-			Name: guild.Name,
-			ID:   guildID,
-		},
-	}
+	joinleaveInfo := utils.NewMessageTemplateData(e.Member, guild.Guild)
 
 	contents, err := mustache.RenderRaw(guildSettings.JoinMessage, true, joinleaveInfo)
 	if err != nil {
@@ -109,23 +71,7 @@ func OnUserLeave(e *events.GuildMemberLeave) {
 		return
 	}
 
-	joinleaveInfo := joinleaveInfo{
-		User: joinLeaveUserInfo{
-			Username: utils.Iif(
-				e.Member.User.Discriminator == "0",
-				e.Member.User.Username,
-				e.Member.User.Username+"#"+e.Member.User.Discriminator,
-			),
-			GlobalName:   utils.RefDefault(e.Member.User.GlobalName, ""),
-			ServerName:   utils.RefDefault(e.Member.Nick, ""),
-			ResolvedName: e.Member.EffectiveName(),
-			Mention:      e.Member.Mention(),
-		},
-		Server: joinLeaveServerInfo{
-			Name: guild.Name,
-			ID:   guildID,
-		},
-	}
+	joinleaveInfo := utils.NewMessageTemplateData(e.Member, guild.Guild)
 
 	contents, err := mustache.RenderRaw(guildSettings.LeaveMessage, true, joinleaveInfo)
 	if err != nil {

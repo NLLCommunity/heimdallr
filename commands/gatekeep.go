@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"github.com/cbroglie/mustache"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/json"
@@ -76,21 +77,26 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		}
 	}
 
-	if guildSettings.GatekeepApprovedMessage != "" {
-		channel := guildSettings.JoinLeaveChannel
-		if channel == 0 {
-			if guild.SystemChannelID != nil {
-				channel = *guild.SystemChannelID
-			}
-		}
-
-		_ = e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContent(guildSettings.GatekeepApprovedMessage).
-			SetAllowedMentions(&discord.AllowedMentions{
-				Users: []snowflake.ID{member.User.ID},
-			}).
-			Build())
+	if guildSettings.GatekeepApprovedMessage == "" {
+		return nil
 	}
 
-	return nil
+	channel := guildSettings.JoinLeaveChannel
+	if channel == 0 {
+		if guild.SystemChannelID != nil {
+			channel = *guild.SystemChannelID
+		}
+	}
+
+	templateData := utils.NewMessageTemplateData(member.Member, guild)
+	contents, err := mustache.RenderRaw(guildSettings.GatekeepApprovedMessage, true, templateData)
+	if err != nil {
+		return err
+	}
+	return e.CreateMessage(discord.NewMessageCreateBuilder().
+		SetContent(contents).
+		SetAllowedMentions(&discord.AllowedMentions{
+			Users: []snowflake.ID{member.User.ID},
+		}).
+		Build())
 }
