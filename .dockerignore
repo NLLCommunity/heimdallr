@@ -1,0 +1,11 @@
+config.toml
+heimdallr
+heimdallr.exe
+heimdallr.db
+.env
+Dockerfile
+.git
+.gitignore
+README.md
+LICENSE
+.dockerignore
