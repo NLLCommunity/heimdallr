@@ -122,10 +122,13 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		slog.Warn("Failed to render approved message template.")
 		return err
 	}
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContent(contents).
-		SetAllowedMentions(&discord.AllowedMentions{
-			Users: []snowflake.ID{member.User.ID},
-		}).
-		Build())
+	_, err = e.Client().Rest().CreateMessage(channel,
+		discord.NewMessageCreateBuilder().
+			SetContent(contents).
+			SetAllowedMentions(&discord.AllowedMentions{
+				Users: []snowflake.ID{member.User.ID},
+			}).
+			Build(),
+	)
+	return err
 }
