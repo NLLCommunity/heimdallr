@@ -161,6 +161,7 @@ func WarnHandler(e *handler.CommandEvent) error {
 	guildSettings, err := model.GetGuildSettings(guild.ID)
 	if err == nil && guildSettings.ModeratorChannel != 0 {
 		_, err = e.Client().Rest().CreateMessage(guildSettings.ModeratorChannel, discord.NewMessageCreateBuilder().
+			SetContent(fmt.Sprintf("## Warning sent to %s.", user.Mention())).
 			SetEmbeds(embed.Build()).
 			Build())
 		if err != nil {
