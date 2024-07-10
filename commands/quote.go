@@ -81,9 +81,26 @@ func QuoteHandler(e *handler.CommandEvent) error {
 		}
 		embed.AddField("Attachments", strings.Join(lines, "\n"), false)
 	}
+	if message.ReferencedMessage != nil {
+		ref := message.ReferencedMessage
+
+		msg := fmt.Sprintf("message by %s", ref.Author.Mention())
+		if ref.Content != "" {
+			msg = fmt.Sprintf("%s:\n", ref.Author.Mention())
+			if len(ref.Content) > 100 {
+				msg += addQuoteToMessage(ref.Content[:97] + "...")
+			} else {
+				msg += addQuoteToMessage(ref.Content)
+			}
+		}
+		msg += fmt.Sprintf("\n\n[[jump to](%s)]", ref.JumpURL())
+
+		embed.AddField("Reply to", msg, false)
+	}
 
 	resp := discord.NewMessageCreateBuilder().SetEmbeds(embed.Build())
 	resp.AddContainerComponents(discord.NewActionRow(discord.NewLinkButton("Jump to message", url)))
+	resp.SetAllowedMentions(&discord.AllowedMentions{})
 
 	return e.CreateMessage(resp.Build())
 }
@@ -235,4 +252,13 @@ func respondWithContentEph(e *handler.CommandEvent, content string) error {
 		SetEphemeral(true).
 		Build(),
 	)
+}
+
+func addQuoteToMessage(text string) string {
+	origs := strings.Split(text, "\n")
+	temp := make([]string, len(origs))
+	for i, s := range origs {
+		temp[i] = fmt.Sprintf("> %s", s)
+	}
+	return strings.Join(temp, "\n")
 }
