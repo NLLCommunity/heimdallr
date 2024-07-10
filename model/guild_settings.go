@@ -6,7 +6,7 @@ import (
 )
 
 type GuildSettings struct {
-	GuildID   snowflake.ID `gorm:"primaryKey"`
+	GuildID   snowflake.ID `gorm:"primaryKey;autoIncrement:false"`
 	UpdatedAt time.Time    `gorm:"autoUpdateTime"`
 
 	// ModeratorChannel is the channel where notifications and other
