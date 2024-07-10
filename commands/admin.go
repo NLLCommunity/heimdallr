@@ -145,7 +145,17 @@ func AdminInfoHandler(e *handler.CommandEvent) error {
 	message := fmt.Sprintf("# Server settings\n%s\n\n%s\n\n%s\n\n%s",
 		modChannel, infractionSettings, gatekeepSettings, joinLeaveSettings)
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().SetContent(message).Build())
+	return e.CreateMessage(discord.NewMessageCreateBuilder().
+		SetContent(message).
+		SetEphemeral(true).
+		AddActionRow(discord.NewPrimaryButton("Display for everyone", "/admin/info/show-for-all")).
+		Build())
+}
+
+func AdminInfoShowForAllHandler(e *handler.ComponentEvent) error {
+	return e.CreateMessage(discord.NewMessageCreateBuilder().
+		SetContent(e.Message.Content).
+		Build())
 }
 
 func modChannelInfo(settings *model.GuildSettings) string {

@@ -60,6 +60,7 @@ func main() {
 	r.Component("/infractions-mod/{userID}/{offset}", commands.InfractionsListComponentHandler)
 	r.Route("/admin", func(r handler.Router) {
 		r.Command("/info", commands.AdminInfoHandler)
+		r.Component("/info/show-for-all", commands.AdminInfoShowForAllHandler)
 		r.Command("/mod-channel", commands.AdminModChannelHandler)
 		r.Command("/infractions", commands.AdminInfractionsHandler)
 		r.Command("/gatekeep", commands.AdminGatekeepHandler)
