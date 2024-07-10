@@ -130,5 +130,14 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 			}).
 			Build(),
 	)
-	return err
+	if err != nil {
+		return e.CreateMessage(discord.NewMessageCreateBuilder().
+			SetEphemeral(true).
+			SetContent("Failed to send message to approved user.").
+			Build())
+	}
+	return e.CreateMessage(discord.NewMessageCreateBuilder().
+		SetEphemeral(true).
+		SetContent("Message sent to approved user.").
+		Build())
 }
