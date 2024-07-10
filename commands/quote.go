@@ -77,9 +77,9 @@ func QuoteHandler(e *handler.CommandEvent) error {
 	} else if len(message.Attachments) > 1 {
 		var lines []string
 		for _, att := range message.Attachments {
-			lines = append(lines, fmt.Sprintf("· [%s](%s)", att.Filename, att.URL))
+			lines = append(lines, fmt.Sprintf("- [%s](%s)", att.Filename, att.URL))
 		}
-		embed.AddField("Attachments", "• "+strings.Join(lines, "\n"), false)
+		embed.AddField("Attachments", strings.Join(lines, "\n"), false)
 	}
 
 	resp := discord.NewMessageCreateBuilder().SetEmbeds(embed.Build())
