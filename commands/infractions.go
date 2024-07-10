@@ -521,7 +521,7 @@ func getUserInfractions(guildID, userID snowflake.ID, limit, offset int) (userIn
 
 	severity := 0.0
 	for _, inf := range allInfractions {
-		diff := time.Now().Sub(inf.CreatedAt)
+		diff := time.Since(inf.CreatedAt)
 		severity += utils.CalcHalfLife(diff, guildSettings.InfractionHalfLifeDays, float64(inf.Weight))
 	}
 

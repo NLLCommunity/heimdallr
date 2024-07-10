@@ -6,9 +6,6 @@ import (
 	"time"
 )
 
-func banUntilTask() {
-}
-
 type TaskStatus int
 
 const (
@@ -39,6 +36,7 @@ type taskImpl struct {
 func New(name string, exec func(ctx context.Context), contextValues map[string]any, interval time.Duration) Task {
 	ctx := context.Background()
 	for k, v := range contextValues {
+		//nolint:staticcheck
 		ctx = context.WithValue(ctx, k, v)
 	}
 	ctx, cancelFunc := context.WithCancel(ctx)

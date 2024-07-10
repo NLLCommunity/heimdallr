@@ -45,6 +45,13 @@ func OnUserJoin(e *events.GuildMemberJoin) {
 	}
 
 	_, err = e.Client().Rest().CreateMessage(joinLeaveChannel, discord.NewMessageCreateBuilder().SetContent(contents).Build())
+	if err != nil {
+		slog.Error("Failed to send join message.",
+			"guild_id", guildID,
+			"channel_id", joinLeaveChannel,
+			"err", err,
+		)
+	}
 }
 
 func OnUserLeave(e *events.GuildMemberLeave) {
@@ -83,4 +90,11 @@ func OnUserLeave(e *events.GuildMemberLeave) {
 	}
 
 	_, err = e.Client().Rest().CreateMessage(joinLeaveChannel, discord.NewMessageCreateBuilder().SetContent(contents).Build())
+	if err != nil {
+		slog.Error("Failed to send leave message.",
+			"guild_id", guildID,
+			"channel_id", joinLeaveChannel,
+			"err", err,
+		)
+	}
 }
