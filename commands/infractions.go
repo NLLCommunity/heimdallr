@@ -222,7 +222,9 @@ func UserInfractionsHandler(e *handler.CommandEvent) error {
 
 	if infrData.TotalCount == 0 {
 		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContent("You have no infractions.").Build())
+			SetContent("You have no infractions.").
+			SetEphemeral(true).
+			Build())
 	}
 
 	message := discord.NewMessageCreateBuilder().
@@ -267,6 +269,7 @@ func UserInfractionButtonHandler(e *handler.ComponentEvent) error {
 		return e.CreateMessage(discord.NewMessageCreateBuilder().
 			SetEphemeral(true).
 			SetContent("You have no infractions.").
+			SetEphemeral(true).
 			Build())
 	}
 
