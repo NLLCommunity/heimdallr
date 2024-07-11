@@ -149,12 +149,14 @@ func AdminInfoHandler(e *handler.CommandEvent) error {
 		SetContent(message).
 		SetEphemeral(true).
 		AddActionRow(discord.NewPrimaryButton("Display for everyone", "/admin/info/show-for-all")).
+		SetAllowedMentions(&discord.AllowedMentions{}).
 		Build())
 }
 
 func AdminInfoShowForAllHandler(e *handler.ComponentEvent) error {
 	return e.CreateMessage(discord.NewMessageCreateBuilder().
 		SetContent(e.Message.Content).
+		SetAllowedMentions(&discord.AllowedMentions{}).
 		Build())
 }
 
@@ -238,7 +240,10 @@ func AdminModChannelHandler(e *handler.CommandEvent) error {
 
 	if !hasChannel {
 		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContent(modChannelInfo(settings)).Build())
+			SetContent(modChannelInfo(settings)).
+			SetEphemeral(true).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build())
 	}
 
 	settings.ModeratorChannel = channel.ID
@@ -247,7 +252,11 @@ func AdminModChannelHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().SetContentf("Moderator channel set to <#%d>", channel.ID).Build())
+	return e.CreateMessage(discord.NewMessageCreateBuilder().
+		SetContentf("Moderator channel set to <#%d>", channel.ID).
+		SetEphemeral(true).
+		SetAllowedMentions(&discord.AllowedMentions{}).
+		Build())
 }
 
 func AdminInfractionsHandler(e *handler.CommandEvent) error {
@@ -283,7 +292,11 @@ func AdminInfractionsHandler(e *handler.CommandEvent) error {
 	}
 
 	if !utils.Any(hasHalfLife, hasNotifyThreshold, hasNotifyOnWarnedUserJoin) {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().SetContent(infractionInfo(settings)).Build())
+		return e.CreateMessage(discord.NewMessageCreateBuilder().
+			SetContent(infractionInfo(settings)).
+			SetEphemeral(true).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build())
 	}
 
 	err = model.SetGuildSettings(settings)
@@ -291,7 +304,11 @@ func AdminInfractionsHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().SetContent(message).Build())
+	return e.CreateMessage(discord.NewMessageCreateBuilder().
+		SetContent(message).
+		SetEphemeral(true).
+		SetAllowedMentions(&discord.AllowedMentions{}).
+		Build())
 }
 
 func AdminGatekeepHandler(e *handler.CommandEvent) error {
@@ -333,7 +350,11 @@ func AdminGatekeepHandler(e *handler.CommandEvent) error {
 	}
 
 	if !utils.Any(hasEnabled, hasPendingRole, hasApprovedRole, hasUsePendingRole) {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().SetContent(gatekeepInfo(settings)).Build())
+		return e.CreateMessage(discord.NewMessageCreateBuilder().
+			SetContent(gatekeepInfo(settings)).
+			SetEphemeral(true).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build())
 	}
 
 	err = model.SetGuildSettings(settings)
@@ -341,7 +362,11 @@ func AdminGatekeepHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().SetContent(message).Build())
+	return e.CreateMessage(discord.NewMessageCreateBuilder().
+		SetContent(message).
+		SetEphemeral(true).
+		SetAllowedMentions(&discord.AllowedMentions{}).
+		Build())
 }
 
 func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
@@ -365,6 +390,7 @@ func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
 		AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/gatekeep-message/button")).
 		SetAllowedMentions(&discord.AllowedMentions{}).
 		SetEphemeral(true).
+		SetAllowedMentions(&discord.AllowedMentions{}).
 		Build())
 }
 
@@ -416,6 +442,7 @@ func AdminGatekeepMessageModalHandler(e *handler.ModalEvent) error {
 	return e.CreateMessage(discord.NewMessageCreateBuilder().
 		SetContent("Gatekeep approved message updated.").
 		SetEphemeral(true).
+		SetAllowedMentions(&discord.AllowedMentions{}).
 		Build())
 }
 
@@ -451,7 +478,11 @@ func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
 	}
 
 	if !utils.Any(hasJoinEnabled, hasLeaveEnabled, hasChannel) {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().SetContent(joinLeaveInfo(settings)).Build())
+		return e.CreateMessage(discord.NewMessageCreateBuilder().
+			SetContent(joinLeaveInfo(settings)).
+			SetEphemeral(true).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build())
 	}
 
 	err = model.SetGuildSettings(settings)
@@ -459,7 +490,11 @@ func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().SetContent(message).Build())
+	return e.CreateMessage(discord.NewMessageCreateBuilder().
+		SetContent(message).
+		SetEphemeral(true).
+		SetAllowedMentions(&discord.AllowedMentions{}).
+		Build())
 }
 
 func AdminJoinMessageHandler(e *handler.CommandEvent) error {
@@ -526,6 +561,7 @@ func AdminJoinMessageModalHandler(e *handler.ModalEvent) error {
 	return e.CreateMessage(discord.NewMessageCreateBuilder().
 		SetContent("Join message updated.").
 		SetEphemeral(true).
+		SetAllowedMentions(&discord.AllowedMentions{}).
 		Build())
 }
 
@@ -593,5 +629,6 @@ func AdminLeaveMessageModalHandler(e *handler.ModalEvent) error {
 	return e.CreateMessage(discord.NewMessageCreateBuilder().
 		SetContent("Leave message updated.").
 		SetEphemeral(true).
+		SetAllowedMentions(&discord.AllowedMentions{}).
 		Build())
 }
