@@ -13,7 +13,7 @@ type Infraction struct {
 	UserID    snowflake.ID
 	Moderator snowflake.ID
 	Reason    string
-	Weight    float32
+	Weight    float64
 	Timestamp time.Time
 	Silent    bool
 }
@@ -27,7 +27,7 @@ func (i Infraction) Sqid() string {
 
 }
 
-func CreateInfraction(guildID, userID, moderator snowflake.ID, reason string, weight float32, silent bool) (*Infraction, error) {
+func CreateInfraction(guildID, userID, moderator snowflake.ID, reason string, weight float64, silent bool) (*Infraction, error) {
 	inf := &Infraction{
 		GuildID:   guildID,
 		UserID:    userID,
@@ -47,7 +47,7 @@ func CreateInfraction(guildID, userID, moderator snowflake.ID, reason string, we
 
 func GetUserInfractions(guildID, userID snowflake.ID, limit, offset int) ([]Infraction, int64, error) {
 	var infractions []Infraction
-	res := DB.Where("guild_id = ? AND user_id = ?", guildID, userID).
+	res := DB.Order("timestamp desc").Where("guild_id = ? AND user_id = ?", guildID, userID).
 		Offset(offset).Limit(limit).Find(&infractions)
 	if res.Error != nil {
 		return nil, 0, res.Error

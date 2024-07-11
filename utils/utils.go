@@ -6,6 +6,7 @@ import (
 	"math"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -111,4 +112,11 @@ func ParseLongDuration(s string) (time.Duration, error) {
 	}
 
 	return duration, nil
+}
+func FormatFloatUpToPrec(num float64, prec int) string {
+	str := strconv.FormatFloat(num, 'f', prec, 64)
+	str = strings.TrimRight(str, "0")
+	str = strings.TrimSuffix(str, ".")
+
+	return str
 }

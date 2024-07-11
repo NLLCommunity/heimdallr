@@ -12,6 +12,7 @@ import (
 	"log/slog"
 	"math"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -115,7 +116,7 @@ func WarnHandler(e *handler.CommandEvent) error {
 		"guild", guild.Name,
 		"moderator", e.User().Username)
 
-	inf, err := model.CreateInfraction(guild.ID, user.ID, e.User().ID, reason, float32(severity), silent)
+	inf, err := model.CreateInfraction(guild.ID, user.ID, e.User().ID, reason, severity, silent)
 	if err != nil {
 		return fmt.Errorf("failed to create infraction: %w", err)
 	}
@@ -178,7 +179,7 @@ func WarnHandler(e *handler.CommandEvent) error {
 		SetContent(fmt.Sprintf("Warning sent to %s.", user.Mention())).Build())
 }
 
-func severityToColor(severity float32) int {
+func severityToColor(severity float64) int {
 	if severity >= 3.0 {
 		return 0xFF0000
 	}
@@ -213,33 +214,10 @@ func UserInfractionsHandler(e *handler.CommandEvent) error {
 		slog.Warn("No guild id found in event.", "guild", guild)
 		return ErrEventNoGuildID
 	}
-	infrData, err := getUserInfractions(guild.ID, user.ID, pageSize, 0)
+
+	message, err := getUserInfractionsAndMakeMessage(false, &guild, &user)
 	if err != nil {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to retrieve infractions.").
-			Build())
-	}
-
-	if infrData.TotalCount == 0 {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContent("You have no infractions.").
-			SetEphemeral(true).
-			Build())
-	}
-
-	message := discord.NewMessageCreateBuilder().
-		SetEphemeral(true).
-		SetEmbeds(infrData.Embeds...).
-		SetContentf("You have %d infractions. (Viewing %d-%d)\nTotal severity: %.2f",
-			infrData.TotalCount,
-			infrData.Offset+1,
-			infrData.Offset+infrData.CurrentCount,
-			infrData.TotalSeverity,
-		)
-
-	if infrData.Components != nil {
-		message.AddActionRow(infrData.Components...)
+		slog.Error("Error occurred getting infractions", "err", err)
 	}
 
 	return e.CreateMessage(message.Build())
@@ -258,31 +236,14 @@ func UserInfractionButtonHandler(e *handler.ComponentEvent) error {
 		return ErrEventNoGuildID
 	}
 
-	infrData, err := getUserInfractions(guild.ID, user.ID, pageSize, offset)
+	mcb, mub, err := getUserInfractionsAndUpdateMessage(false, offset, &guild, &user)
 	if err != nil {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to retrieve infractions.").
-			Build())
+		slog.Error("Error occurred getting infractions", "err", err)
 	}
-
-	if infrData.TotalCount == 0 {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("You have no infractions.").
-			SetEphemeral(true).
-			Build())
+	if mcb != nil {
+		return e.CreateMessage(mcb.Build())
 	}
-
-	return e.UpdateMessage(discord.NewMessageUpdateBuilder().
-		SetEmbeds(infrData.Embeds...).
-		AddActionRow(infrData.Components...).
-		SetContentf("You have %d infractions. (Viewing %d-%d)\nTotal severity: %.2f",
-			infrData.TotalCount,
-			infrData.Offset+1,
-			infrData.Offset+infrData.CurrentCount,
-			infrData.TotalSeverity).Build())
-
+	return e.UpdateMessage(mub.Build())
 }
 
 //░▀█▀░█▀█░█▀▀░█▀▄░█▀█░█▀▀░▀█▀░▀█▀░█▀█░█▀█░█▀▀░░░▄▀░░█▄█░█▀█░█▀▄░▀▄░
@@ -363,34 +324,9 @@ func InfractionsListHandler(e *handler.CommandEvent) error {
 		return ErrEventNoGuildID
 	}
 
-	infrData, err := getUserInfractions(guild.ID, user.ID, pageSize, 0)
+	message, err := getUserInfractionsAndMakeMessage(true, &guild, &user)
 	if err != nil {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to retrieve infractions.").
-			Build())
-	}
-
-	if infrData.TotalCount == 0 {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			SetEphemeral(true).
-			SetContentf("%s has no infractions.", user.Mention()).
-			Build())
-	}
-
-	message := discord.NewMessageCreateBuilder().
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		SetEmbeds(infrData.Embeds...).
-		SetContentf("%s has %d infractions. (Viewing %d-%d)\nTotal severity: %.2f",
-			user.Mention(),
-			infrData.TotalCount,
-			infrData.Offset+1,
-			infrData.Offset+infrData.CurrentCount,
-			infrData.TotalSeverity)
-
-	if infrData.Components != nil {
-		message.AddActionRow(infrData.Components...)
+		slog.Error("Error occurred getting infractions", "err", err)
 	}
 
 	return e.CreateMessage(message.Build())
@@ -451,43 +387,14 @@ func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
 			Build())
 	}
 
-	infrData, err := getUserInfractions(guild.ID, userID, pageSize, offset)
+	mcb, mub, err := getUserInfractionsAndUpdateMessage(false, offset, &guild, user)
 	if err != nil {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContent("Failed to retrieve infractions.").
-			SetEphemeral(true).
-			Build())
+		slog.Error("Error occurred getting infractions", "err", err)
 	}
-
-	if infrData.TotalCount == 0 {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			SetContentf("%s has no infractions. You shouldn't be able to navigate to this, though?", user.Mention()).
-			SetEphemeral(true).
-			Build())
+	if mcb != nil {
+		return e.CreateMessage(mcb.Build())
 	}
-
-	if infrData.CurrentCount == 0 {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContent("No more infractions to show.").
-			SetEphemeral(true).
-			Build())
-	}
-
-	message := discord.NewMessageUpdateBuilder().
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		ClearEmbeds().
-		ClearContainerComponents().
-		SetEmbeds(infrData.Embeds...).
-		SetContentf("%s has %d infractions. (Viewing %d-%d)\nTotal severity: %.2f",
-			user.Mention(),
-			infrData.TotalCount,
-			infrData.Offset+1,
-			infrData.Offset+infrData.CurrentCount,
-			infrData.TotalSeverity).
-		AddActionRow(infrData.Components...)
-
-	return e.UpdateMessage(message.Build())
+	return e.UpdateMessage(mub.Build())
 }
 
 //░█░█░▀█▀░▀█▀░█░░░▀█▀░▀█▀░█░█░░░█▀▀░▀█▀░█▀▄░█░█░█▀▀░▀█▀░█▀▀░░░█░█▀▀░█░█░█▀█░█▀▀░█▀▀
@@ -526,10 +433,10 @@ func getUserInfractions(guildID, userID snowflake.ID, limit, offset int) (userIn
 	severity := 0.0
 	for _, inf := range allInfractions {
 		diff := time.Since(inf.CreatedAt)
-		severity += utils.CalcHalfLife(diff, guildSettings.InfractionHalfLifeDays, float64(inf.Weight))
+		severity += utils.CalcHalfLife(diff, guildSettings.InfractionHalfLifeDays, inf.Weight)
 	}
 
-	embeds := createInfractionEmbeds(infractions)
+	embeds := createInfractionEmbeds(infractions, guildSettings)
 
 	var components []discord.InteractiveComponent
 	slog.Info("Count is", "count", count)
@@ -567,18 +474,142 @@ func getUserInfractions(guildID, userID snowflake.ID, limit, offset int) (userIn
 	}, nil
 }
 
-func createInfractionEmbeds(infractions []model.Infraction) []discord.Embed {
+func createInfractionEmbeds(infractions []model.Infraction, guildSettings *model.GuildSettings) []discord.Embed {
 	var embeds []discord.Embed
 
 	for _, inf := range infractions {
+		weightWithHalfLife := utils.CalcHalfLife(
+			time.Since(inf.CreatedAt),
+			utils.Iif(guildSettings == nil, 0.0, guildSettings.InfractionHalfLifeDays),
+			inf.Weight)
+
 		embed := discord.NewEmbedBuilder().
 			SetTitlef("Infraction `%s`", inf.Sqid()).
 			SetDescription(inf.Reason).
 			SetColor(severityToColor(inf.Weight)).
 			SetTimestamp(inf.Timestamp).
-			AddField("Severity", fmt.Sprintf("%.4g", inf.Weight), true)
+			AddField("Strikes",
+				fmt.Sprintf("%s (%s)\n(at warn time: %s)",
+					severityToDots(weightWithHalfLife),
+					utils.FormatFloatUpToPrec(weightWithHalfLife, 2),
+					utils.FormatFloatUpToPrec(inf.Weight, 2),
+				), true)
 
 		embeds = append(embeds, embed.Build())
 	}
 	return embeds
+}
+
+func severityToDots(severity float64) string {
+	severityFloor := math.Floor(severity)
+
+	dots := ""
+	severityInt := int(severityFloor)
+	dots += strings.Repeat("●", severityInt)
+
+	remaining := severity - severityFloor
+	if remaining >= 0.0 && remaining < 0.125 {
+		dots += "○"
+	} else if remaining >= 0.125 && remaining < 0.375 {
+		dots += "◔"
+	} else if remaining >= 0.375 && remaining < 0.625 {
+		dots += "◑"
+	} else if remaining >= 0.625 && remaining < 0.875 {
+		dots += "◕"
+	} else if remaining >= 0.875 {
+		dots += "●"
+	}
+
+	if dots == "" {
+		dots = "○"
+	}
+
+	return dots
+}
+
+func getUserInfractionsAndMakeMessage(
+	modView bool,
+	guild *discord.Guild, user *discord.User,
+) (*discord.MessageCreateBuilder, error) {
+	infrData, err := getUserInfractions(guild.ID, user.ID, pageSize, 0)
+	if err != nil {
+		return discord.NewMessageCreateBuilder().
+				SetEphemeral(true).
+				SetContent("Failed to retrieve infractions."),
+			fmt.Errorf("failed to get user infractions: %w", err)
+	}
+
+	if infrData.TotalCount == 0 {
+		return discord.NewMessageCreateBuilder().
+				SetAllowedMentions(&discord.AllowedMentions{}).
+				SetEphemeral(true).
+				SetContentf("%s has no infractions.", user.Mention()),
+			nil
+	}
+
+	modText := fmt.Sprintf("%s has %d infractions.",
+		user.Mention(),
+		infrData.TotalCount)
+	userText := fmt.Sprintf("You have %d infractions.",
+		infrData.TotalCount)
+
+	message := discord.NewMessageCreateBuilder().
+		SetEphemeral(true).
+		SetAllowedMentions(&discord.AllowedMentions{}).
+		SetEmbeds(infrData.Embeds...).
+		SetContentf("%s (Viewing %d-%d)\nTotal strikes: %s",
+			utils.Iif(modView, modText, userText),
+			infrData.Offset+1,
+			infrData.Offset+infrData.CurrentCount,
+			fmt.Sprintf("%s (%s)",
+				severityToDots(infrData.TotalSeverity),
+				utils.FormatFloatUpToPrec(infrData.TotalSeverity, 2),
+			))
+
+	if infrData.Components != nil {
+		message.AddActionRow(infrData.Components...)
+	}
+
+	return message, nil
+}
+
+func getUserInfractionsAndUpdateMessage(
+	modView bool, offset int,
+	guild *discord.Guild, user *discord.User,
+) (mcb *discord.MessageCreateBuilder, mub *discord.MessageUpdateBuilder, err error) {
+
+	infrData, err := getUserInfractions(guild.ID, user.ID, pageSize, offset)
+	if err != nil {
+		mcb = discord.NewMessageCreateBuilder().
+			SetEphemeral(true).
+			SetContent("Failed to retrieve infractions.")
+		return
+	}
+
+	if infrData.TotalCount == 0 {
+		mcb = discord.NewMessageCreateBuilder().
+			SetEphemeral(true).
+			SetContent("You have no infractions.").
+			SetEphemeral(true)
+		return
+	}
+
+	modText := fmt.Sprintf("%s has %d infractions.",
+		user.Mention(),
+		infrData.TotalCount)
+	userText := fmt.Sprintf("You have %d infractions.",
+		infrData.TotalCount)
+
+	mub = discord.NewMessageUpdateBuilder().
+		SetEmbeds(infrData.Embeds...).
+		AddActionRow(infrData.Components...).
+		SetContentf("%s (Viewing %d-%d)\nTotal strikes: %s",
+			utils.Iif(modView, modText, userText),
+			infrData.Offset+1,
+			infrData.Offset+infrData.CurrentCount,
+			fmt.Sprintf("%s (%s)",
+				severityToDots(infrData.TotalSeverity),
+				utils.FormatFloatUpToPrec(infrData.TotalSeverity, 2),
+			))
+	return
 }
