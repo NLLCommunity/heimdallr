@@ -78,8 +78,8 @@ func main() {
 		r.Modal("/leave-message/modal", commands.AdminLeaveMessageModalHandler)
 	})
 
-	r.Command("/approve", commands.ApproveUserHandler)
-	r.Command("/approve-user", commands.ApproveHandler)
+	r.Command("/Approve", commands.ApproveUserCommandHandler)
+	r.Command("/approve", commands.ApproveSlashCommandHandler)
 
 	r.Command("/kick/with-message", commands.KickWithMessageHandler)
 	r.Command("/ban/with-message", commands.BanWithMessageHandler)
@@ -93,7 +93,7 @@ func main() {
 		commands.AdminCommand,
 		commands.KickCommand,
 		commands.BanCommand,
-		commands.ApproveCommand,
+		commands.ApproveSlashCommand,
 		commands.ApproveUserCommand,
 	}
 

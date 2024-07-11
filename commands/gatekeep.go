@@ -12,13 +12,13 @@ import (
 )
 
 var ApproveUserCommand = discord.UserCommandCreate{
-	Name:                     "approve",
+	Name:                     "Approve",
 	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
 	DMPermission:             utils.Ref(false),
 }
 
-var ApproveCommand = discord.SlashCommandCreate{
-	Name:                     "approve-user",
+var ApproveSlashCommand = discord.SlashCommandCreate{
+	Name:                     "approve",
 	Description:              "Approve a user to join the server",
 	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
 	DMPermission:             utils.Ref(false),
@@ -32,8 +32,8 @@ var ApproveCommand = discord.SlashCommandCreate{
 	},
 }
 
-func ApproveUserHandler(e *handler.CommandEvent) error {
-	slog.Info("`approve` user command called.",
+func ApproveUserCommandHandler(e *handler.CommandEvent) error {
+	slog.Info("`Approve` user command called.",
 		"guild_id", utils.Iif(e.GuildID() == nil, "<null>", e.GuildID().String()))
 	guild, inGuild := e.Guild()
 	if !inGuild {
@@ -44,8 +44,8 @@ func ApproveUserHandler(e *handler.CommandEvent) error {
 	return approvedInnerHandler(e, guild, member)
 }
 
-func ApproveHandler(e *handler.CommandEvent) error {
-	slog.Info("`approve-user` slash command called.",
+func ApproveSlashCommandHandler(e *handler.CommandEvent) error {
+	slog.Info("`approve` slash command called.",
 		"guild_id", utils.Iif(e.GuildID() == nil, "<null>", e.GuildID().String()))
 	guild, inGuild := e.Guild()
 	if !inGuild {
