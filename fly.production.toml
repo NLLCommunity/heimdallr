@@ -2,7 +2,7 @@ app = "heimdallr"
 primary_region = "iad"
 
 [build]
-dockerfile = ".fly/Dockerfile"
+dockerfile = "_fly/Dockerfile"
 
 [[vm]]
 size = "shared-cpu-2x"

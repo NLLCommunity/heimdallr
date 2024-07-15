@@ -7,7 +7,7 @@ app = 'heimdallr-test'
 primary_region = 'iad'
 
 [build]
-  dockerfile = ".fly/Dockerfile"
+  dockerfile = "_fly/Dockerfile"
 
 [env]
   HEIMDALLR_DEV_MODE_EANBLED = "true"
