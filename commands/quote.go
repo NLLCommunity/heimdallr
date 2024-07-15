@@ -87,13 +87,13 @@ func QuoteHandler(e *handler.CommandEvent) error {
 		msg := fmt.Sprintf("message by %s", ref.Author.Mention())
 		if ref.Content != "" {
 			msg = fmt.Sprintf("%s:\n", ref.Author.Mention())
-			if len(ref.Content) > 100 {
-				msg += addQuoteToMessage(ref.Content[:97] + "...")
+			if len(ref.Content) > 140 {
+				msg += addQuoteToMessage(ref.Content[:137] + "...")
 			} else {
 				msg += addQuoteToMessage(ref.Content)
 			}
 		}
-		msg += fmt.Sprintf("\n\n[[jump to](%s)]", ref.JumpURL())
+		msg += fmt.Sprintf("\n%s", ref.JumpURL())
 
 		embed.AddField("Reply to", msg, false)
 	}
