@@ -122,7 +122,6 @@ func QuoteHandler(e *handler.CommandEvent) error {
 }
 
 func userCanReadChannelMessages(userID, channelID snowflake.ID, client bot.Client) (bool, error) {
-	fmt.Println("Checking permissions")
 	channel, err := client.Rest().GetChannel(channelID)
 	if err != nil {
 		return false, fmt.Errorf("failed to get channel: %w", err)
