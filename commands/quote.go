@@ -44,11 +44,27 @@ var QuoteCommand = discord.SlashCommandCreate{
 			},
 			Required: true,
 		},
+		discord.ApplicationCommandOptionBool{
+			Name: "show-reply-to",
+			NameLocalizations: map[discord.Locale]string{
+				discord.LocaleNorwegian: "vis-svar-til",
+			},
+			Description: "Whether to show and link the message that the quoted message replies to. (Default: true)",
+			DescriptionLocalizations: map[discord.Locale]string{
+				discord.LocaleNorwegian: "Om du vil vise og lenke til meldingen som sitatet er et svar til. (Standard er å vise)",
+			},
+			Required: false,
+		},
 	},
 }
 
 func QuoteHandler(e *handler.CommandEvent) error {
 	url := e.SlashCommandInteractionData().String("link")
+	showReplyTo, isSet := e.SlashCommandInteractionData().OptBool("show-reply-to")
+	if !isSet {
+		showReplyTo = true
+	}
+
 	parts, err := parseMessageLink(url)
 	if err != nil {
 		_ = respondWithContentEph(e, "Invalid message link.")
@@ -81,7 +97,7 @@ func QuoteHandler(e *handler.CommandEvent) error {
 		}
 		embed.AddField("Attachments", strings.Join(lines, "\n"), false)
 	}
-	if message.ReferencedMessage != nil {
+	if message.ReferencedMessage != nil && showReplyTo {
 		ref := message.ReferencedMessage
 
 		msg := fmt.Sprintf("message by %s", ref.Author.Mention())
