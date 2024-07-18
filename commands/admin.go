@@ -148,14 +148,15 @@ func AdminInfoHandler(e *handler.CommandEvent) error {
 	return e.CreateMessage(discord.NewMessageCreateBuilder().
 		SetContent(message).
 		SetEphemeral(true).
-		AddActionRow(discord.NewPrimaryButton("Display for everyone", "/admin/info/show-for-all")).
+		AddActionRow(discord.NewPrimaryButton("Display for everyone", "/admin/show-all-button")).
 		SetAllowedMentions(&discord.AllowedMentions{}).
 		Build())
 }
 
-func AdminInfoShowForAllHandler(e *handler.ComponentEvent) error {
+func AdminShowAllButtonHandler(e *handler.ComponentEvent) error {
 	return e.CreateMessage(discord.NewMessageCreateBuilder().
 		SetContent(e.Message.Content).
+		SetEmbeds(e.Message.Embeds...).
 		SetAllowedMentions(&discord.AllowedMentions{}).
 		Build())
 }
