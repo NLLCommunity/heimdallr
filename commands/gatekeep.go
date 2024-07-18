@@ -1,9 +1,11 @@
 package commands
 
 import (
+	"fmt"
 	"github.com/cbroglie/mustache"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
+	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/json"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/myrkvi/heimdallr/model"
@@ -84,7 +86,10 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 	}
 
 	if guildSettings.GatekeepApprovedRole != 0 {
-		err = e.Client().Rest().AddMemberRole(guild.ID, member.User.ID, guildSettings.GatekeepApprovedRole)
+		err = e.Client().Rest().AddMemberRole(guild.ID, member.User.ID,
+			guildSettings.GatekeepApprovedRole,
+			rest.WithReason(fmt.Sprintf("Gatekeep approved by: %s (%s)", e.User().Username, e.User().ID)),
+		)
 		if err != nil {
 			slog.Warn("Failed to add approved role to user",
 				"guild_id", guild.ID,
@@ -94,7 +99,10 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		}
 	}
 	if guildSettings.GatekeepPendingRole != 0 {
-		err = e.Client().Rest().RemoveMemberRole(guild.ID, member.User.ID, guildSettings.GatekeepPendingRole)
+		err = e.Client().Rest().RemoveMemberRole(guild.ID, member.User.ID,
+			guildSettings.GatekeepPendingRole,
+			rest.WithReason(fmt.Sprintf("Gatekeep approved by: %s (%s)", e.User().Username, e.User().ID)),
+		)
 		if err != nil {
 			slog.Warn("Failed to remove pending role from user",
 				"guild_id", guild.ID,
