@@ -45,3 +45,17 @@ func NewMessageTemplateData(user discord.Member, guild discord.Guild) MessageTem
 		},
 	}
 }
+
+var MessageTemplateInfo = "The following placeholders can be used in join/leave/approval messages " +
+	"and will be replaced with the appropriate values." +
+	"\n" +
+	"\n" +
+	"**Username:** `{{User.Username}}` will show as \"Username#1234\" or  \"username\"\n" +
+	"**Global name:** `{{User.GlobalName}}` will show the user's global display name\n" +
+	"**Server name:** `{{User.ServerName}}` will show the user's server nickname, if any\n" +
+	"**Resolved name:** `{{User.ResolvedName}}` will show the user's resolved name, which is" +
+	"the server nickname if set, otherwise the global name, or username if neither is set\n" +
+	"**Mention:** `{{User.Mention}}` will mention the user if it is used\n" +
+	"**User ID:** `{{User.ID}}` will show the user's ID\n" +
+	"**Server name:** `{{Server.Name}}` will show the server name\n" +
+	"**Server ID:** `{{Server.ID}}` will show the server ID\n"

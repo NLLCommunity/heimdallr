@@ -386,8 +386,13 @@ func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
 		SetDescription(settings.GatekeepApprovedMessage).
 		Build()
 
+	templateInfoEmbed := discord.NewEmbedBuilder().
+		SetTitle("Placeholder values").
+		SetDescription(utils.MessageTemplateInfo).
+		Build()
+
 	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetEmbeds(embed).
+		SetEmbeds(embed, templateInfoEmbed).
 		AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/gatekeep-message/button")).
 		SetAllowedMentions(&discord.AllowedMentions{}).
 		SetEphemeral(true).
@@ -514,8 +519,13 @@ func AdminJoinMessageHandler(e *handler.CommandEvent) error {
 		SetDescription(settings.JoinMessage).
 		Build()
 
+	templateInfoEmbed := discord.NewEmbedBuilder().
+		SetTitle("Placeholder values").
+		SetDescription(utils.MessageTemplateInfo).
+		Build()
+
 	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetEmbeds(embed).
+		SetEmbeds(embed, templateInfoEmbed).
 		AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/join-message/button")).
 		SetAllowedMentions(&discord.AllowedMentions{}).
 		SetEphemeral(true).
@@ -582,8 +592,13 @@ func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
 		SetDescription(settings.LeaveMessage).
 		Build()
 
+	templateInfoEmbed := discord.NewEmbedBuilder().
+		SetTitle("Placeholder values").
+		SetDescription(utils.MessageTemplateInfo).
+		Build()
+
 	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetEmbeds(embed).
+		SetEmbeds(embed, templateInfoEmbed).
 		AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/leave-message/button")).
 		SetAllowedMentions(&discord.AllowedMentions{}).
 		SetEphemeral(true).
