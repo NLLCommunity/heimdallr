@@ -14,7 +14,7 @@ primary_region = 'iad'
   HEIMDALLR_BOT_DB = "/litefs/heimdallr-test.db"
 
 [[vm]]
-  size = 'shared-cpu-2x'
+  size = 'shared-cpu-1x'
 
 [mounts]
  source = "litefs"
