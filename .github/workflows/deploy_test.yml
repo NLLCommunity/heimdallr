@@ -1,27 +1,16 @@
 name: Deploy to test
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["Lint and Build"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
 jobs:
-  lint:
-    name: GolangCi-Lint
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-          cache: false
-      - name: GolangCi-Lint
-        uses: golangci/golangci-lint-action@v6.0.1
-        with:
-          version: v1.59.1
-          args: --timeout=5m
   deploy:
     name: Deploy app
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
-    needs: [lint]
     concurrency: deploy-group    # optional: ensure only one action runs at a time
     steps:
       - uses: actions/checkout@v4
