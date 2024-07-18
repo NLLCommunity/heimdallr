@@ -67,6 +67,13 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		return err
 	}
 
+	if !guildSettings.GatekeepEnabled {
+		return e.CreateMessage(discord.NewMessageCreateBuilder().
+			SetContentf("Gatekeep is not enabled in this server.").
+			SetEphemeral(true).
+			Build())
+	}
+
 	hasApprovedRole := false
 	hasPendingRole := false
 	for _, roleID := range member.RoleIDs {
@@ -114,7 +121,10 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 
 	if guildSettings.GatekeepApprovedMessage == "" {
 		slog.Info("No approved message set; not sending message.")
-		return nil
+		return e.CreateMessage(discord.NewMessageCreateBuilder().
+			SetContentf("No approved message set; not sending message. Roles have been set.").
+			SetEphemeral(true).
+			Build())
 	}
 
 	channel := guildSettings.JoinLeaveChannel

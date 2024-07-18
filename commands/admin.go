@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"github.com/cbroglie/mustache"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/json"
@@ -438,6 +439,14 @@ func AdminGatekeepMessageModalHandler(e *handler.ModalEvent) error {
 		return err
 	}
 
+	_, err = mustache.RenderRaw(message, true, utils.MessageTemplateData{})
+	if err != nil {
+		return e.CreateMessage(discord.NewMessageCreateBuilder().
+			SetContentf("The message contains data that is invalid; this may be caused by invalid placeholders.").
+			SetEphemeral(true).
+			Build())
+	}
+
 	settings.GatekeepApprovedMessage = message
 
 	err = model.SetGuildSettings(settings)
@@ -562,6 +571,14 @@ func AdminJoinMessageModalHandler(e *handler.ModalEvent) error {
 		return err
 	}
 
+	_, err = mustache.RenderRaw(message, true, utils.MessageTemplateData{})
+	if err != nil {
+		return e.CreateMessage(discord.NewMessageCreateBuilder().
+			SetContentf("The message contains data that is invalid; this may be caused by invalid placeholders.").
+			SetEphemeral(true).
+			Build())
+	}
+
 	settings.JoinMessage = message
 
 	err = model.SetGuildSettings(settings)
@@ -633,6 +650,14 @@ func AdminLeaveMessageModalHandler(e *handler.ModalEvent) error {
 	settings, err := model.GetGuildSettings(guild.ID)
 	if err != nil {
 		return err
+	}
+
+	_, err = mustache.RenderRaw(message, true, utils.MessageTemplateData{})
+	if err != nil {
+		return e.CreateMessage(discord.NewMessageCreateBuilder().
+			SetContentf("The message contains data that is invalid; this may be caused by invalid placeholders.").
+			SetEphemeral(true).
+			Build())
 	}
 
 	settings.LeaveMessage = message
