@@ -142,7 +142,8 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 	}
 	_, err = e.Client().Rest().CreateMessage(channel,
 		discord.NewMessageCreateBuilder().
-			SetContent(contents).
+			SetContent(contents+
+				fmt.Sprintf("\n\n-# Approved by %s", e.User().Mention())).
 			SetAllowedMentions(&discord.AllowedMentions{
 				Users: []snowflake.ID{member.User.ID},
 			}).
