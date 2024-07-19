@@ -156,6 +156,6 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 	}
 	return e.CreateMessage(discord.NewMessageCreateBuilder().
 		SetEphemeral(true).
-		SetContent("Message sent!").
+		SetContent("User has been approved!").
 		Build())
 }
