@@ -125,6 +125,7 @@ func WarnHandler(e *handler.CommandEvent) error {
 
 	if inf.Silent {
 		err = e.CreateMessage(discord.NewMessageCreateBuilder().
+			SetEphemeral(true).
 			SetContent(fmt.Sprintf("A silent warning has been added for %s", user.Mention())).Build())
 		if err != nil {
 			slog.Error("Failed to respond to 'warn' command interaction.",
