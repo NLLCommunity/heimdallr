@@ -111,6 +111,8 @@ func main() {
 		bot.WithEventListenerFunc(listeners.TestEvent),
 		bot.WithEventListenerFunc(listeners.OnUserJoin),
 		bot.WithEventListenerFunc(listeners.OnUserLeave),
+		bot.WithEventListenerFunc(listeners.OnMemberBan),
+		bot.WithEventListenerFunc(listeners.OnAuditLog),
 		bot.WithGatewayConfigOpts(gateway.WithIntents(gateway.IntentsAll)),
 		bot.WithCacheConfigOpts(
 			cache.WithCaches(cache.FlagsAll),
