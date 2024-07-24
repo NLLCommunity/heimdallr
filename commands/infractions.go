@@ -284,7 +284,18 @@ var InfractionsCommand = discord.SlashCommandCreate{
 					DescriptionLocalizations: map[discord.Locale]string{
 						discord.LocaleNorwegian: "Brukeren du vil se advarsler for.",
 					},
-					Required: true,
+					Required: false,
+				},
+				discord.ApplicationCommandOptionString{
+					Name: "user-id",
+					NameLocalizations: map[discord.Locale]string{
+						discord.LocaleNorwegian: "bruker-id",
+					},
+					Description: "The ID of the user user to view warnings for.",
+					DescriptionLocalizations: map[discord.Locale]string{
+						discord.LocaleNorwegian: "ID-en til brukeren du vil se advarsler for.",
+					},
+					Required: false,
 				},
 			},
 		},
@@ -318,7 +329,38 @@ var InfractionsCommand = discord.SlashCommandCreate{
 // InfractionsListHandler handles the `/infractions list` command.
 func InfractionsListHandler(e *handler.CommandEvent) error {
 	data := e.SlashCommandInteractionData()
-	user := data.User("user")
+	user, hasUser := data.OptUser("user")
+	userIDString, hasUserID := data.OptString("user-id")
+	userID, err := snowflake.Parse(userIDString)
+	if err != nil {
+		return fmt.Errorf("failed to parse user id: %w", err)
+	}
+
+	if !hasUser && !hasUserID {
+		return e.CreateMessage(discord.NewMessageCreateBuilder().
+			SetContent("You must specify either a user or a user ID.").
+			SetEphemeral(true).
+			Build())
+	}
+
+	if hasUser && hasUserID {
+		return e.CreateMessage(discord.NewMessageCreateBuilder().
+			SetContent("You can only specify either a user or a user ID.").
+			SetEphemeral(true).
+			Build())
+	}
+
+	if !hasUser {
+		userRef, err := e.Client().Rest().GetUser(userID)
+		if err != nil || userRef == nil {
+			user = discord.User{
+				ID:       userID,
+				Username: "unknown_user",
+			}
+		} else {
+			user = *userRef
+		}
+	}
 	guild, ok := e.Guild()
 	if !ok {
 		slog.Warn("No guild id found in event.", "guild", guild)
