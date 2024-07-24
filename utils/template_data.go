@@ -38,6 +38,7 @@ func NewMessageTemplateData(user discord.Member, guild discord.Guild) MessageTem
 			ServerName:   RefDefault(user.Nick, ""),
 			ResolvedName: user.EffectiveName(),
 			Mention:      user.Mention(),
+			ID:           user.User.ID,
 		},
 		Server: TemplateGuildData{
 			Name: guild.Name,
