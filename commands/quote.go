@@ -59,6 +59,12 @@ var QuoteCommand = discord.SlashCommandCreate{
 }
 
 func QuoteHandler(e *handler.CommandEvent) error {
+	var guildID snowflake.ID
+	if e.GuildID() != nil {
+		guildID = *e.GuildID()
+	} else {
+		return ErrEventNoGuildID
+	}
 	url := e.SlashCommandInteractionData().String("link")
 	showReplyTo, isSet := e.SlashCommandInteractionData().OptBool("show-reply-to")
 	if !isSet {
@@ -69,6 +75,10 @@ func QuoteHandler(e *handler.CommandEvent) error {
 	if err != nil {
 		_ = respondWithContentEph(e, "Invalid message link.")
 		return err
+	}
+
+	if parts.GuildId != guildID {
+		return respondWithContentEph(e, "Message link is not in this server.")
 	}
 
 	message, err := e.Client().Rest().GetMessage(parts.ChannelId, parts.MessageId)
