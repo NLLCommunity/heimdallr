@@ -328,13 +328,10 @@ var InfractionsCommand = discord.SlashCommandCreate{
 
 // InfractionsListHandler handles the `/infractions list` command.
 func InfractionsListHandler(e *handler.CommandEvent) error {
+	slog.Info("interaction `/infractions list` called.")
 	data := e.SlashCommandInteractionData()
 	user, hasUser := data.OptUser("user")
 	userIDString, hasUserID := data.OptString("user-id")
-	userID, err := snowflake.Parse(userIDString)
-	if err != nil {
-		return fmt.Errorf("failed to parse user id: %w", err)
-	}
 
 	if !hasUser && !hasUserID {
 		return e.CreateMessage(discord.NewMessageCreateBuilder().
@@ -351,6 +348,15 @@ func InfractionsListHandler(e *handler.CommandEvent) error {
 	}
 
 	if !hasUser {
+		userID, err := snowflake.Parse(userIDString)
+		if err != nil {
+			_ = e.CreateMessage(discord.NewMessageCreateBuilder().
+				SetContent("Failed to parse user id.").
+				SetEphemeral(true).
+				Build())
+			return fmt.Errorf("failed to parse user id: %w", err)
+		}
+
 		userRef, err := e.Client().Rest().GetUser(userID)
 		if err != nil || userRef == nil {
 			user = discord.User{
