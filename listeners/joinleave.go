@@ -1,12 +1,13 @@
 package listeners
 
 import (
+	"log/slog"
+
 	"github.com/cbroglie/mustache"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/utils"
-	"log/slog"
 )
 
 func OnUserJoin(e *events.GuildMemberJoin) {

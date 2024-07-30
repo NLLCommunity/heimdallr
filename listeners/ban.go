@@ -2,6 +2,7 @@ package listeners
 
 import (
 	"fmt"
+
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/myrkvi/heimdallr/model"

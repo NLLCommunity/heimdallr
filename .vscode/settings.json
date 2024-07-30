@@ -1,0 +1,16 @@
+{
+  "editor.rulers": [80, 120],
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "[go]": {
+    "editor.rulers": [100, 120],
+    "editor.defaultFormatter": "golang.go"
+  },
+  "[toml]": {
+    "editor.rulers": [],
+    "editor.defaultFormatter": "tamasfe.even-better-toml"
+  },
+  "[markdown]": {
+    "editor.rulers": []
+  }
+}

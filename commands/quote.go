@@ -3,16 +3,17 @@ package commands
 import (
 	"errors"
 	"fmt"
+	"math"
+	"regexp"
+	"slices"
+	"strings"
+
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/json"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/myrkvi/heimdallr/utils"
-	"math"
-	"regexp"
-	"slices"
-	"strings"
 )
 
 var quoteUrlRegex = regexp.MustCompile(

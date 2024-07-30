@@ -1,9 +1,10 @@
 package listeners
 
 import (
+	"log/slog"
+
 	"github.com/disgoorg/disgo/events"
 	"github.com/myrkvi/heimdallr/model"
-	"log/slog"
 )
 
 func OnGatekeepUserJoin(e *events.GuildMemberJoin) {

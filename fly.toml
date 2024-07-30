@@ -7,15 +7,15 @@ app = 'heimdallr-test'
 primary_region = 'iad'
 
 [build]
-  dockerfile = "_fly/Dockerfile"
+dockerfile = "_fly/Dockerfile"
 
 [env]
-  HEIMDALLR_DEV_MODE_EANBLED = "true"
-  HEIMDALLR_BOT_DB = "/litefs/heimdallr-test.db"
+HEIMDALLR_DEV_MODE_EANBLED = "true"
+HEIMDALLR_BOT_DB = "/litefs/heimdallr-test.db"
 
 [[vm]]
-  size = 'shared-cpu-1x'
+size = 'shared-cpu-1x'
 
 [mounts]
- source = "litefs"
- destination = "/var/lib/litefs"
+source = "litefs"
+destination = "/var/lib/litefs"

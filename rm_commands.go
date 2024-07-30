@@ -2,10 +2,11 @@ package main
 
 import (
 	"context"
+	"log/slog"
+
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/snowflake/v2"
-	"log/slog"
 )
 
 func rmCommands(token string, global bool, guildID uint64) {

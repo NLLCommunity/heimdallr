@@ -1,9 +1,10 @@
 package model
 
 import (
+	"time"
+
 	"github.com/disgoorg/snowflake/v2"
 	"gorm.io/gorm/clause"
-	"time"
 )
 
 type TempBan struct {

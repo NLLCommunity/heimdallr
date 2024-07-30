@@ -1,10 +1,11 @@
 package model
 
 import (
+	"log/slog"
+
 	"github.com/glebarez/sqlite"
 	"github.com/sqids/sqids-go"
 	"gorm.io/gorm"
-	"log/slog"
 )
 
 var sqidGen *sqids.Sqids

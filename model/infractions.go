@@ -2,9 +2,10 @@ package model
 
 import (
 	"errors"
+	"time"
+
 	"github.com/disgoorg/snowflake/v2"
 	"gorm.io/gorm"
-	"time"
 )
 
 type Infraction struct {

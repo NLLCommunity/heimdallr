@@ -1,8 +1,9 @@
 package model
 
 import (
-	"github.com/disgoorg/snowflake/v2"
 	"time"
+
+	"github.com/disgoorg/snowflake/v2"
 )
 
 type GuildSettings struct {

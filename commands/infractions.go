@@ -3,17 +3,18 @@ package commands
 import (
 	"context"
 	"fmt"
+	"log/slog"
+	"math"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/json"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/utils"
-	"log/slog"
-	"math"
-	"strconv"
-	"strings"
-	"time"
 )
 
 // pageSize is the size of one page of infractions

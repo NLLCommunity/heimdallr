@@ -2,6 +2,8 @@ package commands
 
 import (
 	"fmt"
+	"log/slog"
+
 	"github.com/cbroglie/mustache"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
@@ -10,7 +12,6 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/utils"
-	"log/slog"
 )
 
 var ApproveUserCommand = discord.UserCommandCreate{
