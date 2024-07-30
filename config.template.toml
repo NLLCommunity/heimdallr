@@ -1,0 +1,9 @@
+# Copy to config.toml and fill in the values
+
+[bot]
+db = "heimdallr.db"              # Path to SQLite database
+token = "INSERT_YOUR_TOKEN_HERE" # Discord bot token
+
+[dev_mode]
+enabled = true # Enable or disable developer mode
+guild_id = 0   # Guild ID to use for developer mode

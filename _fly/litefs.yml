@@ -24,7 +24,6 @@ proxy:
   target: "localhost:8081"
   db: "heimdallr.db"
 
-
 # This section defines a list of commands to run after LiteFS has connected
 # and sync'd with the cluster. You can run multiple commands but LiteFS expects
 # the last command to be long-running (e.g. an application server). When the

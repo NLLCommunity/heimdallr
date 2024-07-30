@@ -4,6 +4,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"log/slog"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/cache"
@@ -18,10 +23,6 @@ import (
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/scheduled_tasks"
 	"github.com/spf13/viper"
-	"log/slog"
-	"os"
-	"os/signal"
-	"syscall"
 )
 
 var rmGlobalCommands = flag.Bool("rm-global-commands", false, "Remove global commands")

@@ -2,13 +2,14 @@ package commands
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/json"
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/utils"
-	"time"
 )
 
 var BanCommand = discord.SlashCommandCreate{

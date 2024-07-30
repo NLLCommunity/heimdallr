@@ -2,12 +2,13 @@ package scheduled_tasks
 
 import (
 	"context"
+	"log/slog"
+	"time"
+
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/task"
-	"log/slog"
-	"time"
 )
 
 func RemoveTempBansScheduledTask(client bot.Client) task.Task {

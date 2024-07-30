@@ -2,11 +2,12 @@ package listeners
 
 import (
 	"fmt"
+	"log/slog"
+
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/utils"
-	"log/slog"
 )
 
 func OnAuditLog(e *events.GuildAuditLogEntryCreate) {

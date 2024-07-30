@@ -2,12 +2,13 @@ package listeners
 
 import (
 	"fmt"
+	"math"
+	"time"
+
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/utils"
-	"math"
-	"time"
 )
 
 func OnWarnedUserJoin(e *events.GuildMemberJoin) {

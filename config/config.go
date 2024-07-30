@@ -2,9 +2,10 @@ package config
 
 import (
 	"errors"
-	"github.com/spf13/viper"
 	"log/slog"
 	"strings"
+
+	"github.com/spf13/viper"
 )
 
 func init() {
