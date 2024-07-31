@@ -18,6 +18,7 @@ import (
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/myrkvi/heimdallr/commands"
+	"github.com/myrkvi/heimdallr/components"
 	_ "github.com/myrkvi/heimdallr/config"
 	"github.com/myrkvi/heimdallr/listeners"
 	"github.com/myrkvi/heimdallr/model"
@@ -85,6 +86,10 @@ func main() {
 	r.Command("/kick/with-message", commands.KickWithMessageHandler)
 	r.Command("/ban/with-message", commands.BanWithMessageHandler)
 	r.Command("/ban/until", commands.BanUntilHandler)
+
+	r.Command("/create-role-button", commands.CreateRoleButtonHandler)
+	r.Component("/role/assign/{roleID}", components.RoleAssignButtonHandler)
+
 	commandCreates := []discord.ApplicationCommandCreate{
 		commands.PingCommand,
 		commands.QuoteCommand,
@@ -96,6 +101,7 @@ func main() {
 		commands.BanCommand,
 		commands.ApproveSlashCommand,
 		commands.ApproveUserCommand,
+		commands.CreateRoleButtonCommand,
 	}
 
 	client, err := disgo.New(token,
