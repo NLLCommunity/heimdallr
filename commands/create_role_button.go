@@ -96,7 +96,7 @@ func CreateRoleButtonHandler(e *handler.CommandEvent) error {
 
 	// Check if the specific role in question is one the user can assign
 	if !permissions.Has(role.Permissions) {
-		_ = respondWithContentEph(e, "You don't have permissions to assign that role.")
+		_ = respondWithContentEph(e, "You cannot assign a role with permissions you do not have.")
 		return nil
 	}
 
