@@ -90,7 +90,7 @@ func CreateRoleButtonHandler(e *handler.CommandEvent) error {
 
 	// Check if the user has permission to assign roles
 	if !permissions.Has(discord.PermissionManageRoles) {
-		_ = respondWithContentEph(e, "You don't have permissions to assign roles.")
+		_ = respondWithContentEph(e, "You need the Manage Roles permission to create a role button.")
 		return nil
 	}
 
