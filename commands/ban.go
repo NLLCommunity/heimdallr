@@ -68,10 +68,6 @@ var BanCommand = discord.SlashCommandCreate{
 
 var durationChoices = []discord.ApplicationCommandOptionChoiceString{
 	{
-		Name:  "1 minute",
-		Value: "1m",
-	},
-	{
 		Name:  "1 week",
 		Value: "1w",
 	},
