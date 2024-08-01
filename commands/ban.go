@@ -68,10 +68,6 @@ var BanCommand = discord.SlashCommandCreate{
 
 var durationChoices = []discord.ApplicationCommandOptionChoiceString{
 	{
-		Name:  "1 minute",
-		Value: "1m",
-	},
-	{
 		Name:  "1 week",
 		Value: "1w",
 	},
@@ -167,7 +163,11 @@ func banHandlerInner(e *handler.CommandEvent, user discord.User, sendReason bool
 	}
 
 	err := e.Client().Rest().AddBan(guild.ID, user.ID, 0,
-		rest.WithReason(fmt.Sprintf("Banned by: %s (%s), with message: %s", e.User().Username, e.User().ID, reason)))
+		rest.WithReason(fmt.Sprintf("Banned by: %s (%s) %s, with message: %s",
+			e.User().Username, e.User().ID,
+			utils.Iif(duration != "", fmt.Sprintf("for %s", duration), ""),
+			reason,
+		)))
 	if err != nil {
 		return e.CreateMessage(
 			discord.NewMessageCreateBuilder().
