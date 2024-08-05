@@ -44,7 +44,7 @@ func RoleAssignButtonHandler(e *handler.ComponentEvent) error {
 	}
 
 	err = e.Client().Rest().AddMemberRole(*e.GuildID(), e.User().ID, roleID,
-		rest.WithReason(fmt.Sprintf("User pressed %s", componentLabel)),
+		rest.WithReason(fmt.Sprintf("User pressed %s in channel \"%s\"", componentLabel, e.Channel().Name())),
 	)
 
 	if err != nil {
