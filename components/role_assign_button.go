@@ -48,6 +48,10 @@ func RoleAssignButtonHandler(e *handler.ComponentEvent) error {
 	)
 
 	if err != nil {
+		_ = e.CreateMessage(discord.NewMessageCreateBuilder().
+			SetContent("Failed to assign role. This is likely due to the bot not having the required permissions.").
+			SetEphemeral(true).
+			Build())
 		return err
 	}
 
