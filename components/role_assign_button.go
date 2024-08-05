@@ -2,6 +2,8 @@ package components
 
 import (
 	_ "embed"
+	"fmt"
+	"github.com/disgoorg/disgo/rest"
 	"log/slog"
 
 	"github.com/disgoorg/disgo/discord"
@@ -31,7 +33,19 @@ func RoleAssignButtonHandler(e *handler.ComponentEvent) error {
 		return nil
 	}
 
-	err = e.Client().Rest().AddMemberRole(*e.GuildID(), e.User().ID, roleID)
+	customID := e.ButtonInteractionData().CustomID()
+	comp := e.Message.ComponentByID(customID)
+	componentLabel := "role button"
+	if comp != nil {
+		switch x := comp.(type) {
+		case discord.ButtonComponent:
+			componentLabel = fmt.Sprintf("role button \"%s\"", x.Label)
+		}
+	}
+
+	err = e.Client().Rest().AddMemberRole(*e.GuildID(), e.User().ID, roleID,
+		rest.WithReason(fmt.Sprintf("User pressed %s", componentLabel)),
+	)
 
 	if err != nil {
 		return err
