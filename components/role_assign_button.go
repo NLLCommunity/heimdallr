@@ -1,11 +1,12 @@
 package components
 
 import (
-	_ "embed"
+	"fmt"
 	"log/slog"
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
+	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
 )
 
@@ -31,9 +32,25 @@ func RoleAssignButtonHandler(e *handler.ComponentEvent) error {
 		return nil
 	}
 
-	err = e.Client().Rest().AddMemberRole(*e.GuildID(), e.User().ID, roleID)
+	customID := e.ButtonInteractionData().CustomID()
+	comp := e.Message.ComponentByID(customID)
+	componentLabel := "role button"
+	if comp != nil {
+		switch x := comp.(type) {
+		case discord.ButtonComponent:
+			componentLabel = fmt.Sprintf("role button \"%s\"", x.Label)
+		}
+	}
+
+	err = e.Client().Rest().AddMemberRole(*e.GuildID(), e.User().ID, roleID,
+		rest.WithReason(fmt.Sprintf("User pressed %s in channel \"%s\"", componentLabel, e.Channel().Name())),
+	)
 
 	if err != nil {
+		_ = e.CreateMessage(discord.NewMessageCreateBuilder().
+			SetContent("Failed to assign role. This is likely due to the bot not having the required permissions.").
+			SetEphemeral(true).
+			Build())
 		return err
 	}
 
