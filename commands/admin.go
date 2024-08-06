@@ -7,6 +7,7 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/json"
+
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/utils"
 )
@@ -31,6 +32,11 @@ var AdminCommand = discord.SlashCommandCreate{
 					Description:  "The channel to set as the moderator channel",
 					Required:     false,
 					ChannelTypes: []discord.ChannelType{discord.ChannelTypeGuildText},
+				},
+				discord.ApplicationCommandOptionBool{
+					Name:        "unset",
+					Description: "Clear/unset the moderator channel",
+					Required:    false,
 				},
 			},
 		},
@@ -165,8 +171,12 @@ func AdminShowAllButtonHandler(e *handler.ComponentEvent) error {
 
 func modChannelInfo(settings *model.GuildSettings) string {
 	modChannelInfo := "> This is the channel in which notifications and other information for moderators and administrators are sent."
-	return fmt.Sprintf("**Moderator channel:** <#%d>\n%s",
-		settings.ModeratorChannel, modChannelInfo)
+	modChannel := "not set"
+	if settings.ModeratorChannel != 0 {
+		modChannel = fmt.Sprintf("<#%d>", settings.ModeratorChannel)
+	}
+	return fmt.Sprintf("**Moderator channel:** %s\n%s",
+		modChannel, modChannelInfo)
 }
 
 func infractionInfo(settings *model.GuildSettings) string {
@@ -219,8 +229,12 @@ func joinLeaveInfo(settings *model.GuildSettings) string {
 		utils.Iif(settings.LeaveMessageEnabled, "yes", "no"), leaveMessageEnabledInfo)
 
 	joinLeaveChannelInfo := "> This is the channel in which join and leave messages are sent."
-	joinLeaveChannel := fmt.Sprintf("**Join/leave channel:** <#%d>\n%s",
-		settings.JoinLeaveChannel, joinLeaveChannelInfo)
+	joinLeaveChannelMention := "not set"
+	if settings.JoinLeaveChannel != 0 {
+		joinLeaveChannelMention = fmt.Sprintf("<#%d>", settings.JoinLeaveChannel)
+	}
+	joinLeaveChannel := fmt.Sprintf("**Join/leave channel:** %s\n%s",
+		joinLeaveChannelMention, joinLeaveChannelInfo)
 
 	joinLeaveMessageInfo := "The join/leave messages can be viewed by using the `/admin join-message` and `/admin leave-message` commands."
 
