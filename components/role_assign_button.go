@@ -1,13 +1,12 @@
 package components
 
 import (
-	_ "embed"
 	"fmt"
-	"github.com/disgoorg/disgo/rest"
 	"log/slog"
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
+	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
 )
 
