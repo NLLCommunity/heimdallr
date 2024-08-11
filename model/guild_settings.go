@@ -14,6 +14,9 @@ type GuildSettings struct {
 	// information for moderators and administrators are sent.
 	ModeratorChannel snowflake.ID
 
+	// AuditLogChannel is the channel where audit log messages are sent.
+	AuditLogChannel snowflake.ID
+
 	// InfractionHalfLifeDays is the half-life time of infractions in days.
 	InfractionHalfLifeDays      float64
 	NotifyOnWarnedUserJoin      bool

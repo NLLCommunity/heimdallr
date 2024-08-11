@@ -32,6 +32,12 @@ var AdminCommand = discord.SlashCommandCreate{
 					Required:     false,
 					ChannelTypes: []discord.ChannelType{discord.ChannelTypeGuildText},
 				},
+				discord.ApplicationCommandOptionChannel{
+					Name:         "audit-log-channel",
+					Description:  "The channel to set as the audit log channel",
+					Required:     false,
+					ChannelTypes: []discord.ChannelType{discord.ChannelTypeGuildText},
+				},
 			},
 		},
 
@@ -164,9 +170,19 @@ func AdminShowAllButtonHandler(e *handler.ComponentEvent) error {
 }
 
 func modChannelInfo(settings *model.GuildSettings) string {
-	modChannelInfo := "> This is the channel in which notifications and other information for moderators and administrators are sent."
-	return fmt.Sprintf("**Moderator channel:** <#%d>\n%s",
-		settings.ModeratorChannel, modChannelInfo)
+	modChannelInfoHelp := "> This is the channel in which notifications and other information for moderators and administrators are sent."
+	modChannelInfo := fmt.Sprintf("**Moderator channel:** %s\n%s",
+		utils.Iif(settings.ModeratorChannel == 0, "not set",
+			fmt.Sprintf("<#%d>", settings.ModeratorChannel)),
+		modChannelInfoHelp)
+
+	auditLogChannelInfoHelp := "> This is the channel in which audit logs are sent."
+	auditLogChannelInfo := fmt.Sprintf("**Audit log channel:** %s\n%s",
+		utils.Iif(settings.AuditLogChannel == 0, "not set",
+			fmt.Sprintf("<#%d>", settings.AuditLogChannel)),
+		auditLogChannelInfoHelp)
+
+	return fmt.Sprintf("%s\n\n%s", modChannelInfo, auditLogChannelInfo)
 }
 
 func infractionInfo(settings *model.GuildSettings) string {
@@ -235,13 +251,15 @@ func AdminModChannelHandler(e *handler.CommandEvent) error {
 		return ErrEventNoGuildID
 	}
 
-	channel, hasChannel := data.OptChannel("channel")
+	modChannel, hasModChannel := data.OptChannel("channel")
+	auditLogChannel, hasAuditLogChannel := data.OptChannel("audit-log-channel")
+
 	settings, err := model.GetGuildSettings(guild.ID)
 	if err != nil {
 		return err
 	}
 
-	if !hasChannel {
+	if !hasModChannel && !hasAuditLogChannel {
 		return e.CreateMessage(discord.NewMessageCreateBuilder().
 			SetContent(modChannelInfo(settings)).
 			SetEphemeral(true).
@@ -249,14 +267,24 @@ func AdminModChannelHandler(e *handler.CommandEvent) error {
 			Build())
 	}
 
-	settings.ModeratorChannel = channel.ID
+	msg := ""
+
+	if hasModChannel {
+		settings.ModeratorChannel = modChannel.ID
+		msg += fmt.Sprintf("Moderator channel set to <#%d>\n", modChannel.ID)
+	}
+	if hasAuditLogChannel {
+		settings.AuditLogChannel = auditLogChannel.ID
+		msg += fmt.Sprintf("Audit log channel set to <#%d>\n", auditLogChannel.ID)
+	}
+
 	err = model.SetGuildSettings(settings)
 	if err != nil {
 		return err
 	}
 
 	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContentf("Moderator channel set to <#%d>", channel.ID).
+		SetContent(msg).
 		SetEphemeral(true).
 		SetAllowedMentions(&discord.AllowedMentions{}).
 		Build())
