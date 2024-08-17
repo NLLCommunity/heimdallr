@@ -4,13 +4,16 @@ primary_region = "iad"
 [build]
 dockerfile = "_fly/Dockerfile"
 
+[build.args]
+ENV = "production"
+
 [[vm]]
 size = "shared-cpu-2x"
 
 [env]
 HEIMDALLR_DEV_MODE_EANBLED = "false"
-HEIMDALLR_BOT_DB = "/litefs/heimdallr.db"
+HEIMDALLR_BOT_DB = "/var/db/heimdallr.db"
 
 [mounts]
 source = "litefs"
-destination = "/var/lib/litefs"
+destination = "/var/db"
