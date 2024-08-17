@@ -10,6 +10,7 @@ import (
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/json"
 	"github.com/disgoorg/snowflake/v2"
+
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/utils"
 )
@@ -60,19 +61,25 @@ func ApproveSlashCommandHandler(e *handler.CommandEvent) error {
 }
 
 func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member discord.ResolvedMember) error {
+	_ = e.DeferCreateMessage(true)
 	guildSettings, err := model.GetGuildSettings(guild.ID)
 	if err != nil {
 		slog.Error("Failed to get guild settings.",
 			"guild_id", guild.ID,
 			"err", err)
+		_, err = e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
+			SetContent("Failed to get guild information.").
+			SetEphemeral(true).
+			Build())
 		return err
 	}
 
 	if !guildSettings.GatekeepEnabled {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
+		_, err := e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
 			SetContentf("Gatekeep is not enabled in this server.").
 			SetEphemeral(true).
 			Build())
+		return err
 	}
 
 	hasApprovedRole := false
@@ -86,10 +93,11 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 	}
 
 	if hasApprovedRole && (!hasPendingRole || !guildSettings.GatekeepAddPendingRoleOnJoin) {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
+		_, err := e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
 			SetContentf("User %s is already approved.", member.Mention()).
 			SetEphemeral(true).
 			Build())
+		return err
 
 	}
 
@@ -122,10 +130,11 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 
 	if guildSettings.GatekeepApprovedMessage == "" {
 		slog.Info("No approved message set; not sending message.")
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
+		_, err := e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
 			SetContentf("No approved message set; not sending message. Roles have been set.").
 			SetEphemeral(true).
 			Build())
+		return err
 	}
 
 	channel := guildSettings.JoinLeaveChannel
@@ -151,13 +160,15 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 			Build(),
 	)
 	if err != nil {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
+		_, err := e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
 			SetEphemeral(true).
 			SetContent("Failed to send message to approved user.").
 			Build())
+		return err
 	}
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
+	_, err = e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
 		SetEphemeral(true).
 		SetContent("User has been approved!").
 		Build())
+	return err
 }
