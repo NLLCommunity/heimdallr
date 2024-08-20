@@ -68,8 +68,3 @@ func OnWarnedUserJoin(e *events.GuildMemberJoin) {
 				extraMsg,
 			).Build())
 }
-
-func TestEvent(e *events.GuildMessageReactionAdd) {
-	fmt.Println("TestEvent called")
-	fmt.Printf("%#v\n", e.Member)
-}

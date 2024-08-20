@@ -115,7 +115,6 @@ func main() {
 		}),
 		bot.WithEventListenerFunc(listeners.OnWarnedUserJoin),
 		bot.WithEventListenerFunc(listeners.OnGatekeepUserJoin),
-		bot.WithEventListenerFunc(listeners.TestEvent),
 		bot.WithEventListenerFunc(listeners.OnUserJoin),
 		bot.WithEventListenerFunc(listeners.OnUserLeave),
 		bot.WithEventListenerFunc(listeners.OnMemberBan),
