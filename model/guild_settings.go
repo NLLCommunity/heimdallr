@@ -1,6 +1,7 @@
 package model
 
 import (
+	"log/slog"
 	"time"
 
 	"github.com/disgoorg/snowflake/v2"
@@ -33,10 +34,17 @@ type GuildSettings struct {
 }
 
 func GetGuildSettings(guildID snowflake.ID) (*GuildSettings, error) {
+	cur := time.Now()
 	settings := GuildSettings{GuildID: guildID}
 	res := DB.FirstOrCreate(&settings, "guild_id = ?", guildID)
 	if res.Error != nil {
 		return nil, res.Error
+	}
+	dur := time.Since(cur)
+	if dur > time.Second {
+		slog.Warn("GetGuildSettings took too long", "guild_id", guildID, "dur", dur)
+	} else {
+		slog.Debug("GetGuildSettings", "guild_id", guildID, "dur", dur)
 	}
 	return &settings, nil
 }
