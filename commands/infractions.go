@@ -13,6 +13,7 @@ import (
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/json"
 	"github.com/disgoorg/snowflake/v2"
+
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/utils"
 )
@@ -231,7 +232,7 @@ func UserInfractionsHandler(e *handler.CommandEvent) error {
 
 func UserInfractionButtonHandler(e *handler.ComponentEvent) error {
 	utils.LogInteraction("warnings button", e)
-	offsetStr := e.Variables["offset"]
+	offsetStr := e.Vars["offset"]
 	offset, err := strconv.Atoi(offsetStr)
 	if err != nil {
 		return fmt.Errorf("failed to parse offset: %w", err)
@@ -426,11 +427,11 @@ func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
 	if !isGuild {
 		return ErrEventNoGuildID
 	}
-	offset, err := strconv.Atoi(e.Variables["offset"])
+	offset, err := strconv.Atoi(e.Vars["offset"])
 	if err != nil {
 		return fmt.Errorf("failed to parse offset: %w", err)
 	}
-	userID, err := snowflake.Parse(e.Variables["userID"])
+	userID, err := snowflake.Parse(e.Vars["userID"])
 	if err != nil {
 		return fmt.Errorf("failed to parse user id: %w", err)
 	}
