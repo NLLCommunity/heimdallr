@@ -25,7 +25,7 @@ func LogInteraction(interactionName string, interaction discord.Interaction) {
 	slog.Info(fmt.Sprintf("Interaction %s (%s) received", interactionName, type_),
 		"user_id", interaction.User().ID,
 		"guild_id", interaction.GuildID(),
-		"channel_id", interaction.ChannelID(),
+		"channel_id", interaction.Channel().ID(),
 		"delay", delay,
 	)
 }

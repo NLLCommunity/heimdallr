@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"github.com/disgoorg/disgo/handler/middleware"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -17,14 +16,16 @@ import (
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/disgo/gateway"
 	"github.com/disgoorg/disgo/handler"
+	"github.com/disgoorg/disgo/handler/middleware"
 	"github.com/disgoorg/snowflake/v2"
+	"github.com/spf13/viper"
+
 	"github.com/myrkvi/heimdallr/commands"
 	"github.com/myrkvi/heimdallr/components"
 	_ "github.com/myrkvi/heimdallr/config"
 	"github.com/myrkvi/heimdallr/listeners"
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/scheduled_tasks"
-	"github.com/spf13/viper"
 )
 
 var rmGlobalCommands = flag.Bool("rm-global-commands", false, "Remove global commands")
