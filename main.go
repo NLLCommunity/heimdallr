@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/disgoorg/disgo/handler/middleware"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -48,6 +49,9 @@ func main() {
 	}
 
 	r := handler.New()
+
+	r.Use(middleware.Go)
+
 	r.Command("/ping", commands.PingHandler)
 	r.Command("/quote", commands.QuoteHandler)
 

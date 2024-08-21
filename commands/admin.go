@@ -129,6 +129,8 @@ var AdminCommand = discord.SlashCommandCreate{
 }
 
 func AdminInfoHandler(e *handler.CommandEvent) error {
+	utils.LogInteraction("admin info", e)
+
 	guild, inGuild := e.Guild()
 	if !inGuild {
 		return nil
@@ -156,6 +158,8 @@ func AdminInfoHandler(e *handler.CommandEvent) error {
 }
 
 func AdminShowAllButtonHandler(e *handler.ComponentEvent) error {
+	utils.LogInteraction("admin show all button", e)
+
 	return e.CreateMessage(discord.NewMessageCreateBuilder().
 		SetContent(e.Message.Content).
 		SetEmbeds(e.Message.Embeds...).
@@ -315,6 +319,8 @@ func AdminInfractionsHandler(e *handler.CommandEvent) error {
 }
 
 func AdminGatekeepHandler(e *handler.CommandEvent) error {
+	utils.LogInteraction("admin gatekeep", e)
+
 	data := e.SlashCommandInteractionData()
 	guild, isGuild := e.Guild()
 	if !isGuild {
@@ -373,6 +379,8 @@ func AdminGatekeepHandler(e *handler.CommandEvent) error {
 }
 
 func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
+	utils.LogInteraction("admin gatekeep message", e)
+
 	guild, isGuild := e.Guild()
 	if !isGuild {
 		return ErrEventNoGuildID
@@ -411,6 +419,8 @@ func messageModal(customID, title, contents string) discord.ModalCreate {
 }
 
 func AdminGatekeepMessageButtonHandler(e *handler.ComponentEvent) error {
+	utils.LogInteraction("admin gatekeep message button", e)
+
 	guild, isGuild := e.Guild()
 	if !isGuild {
 		return ErrEventNoGuildID
@@ -429,6 +439,8 @@ func AdminGatekeepMessageButtonHandler(e *handler.ComponentEvent) error {
 }
 
 func AdminGatekeepMessageModalHandler(e *handler.ModalEvent) error {
+	utils.LogInteraction("admin gatekeep message modal", e)
+
 	guild, inGuild := e.Guild()
 	if !inGuild {
 		return nil
@@ -463,6 +475,8 @@ func AdminGatekeepMessageModalHandler(e *handler.ModalEvent) error {
 }
 
 func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
+	utils.LogInteraction("admin join-leave", e)
+
 	guild, inGuild := e.Guild()
 	if !inGuild {
 		return nil
@@ -514,6 +528,7 @@ func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
 }
 
 func AdminJoinMessageHandler(e *handler.CommandEvent) error {
+	utils.LogInteraction("admin join-message", e)
 	guild, isGuild := e.Guild()
 	if !isGuild {
 		return ErrEventNoGuildID
@@ -543,6 +558,8 @@ func AdminJoinMessageHandler(e *handler.CommandEvent) error {
 }
 
 func AdminJoinMessageButtonHandler(e *handler.ComponentEvent) error {
+	utils.LogInteraction("admin join-message button", e)
+
 	guild, isGuild := e.Guild()
 	if !isGuild {
 		return ErrEventNoGuildID
@@ -561,6 +578,8 @@ func AdminJoinMessageButtonHandler(e *handler.ComponentEvent) error {
 }
 
 func AdminJoinMessageModalHandler(e *handler.ModalEvent) error {
+	utils.LogInteraction("admin join-message modal", e)
+
 	guild, inGuild := e.Guild()
 	if !inGuild {
 		return nil
@@ -595,6 +614,8 @@ func AdminJoinMessageModalHandler(e *handler.ModalEvent) error {
 }
 
 func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
+	utils.LogInteraction("admin leave-message", e)
+
 	guild, isGuild := e.Guild()
 	if !isGuild {
 		return ErrEventNoGuildID
@@ -624,6 +645,8 @@ func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
 }
 
 func AdminLeaveMessageButtonHandler(e *handler.ComponentEvent) error {
+	utils.LogInteraction("admin leave-message button", e)
+
 	guild, isGuild := e.Guild()
 	if !isGuild {
 		return ErrEventNoGuildID
@@ -642,6 +665,8 @@ func AdminLeaveMessageButtonHandler(e *handler.ComponentEvent) error {
 }
 
 func AdminLeaveMessageModalHandler(e *handler.ModalEvent) error {
+	utils.LogInteraction("admin leave-message modal", e)
+
 	guild, inGuild := e.Guild()
 	if !inGuild {
 		return nil
