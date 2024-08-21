@@ -23,12 +23,12 @@ func RoleAssignButtonHandler(e *handler.ComponentEvent) error {
 		"user",
 		e.User().ID,
 		"roleID",
-		e.Variables["roleID"],
+		e.Vars["roleID"],
 	)
 
-	roleID, err := snowflake.Parse(e.Variables["roleID"])
+	roleID, err := snowflake.Parse(e.Vars["roleID"])
 	if err != nil {
-		slog.Warn("Failed to parse roleID", "roleID", e.Variables["roleID"], "err", err)
+		slog.Warn("Failed to parse roleID", "roleID", e.Vars["roleID"], "err", err)
 		return nil
 	}
 
