@@ -106,6 +106,8 @@ var durationChoices = []discord.ApplicationCommandOptionChoiceString{
 }
 
 func BanWithMessageHandler(e *handler.CommandEvent) error {
+	utils.LogInteraction("ban with-message", e)
+
 	data := e.SlashCommandInteractionData()
 	user := data.User("user")
 	message := data.String("message")
@@ -114,6 +116,8 @@ func BanWithMessageHandler(e *handler.CommandEvent) error {
 }
 
 func BanUntilHandler(e *handler.CommandEvent) error {
+	utils.LogInteraction("ban until", e)
+
 	data := e.SlashCommandInteractionData()
 	user := data.User("user")
 	duration := data.String("duration")

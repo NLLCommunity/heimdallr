@@ -60,6 +60,8 @@ var QuoteCommand = discord.SlashCommandCreate{
 }
 
 func QuoteHandler(e *handler.CommandEvent) error {
+	utils.LogInteraction("quote", e)
+
 	var guildID snowflake.ID
 	if e.GuildID() != nil {
 		guildID = *e.GuildID()

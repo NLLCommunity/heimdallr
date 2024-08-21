@@ -37,8 +37,8 @@ var ApproveSlashCommand = discord.SlashCommandCreate{
 }
 
 func ApproveUserCommandHandler(e *handler.CommandEvent) error {
-	slog.Info("`Approve` user command called.",
-		"guild_id", utils.Iif(e.GuildID() == nil, "<null>", e.GuildID().String()))
+	utils.LogInteraction("approve", e)
+
 	guild, inGuild := e.Guild()
 	if !inGuild {
 		return nil
@@ -49,8 +49,8 @@ func ApproveUserCommandHandler(e *handler.CommandEvent) error {
 }
 
 func ApproveSlashCommandHandler(e *handler.CommandEvent) error {
-	slog.Info("`approve` slash command called.",
-		"guild_id", utils.Iif(e.GuildID() == nil, "<null>", e.GuildID().String()))
+	utils.LogInteraction("Approve", e)
+
 	guild, inGuild := e.Guild()
 	if !inGuild {
 		return nil
@@ -61,6 +61,7 @@ func ApproveSlashCommandHandler(e *handler.CommandEvent) error {
 }
 
 func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member discord.ResolvedMember) error {
+	slog.Debug("Entered approvedInnerHandler")
 	_ = e.DeferCreateMessage(true)
 	guildSettings, err := model.GetGuildSettings(guild.ID)
 	if err != nil {

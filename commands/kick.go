@@ -7,6 +7,7 @@ import (
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/json"
+
 	"github.com/myrkvi/heimdallr/utils"
 )
 
@@ -36,6 +37,8 @@ var KickCommand = discord.SlashCommandCreate{
 }
 
 func KickWithMessageHandler(e *handler.CommandEvent) error {
+	utils.LogInteraction("kick with-message", e)
+
 	data := e.SlashCommandInteractionData()
 	guild, isGuild := e.Guild()
 	if !isGuild {

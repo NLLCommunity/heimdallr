@@ -91,6 +91,8 @@ var WarnCommand = discord.SlashCommandCreate{
 }
 
 func WarnHandler(e *handler.CommandEvent) error {
+	utils.LogInteraction("warn", e)
+
 	ctx := context.Background()
 	data := e.SlashCommandInteractionData()
 
@@ -210,6 +212,8 @@ var UserInfractionsCommand = discord.SlashCommandCreate{
 }
 
 func UserInfractionsHandler(e *handler.CommandEvent) error {
+	utils.LogInteraction("warnings", e)
+
 	user := e.User()
 	guild, ok := e.Guild()
 	if !ok {
@@ -226,6 +230,7 @@ func UserInfractionsHandler(e *handler.CommandEvent) error {
 }
 
 func UserInfractionButtonHandler(e *handler.ComponentEvent) error {
+	utils.LogInteraction("warnings button", e)
 	offsetStr := e.Variables["offset"]
 	offset, err := strconv.Atoi(offsetStr)
 	if err != nil {
@@ -329,6 +334,8 @@ var InfractionsCommand = discord.SlashCommandCreate{
 
 // InfractionsListHandler handles the `/infractions list` command.
 func InfractionsListHandler(e *handler.CommandEvent) error {
+	utils.LogInteraction("infractions list", e)
+
 	slog.Info("interaction `/infractions list` called.")
 	data := e.SlashCommandInteractionData()
 	user, hasUser := data.OptUser("user")
@@ -383,6 +390,8 @@ func InfractionsListHandler(e *handler.CommandEvent) error {
 }
 
 func InfractionsRemoveHandler(e *handler.CommandEvent) error {
+	utils.LogInteraction("infractions remove", e)
+
 	data := e.SlashCommandInteractionData()
 	infID := data.String("infraction-id")
 	guild, ok := e.Guild()
@@ -406,6 +415,8 @@ func InfractionsRemoveHandler(e *handler.CommandEvent) error {
 }
 
 func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
+	utils.LogInteraction("infractions list component", e)
+
 	parentIx := e.Message.Interaction
 	if parentIx == nil {
 		return fmt.Errorf("no parent interaction found")
