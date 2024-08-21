@@ -61,8 +61,12 @@ func ApproveSlashCommandHandler(e *handler.CommandEvent) error {
 }
 
 func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member discord.ResolvedMember) error {
-	slog.Debug("Entered approvedInnerHandler")
-	_ = e.DeferCreateMessage(true)
+	slog.Info("Entered approvedInnerHandler")
+	err := e.DeferCreateMessage(true)
+	if err != nil {
+		slog.Error("Failed to defer message.", "err", err)
+	}
+
 	guildSettings, err := model.GetGuildSettings(guild.ID)
 	if err != nil {
 		slog.Error("Failed to get guild settings.",
