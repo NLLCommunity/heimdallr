@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"time"
@@ -10,17 +11,7 @@ import (
 
 func LogInteraction(interactionName string, interaction discord.Interaction) {
 	delay := time.Since(interaction.ID().Time())
-	type_ := "unknown"
-	switch interaction.Type() {
-	case discord.InteractionTypeApplicationCommand:
-		type_ = "application command"
-	case discord.InteractionTypeComponent:
-		type_ = "message component"
-	case discord.InteractionTypeModalSubmit:
-		type_ = "modal submit"
-	case discord.InteractionTypeAutocomplete:
-		type_ = "autocomplete"
-	}
+	type_ := getInteractionName(interaction)
 
 	slog.Info(fmt.Sprintf("Interaction %s (%s) received", interactionName, type_),
 		"user_id", interaction.User().ID,
@@ -28,4 +19,31 @@ func LogInteraction(interactionName string, interaction discord.Interaction) {
 		"channel_id", interaction.Channel().ID(),
 		"delay", delay,
 	)
+}
+
+func LogInteractionContext(interactionName string, interaction discord.Interaction, ctx context.Context) {
+	delay := time.Since(interaction.ID().Time())
+	type_ := getInteractionName(interaction)
+
+	slog.InfoContext(ctx, fmt.Sprintf("Interaction %s (%s) received", interactionName, type_),
+		"user_id", interaction.User().ID,
+		"guild_id", interaction.GuildID(),
+		"channel_id", interaction.Channel().ID(),
+		"delay", delay,
+	)
+}
+
+func getInteractionName(interaction discord.Interaction) string {
+	switch interaction.Type() {
+	case discord.InteractionTypeApplicationCommand:
+		return "application command"
+	case discord.InteractionTypeComponent:
+		return "message component"
+	case discord.InteractionTypeModalSubmit:
+		return "modal submit"
+	case discord.InteractionTypeAutocomplete:
+		return "autocomplete"
+	default:
+		return "unknown"
+	}
 }
