@@ -37,7 +37,7 @@ var ApproveSlashCommand = discord.SlashCommandCreate{
 }
 
 func ApproveUserCommandHandler(e *handler.CommandEvent) error {
-	utils.LogInteraction("approve", e)
+	utils.LogInteractionContext("approve", e, e.Ctx)
 
 	guild, inGuild := e.Guild()
 	if !inGuild {
@@ -49,7 +49,7 @@ func ApproveUserCommandHandler(e *handler.CommandEvent) error {
 }
 
 func ApproveSlashCommandHandler(e *handler.CommandEvent) error {
-	utils.LogInteraction("Approve", e)
+	utils.LogInteractionContext("Approve", e, e.Ctx)
 
 	guild, inGuild := e.Guild()
 	if !inGuild {
@@ -61,7 +61,7 @@ func ApproveSlashCommandHandler(e *handler.CommandEvent) error {
 }
 
 func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member discord.ResolvedMember) error {
-	slog.Info("Entered approvedInnerHandler")
+	slog.InfoContext(e.Ctx, "Entered approvedInnerHandler")
 	err := e.DeferCreateMessage(true)
 	if err != nil {
 		slog.Error("Failed to defer message.", "err", err)
@@ -69,7 +69,7 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 
 	guildSettings, err := model.GetGuildSettings(guild.ID)
 	if err != nil {
-		slog.Error("Failed to get guild settings.",
+		slog.ErrorContext(e.Ctx, "Failed to get guild settings.",
 			"guild_id", guild.ID,
 			"err", err)
 		_, err = e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
@@ -132,6 +132,9 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 			return err
 		}
 	}
+
+	slog.InfoContext(e.Ctx, "user has been approved",
+		"guild_id", guild.ID)
 
 	if guildSettings.GatekeepApprovedMessage == "" {
 		slog.Info("No approved message set; not sending message.")
