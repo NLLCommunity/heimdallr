@@ -1,5 +1,5 @@
 app = "heimdallr"
-primary_region = "iad"
+primary_region = "bos"
 
 [build]
 dockerfile = "_fly/Dockerfile"
