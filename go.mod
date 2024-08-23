@@ -10,7 +10,7 @@ require (
 	github.com/glebarez/sqlite v1.10.0
 	github.com/spf13/viper v1.18.2
 	github.com/sqids/sqids-go v0.4.1
-	gorm.io/gorm v1.25.7
+	gorm.io/gorm v1.25.11
 )
 
 require (
