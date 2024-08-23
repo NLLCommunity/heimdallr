@@ -15,7 +15,7 @@ if [[ -f "$DB_PATH" ]]; then
   echo "Existing database is $(stat -c %s "${DB_PATH}") bytes"
 else
   echo "Restoring database from replica"
-  litestream restore -if-replica-exists -v "${DB_PATH}"
+  litestream restore -if-replica-exists "${DB_PATH}"
 fi
 
 litestream replicate -exec "${START_COMMAND}"
