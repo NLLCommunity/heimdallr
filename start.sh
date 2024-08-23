@@ -1,6 +1,6 @@
 #!/bin/bash
 
-START_COMMAND=heimdallr
+START_COMMAND=./bin/heimdallr
 
 set -e
 set -u
@@ -10,6 +10,7 @@ litestream version
 echo "DB_REPLICA_URL=${DB_REPLICA_URL}"
 
 readonly DB_PATH='heimdallr.db'
+export DB_PATH
 
 if [[ -f "$DB_PATH" ]]; then
   echo "Existing database is $(stat -c %s "${DB_PATH}") bytes"
