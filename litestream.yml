@@ -5,3 +5,4 @@ dbs:
   - path: ${DB_PATH}
     replicas:
       - url: ${DB_REPLICA_URL}
+        region: ${LITESTREAM_REGION}
