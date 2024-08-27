@@ -3,6 +3,7 @@ package commands
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	"regexp"
 	"slices"
@@ -90,6 +91,17 @@ func QuoteHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
+	channelName := "unknown channel"
+	channel, err := e.Client().Rest().GetChannel(parts.ChannelId)
+	if err == nil {
+		prefix := getChannelTypePrefix(channel)
+		channelName = prefix + channel.Name()
+	} else {
+		slog.Warn("Failed to fetch channel",
+			"guild_id", parts.GuildId,
+			"channel_id", parts.ChannelId)
+	}
+
 	if canRead, _ := userCanReadChannelMessages(e.User().ID, message.ChannelID, e.Client()); !canRead {
 		_ = respondWithContentEph(e, "You don't have permission to read messages in that channel.")
 		return nil
@@ -98,7 +110,8 @@ func QuoteHandler(e *handler.CommandEvent) error {
 	embed := discord.NewEmbedBuilder().
 		SetDescription(message.Content).
 		SetAuthor(message.Author.EffectiveName(), "", message.Author.EffectiveAvatarURL()).
-		SetTimestamp(message.CreatedAt)
+		SetTimestamp(message.CreatedAt).
+		SetFooter(channelName, "")
 
 	if len(message.Attachments) == 1 {
 		att := message.Attachments[0]
@@ -132,6 +145,24 @@ func QuoteHandler(e *handler.CommandEvent) error {
 	resp.SetAllowedMentions(&discord.AllowedMentions{})
 
 	return e.CreateMessage(resp.Build())
+}
+
+func getChannelTypePrefix(channel discord.Channel) string {
+	switch channel.Type() {
+	case discord.ChannelTypeGuildVoice:
+		return "🔊"
+	case discord.ChannelTypeGuildStageVoice:
+		return "🗣️"
+	case discord.ChannelTypeGuildNews:
+		return "📢"
+	case discord.ChannelTypeGuildForum:
+		return "🗪"
+	case discord.ChannelTypeGuildPublicThread,
+		discord.ChannelTypeGuildPrivateThread:
+		return "🧵"
+	default:
+		return "#"
+	}
 }
 
 func userCanReadChannelMessages(userID, channelID snowflake.ID, client bot.Client) (bool, error) {
