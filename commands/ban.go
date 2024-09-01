@@ -147,13 +147,20 @@ func banHandlerInner(e *handler.CommandEvent, user discord.User, sendReason bool
 	if !isGuild {
 		return ErrEventNoGuildID
 	}
+	dur, err := utils.ParseLongDuration(duration)
+	var banExp string
+	if err == nil {
+		banExp = fmt.Sprintf("<t:%d:R>", time.Now().Add(dur).Unix())
+	} else {
+		banExp = duration
+	}
 
 	failedToMessage := false
 	if sendReason || duration != "" {
 		mc := discord.NewMessageCreateBuilder().
 			SetContentf(
 				"You have been banned from %s.\n"+
-					utils.Iif(duration != "", fmt.Sprintf("This ban will expire in %s.\n", duration), "")+
+					utils.Iif(duration != "", fmt.Sprintf("This ban will expire %s.\n", banExp), "")+
 					utils.Iif(sendReason,
 						fmt.Sprintf("Along with the ban, this message was added:\n\n %s\n\n", reason), "")+
 					"(You cannot respond to this message.)",
@@ -166,7 +173,7 @@ func banHandlerInner(e *handler.CommandEvent, user discord.User, sendReason bool
 		}
 	}
 
-	err := e.Client().Rest().AddBan(guild.ID, user.ID, 0,
+	err = e.Client().Rest().AddBan(guild.ID, user.ID, 0,
 		rest.WithReason(fmt.Sprintf("Banned by: %s (%s) %s, with message: %s",
 			e.User().Username, e.User().ID,
 			utils.Iif(duration != "", fmt.Sprintf("for %s", duration), ""),
