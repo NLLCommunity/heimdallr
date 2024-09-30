@@ -18,14 +18,18 @@ import (
 var ApproveUserCommand = discord.UserCommandCreate{
 	Name:                     "Approve",
 	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
-	DMPermission:             utils.Ref(false),
+	Contexts: []discord.InteractionContextType{
+		discord.InteractionContextTypeGuild,
+	},
 }
 
 var ApproveSlashCommand = discord.SlashCommandCreate{
 	Name:                     "approve",
 	Description:              "Approve a user to join the server",
 	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
-	DMPermission:             utils.Ref(false),
+	Contexts: []discord.InteractionContextType{
+		discord.InteractionContextTypeGuild,
+	},
 
 	Options: []discord.ApplicationCommandOption{
 		discord.ApplicationCommandOptionUser{
