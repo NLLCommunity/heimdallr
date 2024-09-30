@@ -43,12 +43,16 @@ var ApproveSlashCommand = discord.SlashCommandCreate{
 func ApproveUserCommandHandler(e *handler.CommandEvent) error {
 	utils.LogInteractionContext("approve", e, e.Ctx)
 
-	guild, inGuild := e.Guild()
+	guild, success, inGuild := getGuild(e)
 	if !inGuild {
-		slog.Warn("Approve command supplied in DMs or guild ID is otherwise nil",
-			"guild_id_is_nil", e.GuildID() == nil)
+		slog.Warn("approve command supplied in DMs or guild ID is otherwise nil")
 		return nil
 	}
+	if !success {
+		slog.Warn("approve command: failed to get guild")
+		return nil
+	}
+
 	member := e.UserCommandInteractionData().TargetMember()
 
 	return approvedInnerHandler(e, guild, member)
@@ -57,15 +61,41 @@ func ApproveUserCommandHandler(e *handler.CommandEvent) error {
 func ApproveSlashCommandHandler(e *handler.CommandEvent) error {
 	utils.LogInteractionContext("Approve", e, e.Ctx)
 
-	guild, inGuild := e.Guild()
+	guild, success, inGuild := getGuild(e)
 	if !inGuild {
-		slog.Warn("Approve command supplied in DMs or guild ID is otherwise nil",
-			"guild_id_is_nil", e.GuildID() == nil)
+		slog.Warn("approve command supplied in DMs or guild ID is otherwise nil")
 		return nil
 	}
+	if !success {
+		slog.Warn("approve command: failed to get guild")
+		return nil
+	}
+
 	member := e.SlashCommandInteractionData().Member("user")
 
 	return approvedInnerHandler(e, guild, member)
+}
+
+func getGuild(e *handler.CommandEvent) (guild discord.Guild, success bool, inGuild bool) {
+	if e.GuildID() == nil {
+		return
+	}
+	inGuild = true
+	guild, success = e.Guild()
+
+	if success {
+		return
+	}
+
+	restGuild, err := e.Client().Rest().GetGuild(*e.GuildID(), false)
+	if err != nil {
+		slog.Warn("Failed to get guild", "guild_id", *e.GuildID(), "err", err)
+		return
+	}
+
+	guild = restGuild.Guild
+	success = true
+	return
 }
 
 func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member discord.ResolvedMember) error {
