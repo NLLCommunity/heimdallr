@@ -18,14 +18,18 @@ import (
 var ApproveUserCommand = discord.UserCommandCreate{
 	Name:                     "Approve",
 	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
-	DMPermission:             utils.Ref(false),
+	Contexts: []discord.InteractionContextType{
+		discord.InteractionContextTypeGuild,
+	},
 }
 
 var ApproveSlashCommand = discord.SlashCommandCreate{
 	Name:                     "approve",
 	Description:              "Approve a user to join the server",
 	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
-	DMPermission:             utils.Ref(false),
+	Contexts: []discord.InteractionContextType{
+		discord.InteractionContextTypeGuild,
+	},
 
 	Options: []discord.ApplicationCommandOption{
 		discord.ApplicationCommandOptionUser{
@@ -41,7 +45,8 @@ func ApproveUserCommandHandler(e *handler.CommandEvent) error {
 
 	guild, inGuild := e.Guild()
 	if !inGuild {
-		slog.Warn("Approve command supplied in DMs or guild ID is otherwise nil")
+		slog.Warn("Approve command supplied in DMs or guild ID is otherwise nil",
+			"guild_id_is_nil", e.GuildID() == nil)
 		return nil
 	}
 	member := e.UserCommandInteractionData().TargetMember()
@@ -54,7 +59,8 @@ func ApproveSlashCommandHandler(e *handler.CommandEvent) error {
 
 	guild, inGuild := e.Guild()
 	if !inGuild {
-		slog.Warn("Approve command supplied in DMs or guild ID is otherwise nil")
+		slog.Warn("Approve command supplied in DMs or guild ID is otherwise nil",
+			"guild_id_is_nil", e.GuildID() == nil)
 		return nil
 	}
 	member := e.SlashCommandInteractionData().Member("user")
