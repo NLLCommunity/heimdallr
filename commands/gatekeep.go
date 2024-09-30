@@ -45,7 +45,8 @@ func ApproveUserCommandHandler(e *handler.CommandEvent) error {
 
 	guild, inGuild := e.Guild()
 	if !inGuild {
-		slog.Warn("Approve command supplied in DMs or guild ID is otherwise nil")
+		slog.Warn("Approve command supplied in DMs or guild ID is otherwise nil",
+			"guild_id_is_nil", e.GuildID() == nil)
 		return nil
 	}
 	member := e.UserCommandInteractionData().TargetMember()
@@ -58,7 +59,8 @@ func ApproveSlashCommandHandler(e *handler.CommandEvent) error {
 
 	guild, inGuild := e.Guild()
 	if !inGuild {
-		slog.Warn("Approve command supplied in DMs or guild ID is otherwise nil")
+		slog.Warn("Approve command supplied in DMs or guild ID is otherwise nil",
+			"guild_id_is_nil", e.GuildID() == nil)
 		return nil
 	}
 	member := e.SlashCommandInteractionData().Member("user")
