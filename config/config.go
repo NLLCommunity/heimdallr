@@ -26,6 +26,8 @@ func init() {
 	viper.SetDefault("bot.token", "")
 	viper.SetDefault("bot.db", "heimdallr.db")
 
+	viper.SetDefault("loglevel", "info")
+
 	viper.SetDefault("dev_mode.enabled", false)
 	viper.SetDefault("dev_mode.guild_id", 0)
 

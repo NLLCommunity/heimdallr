@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/disgoorg/disgo"
@@ -111,7 +112,7 @@ func main() {
 
 	client, err := disgo.New(token,
 		bot.WithLogger(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-			Level: slog.LevelInfo,
+			Level: getLogLevel(viper.GetString("loglevel")),
 		}))),
 		bot.WithDefaultGateway(),
 		bot.WithEventListeners(r),
@@ -161,4 +162,19 @@ func main() {
 	signal.Notify(s, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	<-s
 	removeTempBansTask.Stop()
+}
+
+func getLogLevel(level string) slog.Level {
+	switch strings.ToLower(level) {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }
