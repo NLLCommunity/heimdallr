@@ -10,6 +10,8 @@ github.com/disgoorg/disgo v0.18.11 h1:hvWpU43PtThNeKOeP6ghx3nyjpgP0oaQz2WL3yizCI
 github.com/disgoorg/disgo v0.18.11/go.mod h1:mkNGTSWCxIgTXCIg8GqRJedAqNw4T++xOgBOTEk9d7U=
 github.com/disgoorg/disgo v0.18.12 h1:bB4bgJ9KEyJ+vKfa/fYEwEYv8Ds3C8RUoavotF2xHxY=
 github.com/disgoorg/disgo v0.18.12/go.mod h1:wZ/ZW6x43QivIVrYrJxwSeFbIbrMqpi5vAU1ovsod8o=
+github.com/disgoorg/disgo v0.18.13 h1:RswLnakVS+RbCACBfK7mLv3YGdZh625N2SMnngnqd+Q=
+github.com/disgoorg/disgo v0.18.13/go.mod h1:wZ/ZW6x43QivIVrYrJxwSeFbIbrMqpi5vAU1ovsod8o=
 github.com/disgoorg/json v1.1.0 h1:7xigHvomlVA9PQw9bMGO02PHGJJPqvX5AnwlYg/Tnys=
 github.com/disgoorg/json v1.1.0/go.mod h1:BHDwdde0rpQFDVsRLKhma6Y7fTbQKub/zdGO5O9NqqA=
 github.com/disgoorg/json v1.2.0 h1:6e/j4BCfSHIvucG1cd7tJPAOp1RgnnMFSqkvZUtEd1Y=
