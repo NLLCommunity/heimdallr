@@ -32,6 +32,25 @@ import (
 var rmGlobalCommands = flag.Bool("rm-global-commands", false, "Remove global commands")
 var rmGuildCommands = flag.Uint64("rm-guild-commands", 0, "Remove guild commands for guild specified by ID")
 
+var intents = gateway.IntentGuilds |
+	gateway.IntentGuildMembers |
+	gateway.IntentGuildModeration |
+	gateway.IntentGuildEmojisAndStickers |
+	gateway.IntentGuildIntegrations |
+	gateway.IntentGuildWebhooks |
+	gateway.IntentGuildInvites |
+	gateway.IntentGuildVoiceStates |
+	gateway.IntentGuildMessages |
+	gateway.IntentGuildMessageReactions |
+	gateway.IntentDirectMessages |
+	gateway.IntentDirectMessageReactions |
+	gateway.IntentMessageContent |
+	gateway.IntentGuildScheduledEvents |
+	gateway.IntentAutoModerationConfiguration |
+	gateway.IntentAutoModerationExecution |
+	gateway.IntentGuildMessagePolls |
+	gateway.IntentDirectMessagePolls
+
 func main() {
 	flag.Parse()
 	token := viper.GetString("bot.token")
@@ -125,7 +144,7 @@ func main() {
 		bot.WithEventListenerFunc(listeners.OnUserLeave),
 		bot.WithEventListenerFunc(listeners.OnMemberBan),
 		bot.WithEventListenerFunc(listeners.OnAuditLog),
-		bot.WithGatewayConfigOpts(gateway.WithIntents(gateway.IntentsAll)),
+		bot.WithGatewayConfigOpts(gateway.WithIntents(intents)),
 		bot.WithCacheConfigOpts(
 			cache.WithCaches(cache.FlagsAll),
 		),
