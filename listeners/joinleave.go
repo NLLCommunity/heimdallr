@@ -6,6 +6,7 @@ import (
 	"github.com/cbroglie/mustache"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
+
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/utils"
 )
@@ -79,6 +80,7 @@ func OnUserLeave(e *events.GuildMemberLeave) {
 		return
 	}
 
+	e.Member.User = e.User
 	joinleaveInfo := utils.NewMessageTemplateData(e.Member, guild.Guild)
 
 	contents, err := mustache.RenderRaw(guildSettings.LeaveMessage, true, joinleaveInfo)
