@@ -35,7 +35,7 @@ var rmGuildCommands = flag.Uint64("rm-guild-commands", 0, "Remove guild commands
 var intents = gateway.IntentGuilds |
 	gateway.IntentGuildMembers |
 	gateway.IntentGuildModeration |
-	gateway.IntentGuildEmojisAndStickers |
+	gateway.IntentGuildExpressions |
 	gateway.IntentGuildIntegrations |
 	gateway.IntentGuildWebhooks |
 	gateway.IntentGuildInvites |
