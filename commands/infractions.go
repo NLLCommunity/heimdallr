@@ -122,24 +122,13 @@ func WarnHandler(e *handler.CommandEvent) error {
 
 	inf, err := model.CreateInfraction(guild.ID, user.ID, e.User().ID, reason, severity, silent)
 	if err != nil {
+		_ = e.CreateMessage(discord.NewMessageCreateBuilder().
+			SetEphemeral(true).
+			SetContent("Failed to create infraction.").Build())
 		return fmt.Errorf("failed to create infraction: %w", err)
 	}
 
 	slog.DebugContext(ctx, "Created infraction.", "infraction", inf.Sqid())
-
-	if inf.Silent {
-		err = e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent(fmt.Sprintf("A silent warning has been added for %s", user.Mention())).Build())
-		if err != nil {
-			slog.Error("Failed to respond to 'warn' command interaction.",
-				"err", err,
-				"guildID", guild.ID,
-				"userID", user.ID)
-			return err
-		}
-		return nil
-	}
 
 	embed := discord.NewEmbedBuilder().
 		SetTitlef(`Warning in "%s"`, guild.Name).
@@ -149,27 +138,32 @@ func WarnHandler(e *handler.CommandEvent) error {
 
 	slog.DebugContext(ctx, "Created embed.")
 
-	channel, err := e.Client().Rest().CreateDMChannel(user.ID)
-	if err != nil {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent(fmt.Sprintf("Failed to send warning to %s.", user.Mention())).Build())
+	failedToSend := false
+	if !inf.Silent {
+		channel, err := e.Client().Rest().CreateDMChannel(user.ID)
+		if err != nil {
+			failedToSend = true
+		}
+		_, err = e.Client().Rest().CreateMessage(channel.ID(), discord.NewMessageCreateBuilder().
+			SetEmbeds(embed.Build()).
+			Build())
+		if err != nil {
+			failedToSend = true
+		}
 	}
-	_, err = e.Client().Rest().CreateMessage(channel.ID(), discord.NewMessageCreateBuilder().
+
+	message := discord.NewMessageCreateBuilder().
+		SetContentf("## %s %s.",
+			utils.Iif(inf.Silent, "Silent warning created for",
+				utils.Iif(failedToSend, "Failed to send warning to", "Warning sent to")),
+			user.Mention(),
+		).
 		SetEmbeds(embed.Build()).
-		Build())
-	if err != nil {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent(fmt.Sprintf("Failed to send warning to %s.", user.Mention())).Build())
-	}
+		Build()
 
 	guildSettings, err := model.GetGuildSettings(guild.ID)
 	if err == nil && guildSettings.ModeratorChannel != 0 {
-		_, err = e.Client().Rest().CreateMessage(guildSettings.ModeratorChannel, discord.NewMessageCreateBuilder().
-			SetContent(fmt.Sprintf("## Warning sent to %s.", user.Mention())).
-			SetEmbeds(embed.Build()).
-			Build())
+		_, err = e.Client().Rest().CreateMessage(guildSettings.ModeratorChannel, message)
 		if err != nil {
 			slog.Error("Failed to send warning to moderator channel.",
 				"err", err,
@@ -181,7 +175,8 @@ func WarnHandler(e *handler.CommandEvent) error {
 
 	return e.CreateMessage(discord.NewMessageCreateBuilder().
 		SetEphemeral(true).
-		SetContent(fmt.Sprintf("Warning sent to %s.", user.Mention())).Build())
+		SetContentf("Warning created for %s.",
+			user.Mention()).Build())
 }
 
 func severityToColor(severity float64) int {
