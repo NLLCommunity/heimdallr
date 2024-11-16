@@ -135,7 +135,7 @@ var PruneCommand = discord.SlashCommandCreate{
 			},
 			Required: true,
 
-			MinValue: utils.Ref(0),
+			MinValue: utils.Ref(3),
 			MaxValue: utils.Ref(90),
 		},
 	},
