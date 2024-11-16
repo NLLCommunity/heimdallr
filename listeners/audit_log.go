@@ -6,6 +6,8 @@ import (
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
+
+	"github.com/myrkvi/heimdallr/globals"
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/utils"
 )
@@ -23,6 +25,13 @@ func OnAuditLog(e *events.GuildAuditLogEntryCreate) {
 		user, err := e.Client().Rest().GetUser(entry.UserID)
 		if err != nil {
 			slog.Warn("Failed to get user for audit log entry.", "err", err, "user_id", entry.UserID)
+			return
+		}
+
+		if _, ok := globals.ExcludedFromModKickLog[targetUser.ID]; ok {
+			// User is excluded from mod kick log, likely because they were pruned.
+			// Remove from excluded list and don't log.
+			delete(globals.ExcludedFromModKickLog, targetUser.ID)
 			return
 		}
 

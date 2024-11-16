@@ -3,11 +3,17 @@ package utils
 import (
 	"cmp"
 	"errors"
+	"iter"
+	"log/slog"
 	"math"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/rest"
+	"github.com/disgoorg/snowflake/v2"
 )
 
 func Ref[T any](v T) *T {
@@ -119,4 +125,44 @@ func FormatFloatUpToPrec(num float64, prec int) string {
 	str = strings.TrimSuffix(str, ".")
 
 	return str
+}
+
+type IterResult[T any] struct {
+	Value T
+	Error error
+}
+
+func GetMembersIter(r rest.Rest, guildID snowflake.ID) iter.Seq[IterResult[discord.Member]] {
+	const LIMIT int = 2
+	memberOffset := snowflake.ID(0)
+	totalMembers := 0
+	return func(yield func(IterResult[discord.Member]) bool) {
+		for {
+			members, err := r.GetMembers(guildID, LIMIT, memberOffset)
+			if err != nil {
+				yield(IterResult[discord.Member]{
+					Error: err,
+				})
+			}
+
+			count := len(members)
+			totalMembers += count
+
+			for _, member := range members {
+				if !yield(IterResult[discord.Member]{
+					Value: member,
+				}) {
+					return
+				}
+			}
+
+			if count < LIMIT {
+				slog.Debug("Finished getting members", "guild_id", guildID, "total_members", totalMembers)
+				return
+			}
+			slog.Debug("Retrieving more members", "guild_id", guildID, "total_members", totalMembers)
+
+			memberOffset = members[len(members)-1].User.ID
+		}
+	}
 }
