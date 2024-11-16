@@ -133,7 +133,7 @@ type IterResult[T any] struct {
 }
 
 func GetMembersIter(r rest.Rest, guildID snowflake.ID) iter.Seq[IterResult[discord.Member]] {
-	const LIMIT int = 2
+	const LIMIT int = 1000
 	memberOffset := snowflake.ID(0)
 	totalMembers := 0
 	return func(yield func(IterResult[discord.Member]) bool) {
