@@ -8,6 +8,7 @@ import (
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/json"
+
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/utils"
 )
@@ -180,25 +181,12 @@ func banHandlerInner(e *handler.CommandEvent, user discord.User, sendReason bool
 			reason,
 		)))
 	if err != nil {
-		return e.CreateMessage(
-			discord.NewMessageCreateBuilder().
-				SetEphemeral(true).
-				SetContent("Failed to ban user").
-				Build())
+		return CreateMessage(e, true, "Failed to ban user")
 	}
 
 	if failedToMessage {
-		return e.CreateMessage(
-			discord.NewMessageCreateBuilder().
-				SetEphemeral(true).
-				SetContent("User was banned but message failed to send.").
-				Build())
+		return CreateMessage(e, true, "User was banned but message failed to send.")
 	}
 
-	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("User was banned.").
-			Build())
-
+	return CreateMessage(e, true, "User was banned.")
 }

@@ -60,28 +60,18 @@ func PruneDryRunHandler(e *handler.CommandEvent) error {
 
 	guildSettings, err := model.GetGuildSettings(*e.GuildID())
 	if err != nil {
-		_ = e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to prune members: could not get guild settings.").
-			Build())
-		return err
+		return CreateMessage(e, true, "Failed to prune members: could not get guild settings.")
 	}
 
 	if guildSettings.GatekeepPendingRole == 0 {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to prune members: no pending role set. This command will only prune pending members.").
-			Build())
+		return CreateMessage(e, true, "Failed to prune members: no pending role set. This command will only prune pending members.")
 	}
 
 	_ = e.DeferCreateMessage(true)
 
 	prunableMembers, err := getPrunableMembers(e, days, guildSettings)
 	if err != nil {
-		_, err = e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to prune members: could not get member list.").
-			Build())
+		_ = CreateFollowupMessage(e, true, "Failed to prune members: could not get member list.")
 		return err
 	}
 
@@ -97,11 +87,7 @@ func PruneDryRunHandler(e *handler.CommandEvent) error {
 		adminMessage += fmt.Sprintf("-# %s (%s)\n", member.User.Username, member.User.ID)
 	}
 
-	_, err = e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
-		SetEphemeral(true).
-		SetContent(adminMessage).
-		Build())
-	return err
+	return CreateFollowupMessage(e, true, adminMessage)
 }
 
 var PruneCommand = discord.SlashCommandCreate{
@@ -149,18 +135,12 @@ func PruneHandler(e *handler.CommandEvent) error {
 
 	guildSettings, err := model.GetGuildSettings(*e.GuildID())
 	if err != nil {
-		_ = e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to prune members: could not get guild settings.").
-			Build())
+		_ = CreateMessage(e, true, "Failed to prune members: could not get guild settings.")
 		return err
 	}
 
 	if guildSettings.GatekeepPendingRole == 0 {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to prune members: no pending role set. This command will only prune pending members.").
-			Build())
+		return CreateMessage(e, true, "Failed to prune members: no pending role set. This command will only prune pending members.")
 	}
 
 	_ = e.DeferCreateMessage(true)
@@ -169,11 +149,7 @@ func PruneHandler(e *handler.CommandEvent) error {
 
 	prunableMembers, err := getPrunableMembers(e, days, guildSettings)
 	if err != nil {
-		_, err = e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to prune members: could not get member list.").
-			Build())
-		return err
+		return CreateFollowupMessage(e, true, "Failed to prune members: could not get member list.")
 	}
 
 	for _, member := range prunableMembers {
@@ -187,11 +163,7 @@ func PruneHandler(e *handler.CommandEvent) error {
 					e.User().Username, e.User().ID)))
 		if err != nil {
 			slog.Error("Failed to prune member.", "err", err, "user_id", member.User.ID)
-			_, err = e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
-				SetEphemeral(true).
-				SetContent("Failed to prune members: failed to remove member.").
-				Build())
-			return err
+			return CreateFollowupMessage(e, true, "Failed to prune members: failed to remove member.")
 		}
 	}
 
@@ -223,11 +195,7 @@ func PruneHandler(e *handler.CommandEvent) error {
 
 	_ = days
 
-	_, err = e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
-		SetEphemeral(true).
-		SetContentf("Pruned %d users.", numKicked).
-		Build())
-	return err
+	return CreateFollowupMessagef(e, true, "Pruned %d users.", numKicked)
 }
 
 func getPrunableMembers(e *handler.CommandEvent, days int, guildSettings *model.GuildSettings) (members []*discord.Member, err error) {

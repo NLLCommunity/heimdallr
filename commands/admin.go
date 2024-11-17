@@ -7,6 +7,7 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/json"
+
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/utils"
 )
@@ -454,10 +455,7 @@ func AdminGatekeepMessageModalHandler(e *handler.ModalEvent) error {
 
 	_, err = mustache.RenderRaw(message, true, utils.MessageTemplateData{})
 	if err != nil {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContentf("The message contains data that is invalid; this may be caused by invalid placeholders.").
-			SetEphemeral(true).
-			Build())
+		return CreateMessage(e, true, "The message contains data that is invalid; this may be caused by invalid placeholders.")
 	}
 
 	settings.GatekeepApprovedMessage = message
@@ -467,11 +465,7 @@ func AdminGatekeepMessageModalHandler(e *handler.ModalEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContent("Gatekeep approved message updated.").
-		SetEphemeral(true).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		Build())
+	return CreateMessage(e, true, "Gatekeep approved message updated.")
 }
 
 func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
@@ -593,10 +587,7 @@ func AdminJoinMessageModalHandler(e *handler.ModalEvent) error {
 
 	_, err = mustache.RenderRaw(message, true, utils.MessageTemplateData{})
 	if err != nil {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContentf("The message contains data that is invalid; this may be caused by invalid placeholders.").
-			SetEphemeral(true).
-			Build())
+		return CreateMessage(e, true, "The message contains data that is invalid; this may be caused by invalid placeholders.")
 	}
 
 	settings.JoinMessage = message
@@ -606,11 +597,7 @@ func AdminJoinMessageModalHandler(e *handler.ModalEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContent("Join message updated.").
-		SetEphemeral(true).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		Build())
+	return CreateMessage(e, true, "Join message updated.")
 }
 
 func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
@@ -680,10 +667,7 @@ func AdminLeaveMessageModalHandler(e *handler.ModalEvent) error {
 
 	_, err = mustache.RenderRaw(message, true, utils.MessageTemplateData{})
 	if err != nil {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContentf("The message contains data that is invalid; this may be caused by invalid placeholders.").
-			SetEphemeral(true).
-			Build())
+		return CreateMessage(e, true, "The message contains data that is invalid; this may be caused by invalid placeholders.")
 	}
 
 	settings.LeaveMessage = message
@@ -693,9 +677,5 @@ func AdminLeaveMessageModalHandler(e *handler.ModalEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContent("Leave message updated.").
-		SetEphemeral(true).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		Build())
+	return CreateMessage(e, true, "Leave message updated.")
 }

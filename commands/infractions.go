@@ -122,9 +122,7 @@ func WarnHandler(e *handler.CommandEvent) error {
 
 	inf, err := model.CreateInfraction(guild.ID, user.ID, e.User().ID, reason, severity, silent)
 	if err != nil {
-		_ = e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to create infraction.").Build())
+		_ = CreateMessage(e, true, "Failed to create infraction.")
 		return fmt.Errorf("failed to create infraction: %w", err)
 	}
 
@@ -173,10 +171,7 @@ func WarnHandler(e *handler.CommandEvent) error {
 		}
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetEphemeral(true).
-		SetContentf("Warning created for %s.",
-			user.Mention()).Build())
+	return CreateMessagef(e, true, "Warning created for %s.", user.Mention())
 }
 
 func severityToColor(severity float64) int {
@@ -338,26 +333,17 @@ func InfractionsListHandler(e *handler.CommandEvent) error {
 	userIDString, hasUserID := data.OptString("user-id")
 
 	if !hasUser && !hasUserID {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContent("You must specify either a user or a user ID.").
-			SetEphemeral(true).
-			Build())
+		return CreateMessage(e, true, "You must specify either a user or a user ID.")
 	}
 
 	if hasUser && hasUserID {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContent("You can only specify either a user or a user ID.").
-			SetEphemeral(true).
-			Build())
+		return CreateMessage(e, true, "You can only specify either a user or a user ID.")
 	}
 
 	if !hasUser {
 		userID, err := snowflake.Parse(userIDString)
 		if err != nil {
-			_ = e.CreateMessage(discord.NewMessageCreateBuilder().
-				SetContent("Failed to parse user id.").
-				SetEphemeral(true).
-				Build())
+			_ = CreateMessage(e, true, "Failed to parse user id.")
 			return fmt.Errorf("failed to parse user id: %w", err)
 		}
 
@@ -398,16 +384,10 @@ func InfractionsRemoveHandler(e *handler.CommandEvent) error {
 
 	err := model.DeleteInfractionBySqid(infID)
 	if err != nil {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to delete infraction.").
-			Build())
+		return CreateMessage(e, true, "Failed to delete infraction.")
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetEphemeral(true).
-		SetContent("Infraction deleted.").
-		Build())
+	return CreateMessage(e, true, "Infraction deleted.")
 }
 
 func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
@@ -437,11 +417,7 @@ func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
 	}
 
 	if e.User().ID != parentIx.User.ID {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			SetContent("You can only paginate responses from your own commands.").
-			SetEphemeral(true).
-			Build())
+		return CreateMessage(e, true, "You can only paginate responses from your own commands.")
 	}
 
 	mcb, mub, err := getUserInfractionsAndUpdateMessage(false, offset, &guild, user)

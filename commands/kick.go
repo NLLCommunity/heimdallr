@@ -76,11 +76,7 @@ func KickWithMessageHandler(e *handler.CommandEvent) error {
 	}
 
 	if failedToMessage {
-		return e.CreateMessage(
-			discord.NewMessageCreateBuilder().
-				SetEphemeral(true).
-				SetContent("User was kicked but message failed to send.").
-				Build())
+		return CreateMessage(e, true, "User was kicked but message failed to send.")
 	}
 
 	return e.CreateMessage(
