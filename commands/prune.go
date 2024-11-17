@@ -87,15 +87,8 @@ func PruneDryRunHandler(e *handler.CommandEvent) error {
 
 	numKicked := len(prunableMembers)
 
-	adminMessage := fmt.Sprintf("Dry run: pruned %d members.\n\nMembers:\n", numKicked)
-
-	for _, member := range prunableMembers {
-		if member == nil {
-			continue
-		}
-
-		adminMessage += fmt.Sprintf("-# %s (%s)\n", member.User.Username, member.User.ID)
-	}
+	header := fmt.Sprintf("Dry run: pruned %d members.", numKicked)
+	adminMessage := createKickedMembersLogText(header, prunableMembers)
 
 	_, err = e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
 		SetEphemeral(true).
@@ -197,15 +190,8 @@ func PruneHandler(e *handler.CommandEvent) error {
 
 	numKicked := len(kickedMembers)
 
-	adminMessage := fmt.Sprintf("Pruned %d members.\n\nMembers:\n", numKicked)
-
-	for _, member := range kickedMembers {
-		if member == nil {
-			continue
-		}
-
-		adminMessage += fmt.Sprintf("-# %s (%s)\n", member.User.Username, member.User.ID)
-	}
+	header := fmt.Sprintf("Pruned %d members.", numKicked)
+	adminMessage := createKickedMembersLogText(header, kickedMembers)
 
 	if numKicked > 0 && guildSettings.ModeratorChannel != 0 {
 		_, err = e.Client().Rest().CreateMessage(guildSettings.ModeratorChannel, discord.NewMessageCreateBuilder().
@@ -255,4 +241,22 @@ func getPrunableMembers(e *handler.CommandEvent, days int, guildSettings *model.
 	}
 
 	return
+}
+
+func createKickedMembersLogText(title string, kickedMembers []*discord.Member) string {
+	adminMessage := fmt.Sprintf("%s\n\n", title)
+
+	for _, member := range kickedMembers {
+		if member == nil {
+			continue
+		}
+	
+		adminMessage += fmt.Sprintf("-# %s ( %s ) <t:%d:R>\n",
+			member.User.Username,
+			member.User.ID,
+			member.User.ID.Time().Unix(),
+		)
+	}
+
+	return adminMessage
 }
