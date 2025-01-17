@@ -116,7 +116,6 @@ func main() {
 	r.Component("/role/assign/{roleID}", components.RoleAssignButtonHandler)
 
 	r.Command("/prune-pending-members", commands.PruneHandler)
-	r.Command("/prune-pending-members-dry-run", commands.PruneDryRunHandler)
 
 	commandCreates := []discord.ApplicationCommandCreate{
 		commands.PingCommand,
@@ -131,7 +130,6 @@ func main() {
 		commands.ApproveUserCommand,
 		commands.CreateRoleButtonCommand,
 		commands.PruneCommand,
-		commands.PruneDryRunCommand,
 	}
 
 	client, err := disgo.New(token,
