@@ -2,11 +2,13 @@ package commands
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/cbroglie/mustache"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/json"
+
 	"github.com/myrkvi/heimdallr/model"
 	"github.com/myrkvi/heimdallr/utils"
 )
@@ -15,7 +17,7 @@ var AdminCommand = discord.SlashCommandCreate{
 	Name:                     "admin",
 	Description:              "admin commands",
 	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionAdministrator),
-	DMPermission:             utils.Ref(false),
+	Contexts:                 []discord.InteractionContextType{discord.InteractionContextTypeGuild},
 	Options: []discord.ApplicationCommandOption{
 		discord.ApplicationCommandOptionSubCommand{
 			Name:        "info",
@@ -125,6 +127,32 @@ var AdminCommand = discord.SlashCommandCreate{
 			Name:        "leave-message",
 			Description: "Set the message to send when a user leaves",
 		},
+
+		discord.ApplicationCommandOptionSubCommand{
+			Name:        "anti-spam",
+			Description: "View or set anti-spam settings",
+			Options: []discord.ApplicationCommandOption{
+				discord.ApplicationCommandOptionBool{
+					Name:        "enabled",
+					Description: "Whether to enable the anti-spam system",
+					Required:    false,
+				},
+				discord.ApplicationCommandOptionInt{
+					Name:        "count",
+					Description: "The number of messages needed for Heimdallr to take action (within the cooldown period)",
+					Required:    false,
+					MinValue:    utils.Ref(2),
+					MaxValue:    utils.Ref(10),
+				},
+				discord.ApplicationCommandOptionInt{
+					Name:        "cooldown",
+					Description: "The time in seconds to wait before resetting the message count",
+					Required:    false,
+					MinValue:    utils.Ref(1),
+					MaxValue:    utils.Ref(60),
+				},
+			},
+		},
 	},
 }
 
@@ -145,9 +173,10 @@ func AdminInfoHandler(e *handler.CommandEvent) error {
 	infractionSettings := infractionInfo(settings)
 	gatekeepSettings := gatekeepInfo(settings)
 	joinLeaveSettings := joinLeaveInfo(settings)
+	antiSpamSettings := antiSpamInfo(settings)
 
-	message := fmt.Sprintf("# Server settings\n%s\n\n%s\n\n%s\n\n%s",
-		modChannel, infractionSettings, gatekeepSettings, joinLeaveSettings)
+	message := fmt.Sprintf("# Server settings\n%s\n\n%s\n\n%s\n\n%s\n\n%s",
+		modChannel, infractionSettings, gatekeepSettings, joinLeaveSettings, antiSpamSettings)
 
 	return e.CreateMessage(discord.NewMessageCreateBuilder().
 		SetContent(message).
@@ -230,6 +259,23 @@ func joinLeaveInfo(settings *model.GuildSettings) string {
 
 	return fmt.Sprintf("## Join/leave settings\n%s\n\n%s\n\n%s\n\n*%s*",
 		joinMessageEnabled, leaveMessageEnabled, joinLeaveChannel, joinLeaveMessageInfo)
+}
+
+func antiSpamInfo(settings *model.GuildSettings) string {
+	antispamEnabledInfo := "> This determines whether to enable the anti-spam system."
+	antispamEnabled := fmt.Sprintf("**Anti-spam enabled:** %s\n%s",
+		utils.Iif(settings.AntiSpamEnabled, "yes", "no"), antispamEnabledInfo)
+
+	antispamCountInfo := "> This is the number of messages needed for Heimdallr to take action (within the cooldown period)."
+	antispamCount := fmt.Sprintf("**Anti-spam count:** %d\n%s",
+		settings.AntiSpamCount, antispamCountInfo)
+
+	antispamCooldownInfo := "> This is the time in seconds to wait before resetting the message count."
+	antispamCooldown := fmt.Sprintf("**Anti-spam cooldown:** %d\n%s",
+		settings.AntiSpamCooldownSeconds, antispamCooldownInfo)
+
+	return fmt.Sprintf("## Anti-spam settings\n%s\n\n%s\n\n%s",
+		antispamEnabled, antispamCount, antispamCooldown)
 }
 
 func AdminModChannelHandler(e *handler.CommandEvent) error {
@@ -695,6 +741,60 @@ func AdminLeaveMessageModalHandler(e *handler.ModalEvent) error {
 
 	return e.CreateMessage(discord.NewMessageCreateBuilder().
 		SetContent("Leave message updated.").
+		SetEphemeral(true).
+		SetAllowedMentions(&discord.AllowedMentions{}).
+		Build())
+}
+func AdminAntiSpamHandler(e *handler.CommandEvent) error {
+	utils.LogInteraction("admin anti-spam", e)
+	data := e.SlashCommandInteractionData()
+	guild, isGuild := e.Guild()
+	if !isGuild {
+		return ErrEventNoGuildID
+	}
+
+	settings, err := model.GetGuildSettings(guild.ID)
+	if err != nil {
+		slog.Warn("Failed to get guild settings", "err", err)
+		return err
+	}
+
+	message := ""
+
+	enabled, hasEnabled := data.OptBool("enabled")
+	if hasEnabled {
+		settings.AntiSpamEnabled = enabled
+		message += fmt.Sprintf("Anti-spam enabled set to %s\n", utils.Iif(enabled, "yes", "no"))
+	}
+
+	count, hasCount := data.OptInt("count")
+	if hasCount {
+		settings.AntiSpamCount = count
+		message += fmt.Sprintf("Anti-spam count (message threshold within cooldown period) set to %d\n", count)
+	}
+
+	cooldown, hasCooldown := data.OptInt("cooldown")
+	if hasCooldown {
+		settings.AntiSpamCooldownSeconds = cooldown
+		message += fmt.Sprintf("Anti-spam cooldown (seconds) set to %d\n", cooldown)
+	}
+
+	if !utils.Any(hasEnabled, hasCount, hasCooldown) {
+		return e.CreateMessage(discord.NewMessageCreateBuilder().
+			SetContent(antiSpamInfo(settings)).
+			SetEphemeral(true).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build())
+	}
+
+	err = model.SetGuildSettings(settings)
+	if err != nil {
+		slog.Warn("Failed to set guild settings", "err", err)
+		return err
+	}
+
+	return e.CreateMessage(discord.NewMessageCreateBuilder().
+		SetContent(message).
 		SetEphemeral(true).
 		SetAllowedMentions(&discord.AllowedMentions{}).
 		Build())

@@ -31,6 +31,10 @@ type GuildSettings struct {
 	LeaveMessageEnabled bool
 	LeaveMessage        string
 	JoinLeaveChannel    snowflake.ID
+
+	AntiSpamEnabled         bool
+	AntiSpamCount           int `gorm:"default:5"`
+	AntiSpamCooldownSeconds int `gorm:"default:20"`
 }
 
 func GetGuildSettings(guildID snowflake.ID) (*GuildSettings, error) {
