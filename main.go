@@ -103,6 +103,8 @@ func main() {
 		r.Command("/leave-message", commands.AdminLeaveMessageHandler)
 		r.Component("/leave-message/button", commands.AdminLeaveMessageButtonHandler)
 		r.Modal("/leave-message/modal", commands.AdminLeaveMessageModalHandler)
+
+		r.Command("/anti-spam", commands.AdminAntiSpamHandler)
 	})
 
 	r.Command("/Approve", commands.ApproveUserCommandHandler)
@@ -147,6 +149,7 @@ func main() {
 		bot.WithEventListenerFunc(listeners.OnUserLeave),
 		bot.WithEventListenerFunc(listeners.OnMemberBan),
 		bot.WithEventListenerFunc(listeners.OnAuditLog),
+		bot.WithEventListenerFunc(listeners.OnAntispamMessageCreate),
 		bot.WithGatewayConfigOpts(gateway.WithIntents(intents)),
 		bot.WithCacheConfigOpts(
 			cache.WithCaches(cache.FlagsAll),
