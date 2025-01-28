@@ -3,7 +3,7 @@ module github.com/myrkvi/heimdallr
 go 1.23.0
 
 require (
-	github.com/agnivade/levenshtein v1.2.0
+	github.com/agnivade/levenshtein v1.2.1
 	github.com/cbroglie/mustache v1.4.0
 	github.com/disgoorg/disgo v0.18.14
 	github.com/disgoorg/json v1.2.0
