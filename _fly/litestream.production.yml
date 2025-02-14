@@ -1,9 +1,0 @@
-exec: heimdallr
-dbs:
-  - path: /var/db/heimdallr.db
-    replicas:
-      - type: s3
-        bucket: broken-silence-792
-        endpoint: "fly.storage.tigris.dev"
-        path: "heimdallr.db"
-        force-path-style: true

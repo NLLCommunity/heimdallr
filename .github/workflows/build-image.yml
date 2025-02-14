@@ -1,0 +1,47 @@
+# WARNING: The build tag uses github.run_number which is a unique counter for
+# this workflow. Renaming, moving, or deleting this workflow file will reset the
+# run number. Please do not change the workflow filename or its identity without
+# coordinating with the team, as a reset can cause previously higher build
+# numbers to be replaced with lower ones.
+
+name: Build and Push Docker Image to GHCR
+
+on:
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: build-and-push
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        run: echo ${{ secrets.GITHUB_TOKEN }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/nllcommunity/heimdallr:${{ github.sha }}
+            ghcr.io/nllcommunity/heimdallr:${{ github.run_number }}
+            ghcr.io/nllcommunity/heimdallr:latest
+          labels: |
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}
+            org.opencontainers.image.revision=${{ github.sha }}
