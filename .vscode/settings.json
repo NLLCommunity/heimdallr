@@ -12,5 +12,6 @@
   },
   "[markdown]": {
     "editor.rulers": []
-  }
+  },
+  "go.formatTool": "goimports"
 }
