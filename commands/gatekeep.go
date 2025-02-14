@@ -11,8 +11,8 @@ import (
 	"github.com/disgoorg/json"
 	"github.com/disgoorg/snowflake/v2"
 
-	"github.com/myrkvi/heimdallr/model"
-	"github.com/myrkvi/heimdallr/utils"
+	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 var ApproveUserCommand = discord.UserCommandCreate{

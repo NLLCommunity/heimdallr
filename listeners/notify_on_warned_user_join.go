@@ -7,8 +7,9 @@ import (
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
-	"github.com/myrkvi/heimdallr/model"
-	"github.com/myrkvi/heimdallr/utils"
+
+	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 func OnWarnedUserJoin(e *events.GuildMemberJoin) {

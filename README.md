@@ -14,7 +14,7 @@ As a [Go](https://golang.org) project, you'll need to have Go installed on your 
 1. To contribute to Heimdallr, you'll need to fork the repository and clone it to your machine. You can do this by running the following command:
 
     ```bash
-    git clone https://github.com/myrkvi/heimdallr.git
+    git clone https://github.com/NLLCommunity/heimdallr.git
     cd heimdallr
     ```
 

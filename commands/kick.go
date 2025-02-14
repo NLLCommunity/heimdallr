@@ -8,7 +8,7 @@ import (
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/json"
 
-	"github.com/myrkvi/heimdallr/utils"
+	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 var KickCommand = discord.SlashCommandCreate{

@@ -10,9 +10,9 @@ import (
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/json"
 
-	"github.com/myrkvi/heimdallr/globals"
-	"github.com/myrkvi/heimdallr/model"
-	"github.com/myrkvi/heimdallr/utils"
+	"github.com/NLLCommunity/heimdallr/globals"
+	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 var PruneCommand = discord.SlashCommandCreate{

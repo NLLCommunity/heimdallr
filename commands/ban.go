@@ -8,8 +8,9 @@ import (
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/json"
-	"github.com/myrkvi/heimdallr/model"
-	"github.com/myrkvi/heimdallr/utils"
+
+	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 var BanCommand = discord.SlashCommandCreate{

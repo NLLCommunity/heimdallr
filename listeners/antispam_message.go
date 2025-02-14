@@ -14,7 +14,7 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/jellydator/ttlcache/v3"
 
-	"github.com/myrkvi/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/model"
 )
 
 const minMessageLength = 10

@@ -7,7 +7,8 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/json"
-	"github.com/myrkvi/heimdallr/utils"
+
+	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 var CreateRoleButtonCommand = discord.SlashCommandCreate{

@@ -7,8 +7,9 @@ import (
 
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/rest"
-	"github.com/myrkvi/heimdallr/model"
-	"github.com/myrkvi/heimdallr/task"
+
+	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/task"
 )
 
 func RemoveTempBansScheduledTask(client bot.Client) task.Task {

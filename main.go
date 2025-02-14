@@ -21,12 +21,12 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/spf13/viper"
 
-	"github.com/myrkvi/heimdallr/commands"
-	"github.com/myrkvi/heimdallr/components"
-	_ "github.com/myrkvi/heimdallr/config"
-	"github.com/myrkvi/heimdallr/listeners"
-	"github.com/myrkvi/heimdallr/model"
-	"github.com/myrkvi/heimdallr/scheduled_tasks"
+	"github.com/NLLCommunity/heimdallr/commands"
+	"github.com/NLLCommunity/heimdallr/components"
+	_ "github.com/NLLCommunity/heimdallr/config"
+	"github.com/NLLCommunity/heimdallr/listeners"
+	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/scheduled_tasks"
 )
 
 var rmGlobalCommands = flag.Bool("rm-global-commands", false, "Remove global commands")
