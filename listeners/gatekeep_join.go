@@ -4,7 +4,8 @@ import (
 	"log/slog"
 
 	"github.com/disgoorg/disgo/events"
-	"github.com/myrkvi/heimdallr/model"
+
+	"github.com/NLLCommunity/heimdallr/model"
 )
 
 func OnGatekeepUserJoin(e *events.GuildMemberJoin) {

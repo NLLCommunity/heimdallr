@@ -14,7 +14,8 @@ import (
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/json"
 	"github.com/disgoorg/snowflake/v2"
-	"github.com/myrkvi/heimdallr/utils"
+
+	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 var quoteUrlRegex = regexp.MustCompile(

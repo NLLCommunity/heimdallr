@@ -1,4 +1,4 @@
-module github.com/myrkvi/heimdallr
+module github.com/NLLCommunity/heimdallr
 
 go 1.23.0
 
