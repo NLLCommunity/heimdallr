@@ -1,4 +1,4 @@
-package commands
+package prune
 
 import (
 	"fmt"
@@ -11,9 +11,16 @@ import (
 	"github.com/disgoorg/json"
 
 	"github.com/NLLCommunity/heimdallr/globals"
+	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
+
+func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+	r.Command("/prune-pending-members", PruneHandler)
+
+	return []discord.ApplicationCommandCreate{PruneCommand}
+}
 
 var PruneCommand = discord.SlashCommandCreate{
 	Name: "prune-pending-members",
@@ -58,7 +65,7 @@ var PruneCommand = discord.SlashCommandCreate{
 
 func PruneHandler(e *handler.CommandEvent) error {
 	if e.GuildID() == nil {
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 	days := e.SlashCommandInteractionData().Int("days")
 	dryRun, dryRunOk := e.SlashCommandInteractionData().OptBool("dry-run")
@@ -68,27 +75,33 @@ func PruneHandler(e *handler.CommandEvent) error {
 
 	guildSettings, err := model.GetGuildSettings(*e.GuildID())
 	if err != nil {
-		_ = e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to prune members: could not get guild settings.").
-			Build())
+		_ = e.CreateMessage(
+			discord.NewMessageCreateBuilder().
+				SetEphemeral(true).
+				SetContent("Failed to prune members: could not get guild settings.").
+				Build(),
+		)
 		return err
 	}
 
 	if guildSettings.GatekeepPendingRole == 0 {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to prune members: no pending role set. This command will only prune pending members.").
-			Build())
+		return e.CreateMessage(
+			discord.NewMessageCreateBuilder().
+				SetEphemeral(true).
+				SetContent("Failed to prune members: no pending role set. This command will only prune pending members.").
+				Build(),
+		)
 	}
 
 	_ = e.DeferCreateMessage(true)
 	prunableMembers, err := getPrunableMembers(e, days, guildSettings)
 	if err != nil {
-		_, err = e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to prune members: could not get member list.").
-			Build())
+		_, err = e.CreateFollowupMessage(
+			discord.NewMessageCreateBuilder().
+				SetEphemeral(true).
+				SetContent("Failed to prune members: could not get member list.").
+				Build(),
+		)
 		return err
 	}
 
@@ -120,22 +133,28 @@ func pruneMembers(e *handler.CommandEvent, guildSettings model.GuildSettings, me
 	}
 
 	if numKicked > 0 && guildSettings.ModeratorChannel != 0 {
-		_, err = e.Client().Rest().CreateMessage(guildSettings.ModeratorChannel, discord.NewMessageCreateBuilder().
-			SetContent(adminMessage).
-			Build())
+		_, err = e.Client().Rest().CreateMessage(
+			guildSettings.ModeratorChannel, discord.NewMessageCreateBuilder().
+				SetContent(adminMessage).
+				Build(),
+		)
 		if err != nil {
-			slog.Error("Failed to send prune message to moderator channel.",
+			slog.Error(
+				"Failed to send prune message to moderator channel.",
 				"err", err,
 				"guild_id", *e.GuildID(),
 				"channel_id", guildSettings.ModeratorChannel,
-				"user_id", e.User().ID)
+				"user_id", e.User().ID,
+			)
 		}
 	}
 
-	_, err = e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
-		SetEphemeral(true).
-		SetContentf("Pruned %d users.", numKicked).
-		Build())
+	_, err = e.CreateFollowupMessage(
+		discord.NewMessageCreateBuilder().
+			SetEphemeral(true).
+			SetContentf("Pruned %d users.", numKicked).
+			Build(),
+	)
 	return err
 }
 
@@ -149,10 +168,12 @@ func dryRunPruneMembers(e *handler.CommandEvent, members []*discord.Member) erro
 		adminMessage += fmt.Sprintf("-# %s (%s)\n", member.User.Username, member.User.ID)
 	}
 
-	_, err := e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
-		SetEphemeral(true).
-		SetContent(adminMessage).
-		Build())
+	_, err := e.CreateFollowupMessage(
+		discord.NewMessageCreateBuilder().
+			SetEphemeral(true).
+			SetContent(adminMessage).
+			Build(),
+	)
 	return err
 }
 
@@ -164,10 +185,14 @@ func kickMembers(e *handler.CommandEvent, members []*discord.Member) (kickedMemb
 		}
 		globals.ExcludedFromModKickLog[member.User.ID] = struct{}{}
 
-		err = e.Client().Rest().RemoveMember(member.GuildID, member.User.ID,
+		err = e.Client().Rest().RemoveMember(
+			member.GuildID, member.User.ID,
 			rest.WithReason(
-				fmt.Sprintf("User pruned with command. Pruned by %s (%s)",
-					e.User().Username, e.User().ID)),
+				fmt.Sprintf(
+					"User pruned with command. Pruned by %s (%s)",
+					e.User().Username, e.User().ID,
+				),
+			),
 		)
 		if err != nil {
 			slog.Error("Failed to prune member.", "err", err, "user_id", member.User.ID)
@@ -178,7 +203,9 @@ func kickMembers(e *handler.CommandEvent, members []*discord.Member) (kickedMemb
 	return
 }
 
-func getPrunableMembers(e *handler.CommandEvent, days int, guildSettings *model.GuildSettings) (members []*discord.Member, err error) {
+func getPrunableMembers(
+	e *handler.CommandEvent, days int, guildSettings *model.GuildSettings,
+) (members []*discord.Member, err error) {
 	maxTimeDiff := time.Duration(days) * time.Hour * 24
 
 	for member := range utils.GetMembersIter(e.Client().Rest(), *e.GuildID()) {

@@ -1,4 +1,4 @@
-package commands
+package infractions
 
 import (
 	"context"
@@ -14,9 +14,29 @@ import (
 	"github.com/disgoorg/json"
 	"github.com/disgoorg/snowflake/v2"
 
+	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
+
+func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+	r.Command("/warn", WarnHandler)
+	r.Command("/warnings", UserInfractionsHandler)
+	r.Route(
+		"/infractions", func(r handler.Router) {
+			r.Command("/list", InfractionsListHandler)
+			r.Command("/remove", InfractionsRemoveHandler)
+		},
+	)
+	r.Component("/infractions-user/{offset}", UserInfractionButtonHandler)
+	r.Component("/infractions-mod/{userID}/{offset}", InfractionsListComponentHandler)
+
+	return []discord.ApplicationCommandCreate{
+		InfractionsCommand,
+		UserInfractionsCommand,
+		WarnCommand,
+	}
+}
 
 // pageSize is the size of one page of infractions
 const pageSize = 5
@@ -112,19 +132,23 @@ func WarnHandler(e *handler.CommandEvent) error {
 	guild, ok := e.Guild()
 	if !ok {
 		slog.Warn("No guild id found in event.", "guild", guild)
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 
-	slog.DebugContext(ctx, "Received /warn command.",
+	slog.DebugContext(
+		ctx, "Received /warn command.",
 		"user", user.Username,
 		"guild", guild.Name,
-		"moderator", e.User().Username)
+		"moderator", e.User().Username,
+	)
 
 	inf, err := model.CreateInfraction(guild.ID, user.ID, e.User().ID, reason, severity, silent)
 	if err != nil {
-		_ = e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to create infraction.").Build())
+		_ = e.CreateMessage(
+			discord.NewMessageCreateBuilder().
+				SetEphemeral(true).
+				SetContent("Failed to create infraction.").Build(),
+		)
 		return fmt.Errorf("failed to create infraction: %w", err)
 	}
 
@@ -144,18 +168,23 @@ func WarnHandler(e *handler.CommandEvent) error {
 		if err != nil {
 			failedToSend = true
 		}
-		_, err = e.Client().Rest().CreateMessage(channel.ID(), discord.NewMessageCreateBuilder().
-			SetEmbeds(embed.Build()).
-			Build())
+		_, err = e.Client().Rest().CreateMessage(
+			channel.ID(), discord.NewMessageCreateBuilder().
+				SetEmbeds(embed.Build()).
+				Build(),
+		)
 		if err != nil {
 			failedToSend = true
 		}
 	}
 
 	message := discord.NewMessageCreateBuilder().
-		SetContentf("## %s %s.",
-			utils.Iif(inf.Silent, "Silent warning created for",
-				utils.Iif(failedToSend, "Failed to send warning to", "Warning sent to")),
+		SetContentf(
+			"## %s %s.",
+			utils.Iif(
+				inf.Silent, "Silent warning created for",
+				utils.Iif(failedToSend, "Failed to send warning to", "Warning sent to"),
+			),
 			user.Mention(),
 		).
 		SetEmbeds(embed.Build()).
@@ -165,18 +194,24 @@ func WarnHandler(e *handler.CommandEvent) error {
 	if err == nil && guildSettings.ModeratorChannel != 0 {
 		_, err = e.Client().Rest().CreateMessage(guildSettings.ModeratorChannel, message)
 		if err != nil {
-			slog.Error("Failed to send warning to moderator channel.",
+			slog.Error(
+				"Failed to send warning to moderator channel.",
 				"err", err,
 				"guildID", guild.ID,
 				"channelID", guildSettings.ModeratorChannel,
-				"userID", user.ID)
+				"userID", user.ID,
+			)
 		}
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetEphemeral(true).
-		SetContentf("Warning created for %s.",
-			user.Mention()).Build())
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetEphemeral(true).
+			SetContentf(
+				"Warning created for %s.",
+				user.Mention(),
+			).Build(),
+	)
 }
 
 func severityToColor(severity float64) int {
@@ -214,7 +249,7 @@ func UserInfractionsHandler(e *handler.CommandEvent) error {
 	guild, ok := e.Guild()
 	if !ok {
 		slog.Warn("No guild id found in event.", "guild", guild)
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 
 	message, err := getUserInfractionsAndMakeMessage(false, &guild, &user)
@@ -236,7 +271,7 @@ func UserInfractionButtonHandler(e *handler.ComponentEvent) error {
 	user := e.User()
 	guild, ok := e.Guild()
 	if !ok {
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 
 	mcb, mub, err := getUserInfractionsAndUpdateMessage(false, offset, &guild, &user)
@@ -338,26 +373,32 @@ func InfractionsListHandler(e *handler.CommandEvent) error {
 	userIDString, hasUserID := data.OptString("user-id")
 
 	if !hasUser && !hasUserID {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContent("You must specify either a user or a user ID.").
-			SetEphemeral(true).
-			Build())
+		return e.CreateMessage(
+			discord.NewMessageCreateBuilder().
+				SetContent("You must specify either a user or a user ID.").
+				SetEphemeral(true).
+				Build(),
+		)
 	}
 
 	if hasUser && hasUserID {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContent("You can only specify either a user or a user ID.").
-			SetEphemeral(true).
-			Build())
+		return e.CreateMessage(
+			discord.NewMessageCreateBuilder().
+				SetContent("You can only specify either a user or a user ID.").
+				SetEphemeral(true).
+				Build(),
+		)
 	}
 
 	if !hasUser {
 		userID, err := snowflake.Parse(userIDString)
 		if err != nil {
-			_ = e.CreateMessage(discord.NewMessageCreateBuilder().
-				SetContent("Failed to parse user id.").
-				SetEphemeral(true).
-				Build())
+			_ = e.CreateMessage(
+				discord.NewMessageCreateBuilder().
+					SetContent("Failed to parse user id.").
+					SetEphemeral(true).
+					Build(),
+			)
 			return fmt.Errorf("failed to parse user id: %w", err)
 		}
 
@@ -374,7 +415,7 @@ func InfractionsListHandler(e *handler.CommandEvent) error {
 	guild, ok := e.Guild()
 	if !ok {
 		slog.Warn("No guild id found in event.", "guild", guild)
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 
 	message, err := getUserInfractionsAndMakeMessage(true, &guild, &user)
@@ -393,21 +434,25 @@ func InfractionsRemoveHandler(e *handler.CommandEvent) error {
 	guild, ok := e.Guild()
 	if !ok {
 		slog.Warn("No guild id found in event.", "guild", guild)
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 
 	err := model.DeleteInfractionBySqid(infID)
 	if err != nil {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to delete infraction.").
-			Build())
+		return e.CreateMessage(
+			discord.NewMessageCreateBuilder().
+				SetEphemeral(true).
+				SetContent("Failed to delete infraction.").
+				Build(),
+		)
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetEphemeral(true).
-		SetContent("Infraction deleted.").
-		Build())
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetEphemeral(true).
+			SetContent("Infraction deleted.").
+			Build(),
+	)
 }
 
 func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
@@ -420,7 +465,7 @@ func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
 
 	guild, isGuild := e.Guild()
 	if !isGuild {
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 	offset, err := strconv.Atoi(e.Vars["offset"])
 	if err != nil {
@@ -437,11 +482,13 @@ func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
 	}
 
 	if e.User().ID != parentIx.User.ID {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			SetContent("You can only paginate responses from your own commands.").
-			SetEphemeral(true).
-			Build())
+		return e.CreateMessage(
+			discord.NewMessageCreateBuilder().
+				SetAllowedMentions(&discord.AllowedMentions{}).
+				SetContent("You can only paginate responses from your own commands.").
+				SetEphemeral(true).
+				Build(),
+		)
 	}
 
 	mcb, mub, err := getUserInfractionsAndUpdateMessage(false, offset, &guild, user)
@@ -500,24 +547,38 @@ func getUserInfractions(guildID, userID snowflake.ID, limit, offset int) (userIn
 	if count > pageSize {
 		slog.Debug("Adding action row buttons.")
 		if offset > 0 {
-			components = append(components, discord.NewPrimaryButton("Previous",
-				fmt.Sprintf("/infractions-mod/%s/%d",
-					userID,
-					utils.Max(0, offset-pageSize)),
-			))
+			components = append(
+				components, discord.NewPrimaryButton(
+					"Previous",
+					fmt.Sprintf(
+						"/infractions-mod/%s/%d",
+						userID,
+						max(0, offset-pageSize),
+					),
+				),
+			)
 		} else {
-			components = append(components, discord.NewPrimaryButton("Previous", "unreachable").
-				AsDisabled())
+			components = append(
+				components, discord.NewPrimaryButton("Previous", "unreachable").
+					AsDisabled(),
+			)
 		}
 		if count > int64(offset+pageSize) {
-			components = append(components, discord.NewPrimaryButton("Next",
-				fmt.Sprintf("/infractions-mod/%s/%d",
-					userID,
-					utils.Min(count-1, int64(offset+pageSize)),
-				)))
+			components = append(
+				components, discord.NewPrimaryButton(
+					"Next",
+					fmt.Sprintf(
+						"/infractions-mod/%s/%d",
+						userID,
+						min(count-1, int64(offset+pageSize)),
+					),
+				),
+			)
 		} else {
-			components = append(components, discord.NewPrimaryButton("Next", "unreachable").
-				AsDisabled())
+			components = append(
+				components, discord.NewPrimaryButton("Next", "unreachable").
+					AsDisabled(),
+			)
 		}
 	}
 
@@ -538,19 +599,23 @@ func createInfractionEmbeds(infractions []model.Infraction, guildSettings *model
 		weightWithHalfLife := utils.CalcHalfLife(
 			time.Since(inf.CreatedAt),
 			utils.Iif(guildSettings == nil, 0.0, guildSettings.InfractionHalfLifeDays),
-			inf.Weight)
+			inf.Weight,
+		)
 
 		embed := discord.NewEmbedBuilder().
 			SetTitlef("Infraction `%s`", inf.Sqid()).
 			SetDescription(inf.Reason).
 			SetColor(severityToColor(inf.Weight)).
 			SetTimestamp(inf.Timestamp).
-			AddField("Strikes",
-				fmt.Sprintf("%s (%s)\n(at warn time: %s)",
+			AddField(
+				"Strikes",
+				fmt.Sprintf(
+					"%s (%s)\n(at warn time: %s)",
 					severityToDots(weightWithHalfLife),
 					utils.FormatFloatUpToPrec(weightWithHalfLife, 2),
 					utils.FormatFloatUpToPrec(inf.Weight, 2),
-				), true)
+				), true,
+			)
 
 		embeds = append(embeds, embed.Build())
 	}
@@ -604,24 +669,31 @@ func getUserInfractionsAndMakeMessage(
 			nil
 	}
 
-	modText := fmt.Sprintf("%s has %d infractions.",
+	modText := fmt.Sprintf(
+		"%s has %d infractions.",
 		user.Mention(),
-		infrData.TotalCount)
-	userText := fmt.Sprintf("You have %d infractions.",
-		infrData.TotalCount)
+		infrData.TotalCount,
+	)
+	userText := fmt.Sprintf(
+		"You have %d infractions.",
+		infrData.TotalCount,
+	)
 
 	message := discord.NewMessageCreateBuilder().
 		SetEphemeral(true).
 		SetAllowedMentions(&discord.AllowedMentions{}).
 		SetEmbeds(infrData.Embeds...).
-		SetContentf("%s (Viewing %d-%d)\nTotal strikes: %s",
+		SetContentf(
+			"%s (Viewing %d-%d)\nTotal strikes: %s",
 			utils.Iif(modView, modText, userText),
 			infrData.Offset+1,
 			infrData.Offset+infrData.CurrentCount,
-			fmt.Sprintf("%s (%s)",
+			fmt.Sprintf(
+				"%s (%s)",
 				severityToDots(infrData.TotalSeverity),
 				utils.FormatFloatUpToPrec(infrData.TotalSeverity, 2),
-			))
+			),
+		)
 
 	if infrData.Components != nil {
 		message.AddActionRow(infrData.Components...)
@@ -651,22 +723,29 @@ func getUserInfractionsAndUpdateMessage(
 		return
 	}
 
-	modText := fmt.Sprintf("%s has %d infractions.",
+	modText := fmt.Sprintf(
+		"%s has %d infractions.",
 		user.Mention(),
-		infrData.TotalCount)
-	userText := fmt.Sprintf("You have %d infractions.",
-		infrData.TotalCount)
+		infrData.TotalCount,
+	)
+	userText := fmt.Sprintf(
+		"You have %d infractions.",
+		infrData.TotalCount,
+	)
 
 	mub = discord.NewMessageUpdateBuilder().
 		SetEmbeds(infrData.Embeds...).
 		AddActionRow(infrData.Components...).
-		SetContentf("%s (Viewing %d-%d)\nTotal strikes: %s",
+		SetContentf(
+			"%s (Viewing %d-%d)\nTotal strikes: %s",
 			utils.Iif(modView, modText, userText),
 			infrData.Offset+1,
 			infrData.Offset+infrData.CurrentCount,
-			fmt.Sprintf("%s (%s)",
+			fmt.Sprintf(
+				"%s (%s)",
 				severityToDots(infrData.TotalSeverity),
 				utils.FormatFloatUpToPrec(infrData.TotalSeverity, 2),
-			))
+			),
+		)
 	return
 }

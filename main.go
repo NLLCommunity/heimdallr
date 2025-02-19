@@ -21,9 +21,17 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/spf13/viper"
 
-	"github.com/NLLCommunity/heimdallr/commands"
-	"github.com/NLLCommunity/heimdallr/components"
 	_ "github.com/NLLCommunity/heimdallr/config"
+	"github.com/NLLCommunity/heimdallr/interactions"
+	"github.com/NLLCommunity/heimdallr/interactions/admin"
+	"github.com/NLLCommunity/heimdallr/interactions/ban"
+	"github.com/NLLCommunity/heimdallr/interactions/gatekeep"
+	"github.com/NLLCommunity/heimdallr/interactions/infractions"
+	"github.com/NLLCommunity/heimdallr/interactions/kick"
+	"github.com/NLLCommunity/heimdallr/interactions/ping"
+	"github.com/NLLCommunity/heimdallr/interactions/prune"
+	"github.com/NLLCommunity/heimdallr/interactions/quote"
+	"github.com/NLLCommunity/heimdallr/interactions/role_button"
 	"github.com/NLLCommunity/heimdallr/listeners"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/scheduled_tasks"
@@ -70,79 +78,44 @@ func main() {
 	}
 
 	r := handler.New()
-
 	r.Use(middleware.Go)
 
-	r.Command("/ping", commands.PingHandler)
-	r.Command("/quote", commands.QuoteHandler)
-
-	r.Command("/warn", commands.WarnHandler)
-	r.Command("/warnings", commands.UserInfractionsHandler)
-	r.Route("/infractions", func(r handler.Router) {
-		r.Command("/list", commands.InfractionsListHandler)
-		r.Command("/remove", commands.InfractionsRemoveHandler)
-	})
-	r.Component("/infractions-user/{offset}", commands.UserInfractionButtonHandler)
-
-	r.Component("/infractions-mod/{userID}/{offset}", commands.InfractionsListComponentHandler)
-	r.Route("/admin", func(r handler.Router) {
-		r.Component("/show-all-button", commands.AdminShowAllButtonHandler)
-		r.Command("/info", commands.AdminInfoHandler)
-		r.Command("/mod-channel", commands.AdminModChannelHandler)
-		r.Command("/infractions", commands.AdminInfractionsHandler)
-		r.Command("/gatekeep", commands.AdminGatekeepHandler)
-		r.Command("/gatekeep-message", commands.AdminGatekeepMessageHandler)
-		r.Component("/gatekeep-message/button", commands.AdminGatekeepMessageButtonHandler)
-		r.Modal("/gatekeep-message/modal", commands.AdminGatekeepMessageModalHandler)
-		r.Command("/join-leave", commands.AdminJoinLeaveHandler)
-
-		r.Command("/join-message", commands.AdminJoinMessageHandler)
-		r.Component("/join-message/button", commands.AdminJoinMessageButtonHandler)
-		r.Modal("/join-message/modal", commands.AdminJoinMessageModalHandler)
-
-		r.Command("/leave-message", commands.AdminLeaveMessageHandler)
-		r.Component("/leave-message/button", commands.AdminLeaveMessageButtonHandler)
-		r.Modal("/leave-message/modal", commands.AdminLeaveMessageModalHandler)
-
-		r.Command("/anti-spam", commands.AdminAntiSpamHandler)
-	})
-
-	r.Command("/Approve", commands.ApproveUserCommandHandler)
-	r.Command("/approve", commands.ApproveSlashCommandHandler)
-
-	r.Command("/kick/with-message", commands.KickWithMessageHandler)
-	r.Command("/ban/with-message", commands.BanWithMessageHandler)
-	r.Command("/ban/until", commands.BanUntilHandler)
-
-	r.Command("/create-role-button", commands.CreateRoleButtonHandler)
-	r.Component("/role/assign/{roleID}", components.RoleAssignButtonHandler)
-
-	r.Command("/prune-pending-members", commands.PruneHandler)
-
-	commandCreates := []discord.ApplicationCommandCreate{
-		commands.PingCommand,
-		commands.QuoteCommand,
-		commands.WarnCommand,
-		commands.UserInfractionsCommand,
-		commands.InfractionsCommand,
-		commands.AdminCommand,
-		commands.KickCommand,
-		commands.BanCommand,
-		commands.ApproveSlashCommand,
-		commands.ApproveUserCommand,
-		commands.CreateRoleButtonCommand,
-		commands.PruneCommand,
+	commandInteractions := []interactions.ApplicationCommandRegisterFunc{
+		admin.Register,
+		ban.Register,
+		gatekeep.Register,
+		infractions.Register,
+		kick.Register,
+		ping.Register,
+		prune.Register,
+		quote.Register,
+		role_button.Register,
 	}
 
-	client, err := disgo.New(token,
-		bot.WithLogger(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-			Level: getLogLevel(viper.GetString("loglevel")),
-		}))),
+	var commandCreates []discord.ApplicationCommandCreate
+
+	for _, register := range commandInteractions {
+		commandCreates = append(commandCreates, register(r)...)
+	}
+
+	client, err := disgo.New(
+		token,
+		bot.WithLogger(
+			slog.New(
+				slog.NewTextHandler(
+					os.Stderr, &slog.HandlerOptions{
+						Level: getLogLevel(viper.GetString("loglevel")),
+					},
+				),
+			),
+		),
 		bot.WithDefaultGateway(),
 		bot.WithEventListeners(r),
-		bot.WithEventListenerFunc(func(e *events.Ready) {
-			fmt.Println("Bot is ready!")
-		}),
+		bot.WithEventListenerFunc(
+			func(e *events.Ready) {
+				fmt.Println("Bot is ready!")
+			},
+		),
 		bot.WithEventListenerFunc(listeners.OnWarnedUserJoin),
 		bot.WithEventListenerFunc(listeners.OnGatekeepUserJoin),
 		bot.WithEventListenerFunc(listeners.OnUserJoin),

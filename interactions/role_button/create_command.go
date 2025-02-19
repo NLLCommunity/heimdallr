@@ -1,4 +1,4 @@
-package commands
+package role_button
 
 import (
 	"fmt"
@@ -8,6 +8,7 @@ import (
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/json"
 
+	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
@@ -66,7 +67,7 @@ func CreateRoleButtonHandler(e *handler.CommandEvent) error {
 
 	if e.GuildID() == nil {
 		slog.Warn("Received create role button command in DMs or guild ID is otherwise nil")
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 
 	slog.Info(
@@ -93,21 +94,23 @@ func CreateRoleButtonHandler(e *handler.CommandEvent) error {
 
 	// Check if the user has permission to assign roles
 	if !permissions.Has(discord.PermissionManageRoles) {
-		_ = respondWithContentEph(e, "You need the Manage Roles permission to create a role button.")
+		_ = interactions.RespondWithContentEph(e, "You need the Manage Roles permission to create a role button.")
 		return nil
 	}
 
 	// Check if the specific role in question is one the user can assign
 	if !permissions.Has(role.Permissions) {
-		_ = respondWithContentEph(e, "You cannot assign a role with permissions you do not have.")
+		_ = interactions.RespondWithContentEph(e, "You cannot assign a role with permissions you do not have.")
 		return nil
 	}
 
 	// Create the button
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContent(instructions).
-		AddActionRow(discord.NewPrimaryButton(text, fmt.Sprintf("/role/assign/%s", role.ID.String()))).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		Build())
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetContent(instructions).
+			AddActionRow(discord.NewPrimaryButton(text, fmt.Sprintf("/role/assign/%s", role.ID.String()))).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build(),
+	)
 }

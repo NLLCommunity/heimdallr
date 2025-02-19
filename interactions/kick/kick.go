@@ -1,4 +1,4 @@
-package commands
+package kick
 
 import (
 	"fmt"
@@ -8,8 +8,19 @@ import (
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/json"
 
+	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
+
+func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+	r.Route(
+		"/kick", func(r handler.Router) {
+			r.Command("/with-message", KickWithMessageHandler)
+		},
+	)
+
+	return []discord.ApplicationCommandCreate{KickCommand}
+}
 
 var KickCommand = discord.SlashCommandCreate{
 	Name:                     "kick",
@@ -42,7 +53,7 @@ func KickWithMessageHandler(e *handler.CommandEvent) error {
 	data := e.SlashCommandInteractionData()
 	guild, isGuild := e.Guild()
 	if !isGuild {
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 
 	user := data.User("user")
@@ -58,21 +69,26 @@ func KickWithMessageHandler(e *handler.CommandEvent) error {
 		).Build()
 
 	failedToMessage := false
-	_, err := SendDirectMessage(e.Client(), user, mc)
+	_, err := interactions.SendDirectMessage(e.Client(), user, mc)
 	if err != nil {
 		failedToMessage = true
 	}
 
-	err = e.Client().Rest().RemoveMember(guild.ID, user.ID,
-		rest.WithReason(fmt.Sprintf("Kicked by: %s (%s), with message: %s", e.User().Username, e.User().ID, message)))
+	err = e.Client().Rest().RemoveMember(
+		guild.ID, user.ID,
+		rest.WithReason(fmt.Sprintf("Kicked by: %s (%s), with message: %s", e.User().Username, e.User().ID, message)),
+	)
 	if err != nil {
 		return e.CreateMessage(
 			discord.NewMessageCreateBuilder().
 				SetEphemeral(true).
 				SetContentf("Failed to kick user %s.", user.Mention()).
-				SetAllowedMentions(&discord.AllowedMentions{
-					RepliedUser: true,
-				}).Build())
+				SetAllowedMentions(
+					&discord.AllowedMentions{
+						RepliedUser: true,
+					},
+				).Build(),
+		)
 	}
 
 	if failedToMessage {
@@ -80,14 +96,18 @@ func KickWithMessageHandler(e *handler.CommandEvent) error {
 			discord.NewMessageCreateBuilder().
 				SetEphemeral(true).
 				SetContent("User was kicked but message failed to send.").
-				Build())
+				Build(),
+		)
 	}
 
 	return e.CreateMessage(
 		discord.NewMessageCreateBuilder().
 			SetEphemeral(true).
 			SetContentf("User %s was kicked.", user.Mention()).
-			SetAllowedMentions(&discord.AllowedMentions{
-				RepliedUser: true,
-			}).Build())
+			SetAllowedMentions(
+				&discord.AllowedMentions{
+					RepliedUser: true,
+				},
+			).Build(),
+	)
 }

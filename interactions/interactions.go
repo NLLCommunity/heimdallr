@@ -1,9 +1,24 @@
-package commands
+package interactions
 
 import (
+	"errors"
+
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/handler"
 )
+
+type AppCommandRegisterer interface {
+	Register(r *handler.Mux) []discord.ApplicationCommandCreate
+}
+
+type ApplicationCommandRegisterFunc func(r *handler.Mux) []discord.ApplicationCommandCreate
+
+func (f ApplicationCommandRegisterFunc) Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+	return f(r)
+}
+
+var ErrEventNoGuildID = errors.New("no guild id found in event")
 
 type DMError struct {
 	dmChannelCreated bool
@@ -33,7 +48,9 @@ func NewDMError(dmChannelCreated, messageSent bool, inner error) *DMError {
 	}
 }
 
-func SendDirectMessage(client bot.Client, user discord.User, messageCreate discord.MessageCreate) (*discord.Message, error) {
+func SendDirectMessage(client bot.Client, user discord.User, messageCreate discord.MessageCreate) (
+	*discord.Message, error,
+) {
 	dmChannel, err := client.Rest().CreateDMChannel(user.ID)
 	if err != nil {
 		return nil, NewDMError(false, false, err)
@@ -52,4 +69,12 @@ func SendDirectMessage(client bot.Client, user discord.User, messageCreate disco
 	}
 
 	return msg, nil
+}
+func RespondWithContentEph(e *handler.CommandEvent, content string) error {
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetContent(content).
+			SetEphemeral(true).
+			Build(),
+	)
 }

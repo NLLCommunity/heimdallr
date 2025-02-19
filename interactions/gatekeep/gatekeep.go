@@ -1,4 +1,4 @@
-package commands
+package gatekeep
 
 import (
 	"fmt"
@@ -14,6 +14,13 @@ import (
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
+
+func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+	r.Command("/approve", ApproveSlashCommandHandler)
+	r.Command("/Approve", ApproveUserCommandHandler)
+
+	return []discord.ApplicationCommandCreate{ApproveSlashCommand, ApproveUserCommand}
+}
 
 var ApproveUserCommand = discord.UserCommandCreate{
 	Name:                     "Approve",
@@ -107,21 +114,27 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 
 	guildSettings, err := model.GetGuildSettings(guild.ID)
 	if err != nil {
-		slog.ErrorContext(e.Ctx, "Failed to get guild settings.",
+		slog.ErrorContext(
+			e.Ctx, "Failed to get guild settings.",
 			"guild_id", guild.ID,
-			"err", err)
-		_, err = e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
-			SetContent("Failed to get guild information.").
-			SetEphemeral(true).
-			Build())
+			"err", err,
+		)
+		_, err = e.CreateFollowupMessage(
+			discord.NewMessageCreateBuilder().
+				SetContent("Failed to get guild information.").
+				SetEphemeral(true).
+				Build(),
+		)
 		return err
 	}
 
 	if !guildSettings.GatekeepEnabled {
-		_, err := e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
-			SetContentf("Gatekeep is not enabled in this server.").
-			SetEphemeral(true).
-			Build())
+		_, err := e.CreateFollowupMessage(
+			discord.NewMessageCreateBuilder().
+				SetContentf("Gatekeep is not enabled in this server.").
+				SetEphemeral(true).
+				Build(),
+		)
 		return err
 	}
 
@@ -136,50 +149,62 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 	}
 
 	if hasApprovedRole && (!hasPendingRole || !guildSettings.GatekeepAddPendingRoleOnJoin) {
-		_, err := e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
-			SetContentf("User %s is already approved.", member.Mention()).
-			SetEphemeral(true).
-			Build())
+		_, err := e.CreateFollowupMessage(
+			discord.NewMessageCreateBuilder().
+				SetContentf("User %s is already approved.", member.Mention()).
+				SetEphemeral(true).
+				Build(),
+		)
 		return err
 
 	}
 
 	if guildSettings.GatekeepApprovedRole != 0 {
-		err = e.Client().Rest().AddMemberRole(guild.ID, member.User.ID,
+		err = e.Client().Rest().AddMemberRole(
+			guild.ID, member.User.ID,
 			guildSettings.GatekeepApprovedRole,
 			rest.WithReason(fmt.Sprintf("Gatekeep approved by: %s (%s)", e.User().Username, e.User().ID)),
 		)
 		if err != nil {
-			slog.Warn("Failed to add approved role to user",
+			slog.Warn(
+				"Failed to add approved role to user",
 				"guild_id", guild.ID,
 				"user_id", member.User.ID,
-				"role_id", guildSettings.GatekeepApprovedRole)
+				"role_id", guildSettings.GatekeepApprovedRole,
+			)
 			return err
 		}
 	}
 	if guildSettings.GatekeepPendingRole != 0 {
-		err = e.Client().Rest().RemoveMemberRole(guild.ID, member.User.ID,
+		err = e.Client().Rest().RemoveMemberRole(
+			guild.ID, member.User.ID,
 			guildSettings.GatekeepPendingRole,
 			rest.WithReason(fmt.Sprintf("Gatekeep approved by: %s (%s)", e.User().Username, e.User().ID)),
 		)
 		if err != nil {
-			slog.Warn("Failed to remove pending role from user",
+			slog.Warn(
+				"Failed to remove pending role from user",
 				"guild_id", guild.ID,
 				"user_id", member.User.ID,
-				"role_id", guildSettings.GatekeepPendingRole)
+				"role_id", guildSettings.GatekeepPendingRole,
+			)
 			return err
 		}
 	}
 
-	slog.InfoContext(e.Ctx, "user has been approved",
-		"guild_id", guild.ID)
+	slog.InfoContext(
+		e.Ctx, "user has been approved",
+		"guild_id", guild.ID,
+	)
 
 	if guildSettings.GatekeepApprovedMessage == "" {
 		slog.Info("No approved message set; not sending message.")
-		_, err := e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
-			SetContentf("No approved message set; not sending message. Roles have been set.").
-			SetEphemeral(true).
-			Build())
+		_, err := e.CreateFollowupMessage(
+			discord.NewMessageCreateBuilder().
+				SetContentf("No approved message set; not sending message. Roles have been set.").
+				SetEphemeral(true).
+				Build(),
+		)
 		return err
 	}
 
@@ -196,25 +221,34 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		slog.Warn("Failed to render approved message template.")
 		return err
 	}
-	_, err = e.Client().Rest().CreateMessage(channel,
+	_, err = e.Client().Rest().CreateMessage(
+		channel,
 		discord.NewMessageCreateBuilder().
-			SetContent(contents+
-				fmt.Sprintf("\n\n-# Approved by %s", e.User().Mention())).
-			SetAllowedMentions(&discord.AllowedMentions{
-				Users: []snowflake.ID{member.User.ID},
-			}).
+			SetContent(
+				contents+
+					fmt.Sprintf("\n\n-# Approved by %s", e.User().Mention()),
+			).
+			SetAllowedMentions(
+				&discord.AllowedMentions{
+					Users: []snowflake.ID{member.User.ID},
+				},
+			).
 			Build(),
 	)
 	if err != nil {
-		_, err := e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to send message to approved user.").
-			Build())
+		_, err := e.CreateFollowupMessage(
+			discord.NewMessageCreateBuilder().
+				SetEphemeral(true).
+				SetContent("Failed to send message to approved user.").
+				Build(),
+		)
 		return err
 	}
-	_, err = e.CreateFollowupMessage(discord.NewMessageCreateBuilder().
-		SetEphemeral(true).
-		SetContent("User has been approved!").
-		Build())
+	_, err = e.CreateFollowupMessage(
+		discord.NewMessageCreateBuilder().
+			SetEphemeral(true).
+			SetContent("User has been approved!").
+			Build(),
+	)
 	return err
 }

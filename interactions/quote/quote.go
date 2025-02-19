@@ -1,4 +1,4 @@
-package commands
+package quote
 
 import (
 	"errors"
@@ -15,8 +15,15 @@ import (
 	"github.com/disgoorg/json"
 	"github.com/disgoorg/snowflake/v2"
 
+	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
+
+func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+	r.Command("/quote", QuoteHandler)
+
+	return []discord.ApplicationCommandCreate{QuoteCommand}
+}
 
 var quoteUrlRegex = regexp.MustCompile(
 	`https://discord.com/channels/(?P<guild>\d+)/(?P<channel>\d+)/(?P<message>\d+)`,
@@ -68,7 +75,7 @@ func QuoteHandler(e *handler.CommandEvent) error {
 	if e.GuildID() != nil {
 		guildID = *e.GuildID()
 	} else {
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 	url := e.SlashCommandInteractionData().String("link")
 	showReplyTo, isSet := e.SlashCommandInteractionData().OptBool("show-reply-to")
@@ -78,17 +85,17 @@ func QuoteHandler(e *handler.CommandEvent) error {
 
 	parts, err := parseMessageLink(url)
 	if err != nil {
-		_ = respondWithContentEph(e, "Invalid message link.")
+		_ = interactions.RespondWithContentEph(e, "Invalid message link.")
 		return err
 	}
 
 	if parts.GuildId != guildID {
-		return respondWithContentEph(e, "Message link is not in this server.")
+		return interactions.RespondWithContentEph(e, "Message link is not in this server.")
 	}
 
 	message, err := e.Client().Rest().GetMessage(parts.ChannelId, parts.MessageId)
 	if err != nil {
-		_ = respondWithContentEph(e, "Failed to fetch message.")
+		_ = interactions.RespondWithContentEph(e, "Failed to fetch message.")
 		return err
 	}
 
@@ -98,13 +105,15 @@ func QuoteHandler(e *handler.CommandEvent) error {
 		prefix := getChannelTypePrefix(channel)
 		channelName = prefix + channel.Name()
 	} else {
-		slog.Warn("Failed to fetch channel",
+		slog.Warn(
+			"Failed to fetch channel",
 			"guild_id", parts.GuildId,
-			"channel_id", parts.ChannelId)
+			"channel_id", parts.ChannelId,
+		)
 	}
 
 	if canRead, _ := userCanReadChannelMessages(e.User().ID, message.ChannelID, e.Client()); !canRead {
-		_ = respondWithContentEph(e, "You don't have permission to read messages in that channel.")
+		_ = interactions.RespondWithContentEph(e, "You don't have permission to read messages in that channel.")
 		return nil
 	}
 
@@ -304,14 +313,6 @@ func parseMessageLink(url string) (parts linkParts, err error) {
 		MessageId: messageId,
 	}
 	return
-}
-
-func respondWithContentEph(e *handler.CommandEvent, content string) error {
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContent(content).
-		SetEphemeral(true).
-		Build(),
-	)
 }
 
 func addQuoteToMessage(text string) string {

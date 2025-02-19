@@ -1,4 +1,4 @@
-package commands
+package admin
 
 import (
 	"fmt"
@@ -9,9 +9,38 @@ import (
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/json"
 
+	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
+
+func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+	r.Route(
+		"/admin", func(r handler.Router) {
+			r.Component("/show-all-button", AdminShowAllButtonHandler)
+			r.Command("/info", AdminInfoHandler)
+			r.Command("/mod-channel", AdminModChannelHandler)
+			r.Command("/infractions", AdminInfractionsHandler)
+			r.Command("/gatekeep", AdminGatekeepHandler)
+			r.Command("/gatekeep-message", AdminGatekeepMessageHandler)
+			r.Component("/gatekeep-message/button", AdminGatekeepMessageButtonHandler)
+			r.Modal("/gatekeep-message/modal", AdminGatekeepMessageModalHandler)
+			r.Command("/join-leave", AdminJoinLeaveHandler)
+
+			r.Command("/join-message", AdminJoinMessageHandler)
+			r.Component("/join-message/button", AdminJoinMessageButtonHandler)
+			r.Modal("/join-message/modal", AdminJoinMessageModalHandler)
+
+			r.Command("/leave-message", AdminLeaveMessageHandler)
+			r.Component("/leave-message/button", AdminLeaveMessageButtonHandler)
+			r.Modal("/leave-message/modal", AdminLeaveMessageModalHandler)
+
+			r.Command("/anti-spam", AdminAntiSpamHandler)
+		},
+	)
+
+	return []discord.ApplicationCommandCreate{AdminCommand}
+}
 
 var AdminCommand = discord.SlashCommandCreate{
 	Name:                     "admin",
@@ -175,114 +204,157 @@ func AdminInfoHandler(e *handler.CommandEvent) error {
 	joinLeaveSettings := joinLeaveInfo(settings)
 	antiSpamSettings := antiSpamInfo(settings)
 
-	message := fmt.Sprintf("# Server settings\n%s\n\n%s\n\n%s\n\n%s\n\n%s",
-		modChannel, infractionSettings, gatekeepSettings, joinLeaveSettings, antiSpamSettings)
+	message := fmt.Sprintf(
+		"# Server settings\n%s\n\n%s\n\n%s\n\n%s\n\n%s",
+		modChannel, infractionSettings, gatekeepSettings, joinLeaveSettings, antiSpamSettings,
+	)
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContent(message).
-		SetEphemeral(true).
-		AddActionRow(discord.NewPrimaryButton("Display for everyone", "/admin/show-all-button")).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		Build())
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetContent(message).
+			SetEphemeral(true).
+			AddActionRow(discord.NewPrimaryButton("Display for everyone", "/admin/show-all-button")).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build(),
+	)
 }
 
 func AdminShowAllButtonHandler(e *handler.ComponentEvent) error {
 	utils.LogInteraction("admin show all button", e)
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContent(e.Message.Content).
-		SetEmbeds(e.Message.Embeds...).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		Build())
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetContent(e.Message.Content).
+			SetEmbeds(e.Message.Embeds...).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build(),
+	)
 }
 
 func modChannelInfo(settings *model.GuildSettings) string {
 	modChannelInfo := "> This is the channel in which notifications and other information for moderators and administrators are sent."
-	return fmt.Sprintf("**Moderator channel:** <#%d>\n%s",
-		settings.ModeratorChannel, modChannelInfo)
+	return fmt.Sprintf(
+		"**Moderator channel:** <#%d>\n%s",
+		settings.ModeratorChannel, modChannelInfo,
+	)
 }
 
 func infractionInfo(settings *model.GuildSettings) string {
 	infractionHalfLifeInfo := "> This is the half-life time of infractions' severity in days.\n> A half-life of 0 means that infractions never expire."
-	infractionHalfLife := fmt.Sprintf("**Infraction half-life:** %.1f days\n%s",
-		settings.InfractionHalfLifeDays, infractionHalfLifeInfo)
+	infractionHalfLife := fmt.Sprintf(
+		"**Infraction half-life:** %.1f days\n%s",
+		settings.InfractionHalfLifeDays, infractionHalfLifeInfo,
+	)
 
 	notifyOnWarnedUserJoinInfo := "> This determines whether to notify the moderator channel when a warned user (re)joins the server."
-	notifyOnWarnedUserJoin := fmt.Sprintf("**Notify on warned user join:** %s\n%s",
-		utils.Iif(settings.NotifyOnWarnedUserJoin, "yes", "no"), notifyOnWarnedUserJoinInfo)
+	notifyOnWarnedUserJoin := fmt.Sprintf(
+		"**Notify on warned user join:** %s\n%s",
+		utils.Iif(settings.NotifyOnWarnedUserJoin, "yes", "no"), notifyOnWarnedUserJoinInfo,
+	)
 
 	notifyWarnSeverityThresholdInfo := "> This is the minimum severity of infractions to notify on.\n> A threshold of 0 means that all infractions are notified on."
-	notifyWarnSeverityThreshold := fmt.Sprintf("**Notify warn severity threshold:** %.1f\n%s",
-		settings.NotifyWarnSeverityThreshold, notifyWarnSeverityThresholdInfo)
+	notifyWarnSeverityThreshold := fmt.Sprintf(
+		"**Notify warn severity threshold:** %.1f\n%s",
+		settings.NotifyWarnSeverityThreshold, notifyWarnSeverityThresholdInfo,
+	)
 
-	return fmt.Sprintf("## Infraction settings\n%s\n\n%s\n\n%s",
-		infractionHalfLife, notifyOnWarnedUserJoin, notifyWarnSeverityThreshold)
+	return fmt.Sprintf(
+		"## Infraction settings\n%s\n\n%s\n\n%s",
+		infractionHalfLife, notifyOnWarnedUserJoin, notifyWarnSeverityThreshold,
+	)
 }
 
 func gatekeepInfo(settings *model.GuildSettings) string {
 	gatekeepEnabledInfo := "> This determines whether to enable the gatekeep system."
-	gatekeepEnabled := fmt.Sprintf("**Gatekeep enabled:** %s\n%s",
-		utils.Iif(settings.GatekeepEnabled, "yes", "no"), gatekeepEnabledInfo)
+	gatekeepEnabled := fmt.Sprintf(
+		"**Gatekeep enabled:** %s\n%s",
+		utils.Iif(settings.GatekeepEnabled, "yes", "no"), gatekeepEnabledInfo,
+	)
 
 	gatekeepPendingRoleInfo := "> This is the role given to users pending approval."
-	gatekeepPendingRole := fmt.Sprintf("**Gatekeep pending role:** <@&%d>\n%s",
-		settings.GatekeepPendingRole, gatekeepPendingRoleInfo)
+	gatekeepPendingRole := fmt.Sprintf(
+		"**Gatekeep pending role:** <@&%d>\n%s",
+		settings.GatekeepPendingRole, gatekeepPendingRoleInfo,
+	)
 
 	gatekeepApprovedRoleInfo := "> This is the role given to approved users."
-	gatekeepApprovedRole := fmt.Sprintf("**Gatekeep approved role:** <@&%d>\n%s",
-		settings.GatekeepApprovedRole, gatekeepApprovedRoleInfo)
+	gatekeepApprovedRole := fmt.Sprintf(
+		"**Gatekeep approved role:** <@&%d>\n%s",
+		settings.GatekeepApprovedRole, gatekeepApprovedRoleInfo,
+	)
 
 	gatekeepAddPendingRoleOnJoinInfo := "> This determines whether to give the pending role to users when they join."
-	gatekeepAddPendingRoleOnJoin := fmt.Sprintf("**Give pending role on join:** %s\n%s",
-		utils.Iif(settings.GatekeepAddPendingRoleOnJoin, "yes", "no"), gatekeepAddPendingRoleOnJoinInfo)
+	gatekeepAddPendingRoleOnJoin := fmt.Sprintf(
+		"**Give pending role on join:** %s\n%s",
+		utils.Iif(settings.GatekeepAddPendingRoleOnJoin, "yes", "no"), gatekeepAddPendingRoleOnJoinInfo,
+	)
 
 	gatekeepApprovedMessageInfo := "Approved message can be viewed by using the `/admin gatekeep-message` command."
 
-	return fmt.Sprintf("## Gatekeep settings\n%s\n\n%s\n\n%s\n\n%s\n\n*%s*",
-		gatekeepEnabled, gatekeepPendingRole, gatekeepApprovedRole, gatekeepAddPendingRoleOnJoin, gatekeepApprovedMessageInfo)
+	return fmt.Sprintf(
+		"## Gatekeep settings\n%s\n\n%s\n\n%s\n\n%s\n\n*%s*",
+		gatekeepEnabled, gatekeepPendingRole, gatekeepApprovedRole, gatekeepAddPendingRoleOnJoin,
+		gatekeepApprovedMessageInfo,
+	)
 }
 
 func joinLeaveInfo(settings *model.GuildSettings) string {
 	joinMessageEnabledInfo := "> This determines whether to enable join messages."
-	joinMessageEnabled := fmt.Sprintf("**Join message enabled:** %s\n%s",
-		utils.Iif(settings.JoinMessageEnabled, "yes", "no"), joinMessageEnabledInfo)
+	joinMessageEnabled := fmt.Sprintf(
+		"**Join message enabled:** %s\n%s",
+		utils.Iif(settings.JoinMessageEnabled, "yes", "no"), joinMessageEnabledInfo,
+	)
 
 	leaveMessageEnabledInfo := "> This determines whether to enable leave messages."
-	leaveMessageEnabled := fmt.Sprintf("**Leave message enabled:** %s\n%s",
-		utils.Iif(settings.LeaveMessageEnabled, "yes", "no"), leaveMessageEnabledInfo)
+	leaveMessageEnabled := fmt.Sprintf(
+		"**Leave message enabled:** %s\n%s",
+		utils.Iif(settings.LeaveMessageEnabled, "yes", "no"), leaveMessageEnabledInfo,
+	)
 
 	joinLeaveChannelInfo := "> This is the channel in which join and leave messages are sent."
-	joinLeaveChannel := fmt.Sprintf("**Join/leave channel:** <#%d>\n%s",
-		settings.JoinLeaveChannel, joinLeaveChannelInfo)
+	joinLeaveChannel := fmt.Sprintf(
+		"**Join/leave channel:** <#%d>\n%s",
+		settings.JoinLeaveChannel, joinLeaveChannelInfo,
+	)
 
 	joinLeaveMessageInfo := "The join/leave messages can be viewed by using the `/admin join-message` and `/admin leave-message` commands."
 
-	return fmt.Sprintf("## Join/leave settings\n%s\n\n%s\n\n%s\n\n*%s*",
-		joinMessageEnabled, leaveMessageEnabled, joinLeaveChannel, joinLeaveMessageInfo)
+	return fmt.Sprintf(
+		"## Join/leave settings\n%s\n\n%s\n\n%s\n\n*%s*",
+		joinMessageEnabled, leaveMessageEnabled, joinLeaveChannel, joinLeaveMessageInfo,
+	)
 }
 
 func antiSpamInfo(settings *model.GuildSettings) string {
 	antispamEnabledInfo := "> This determines whether to enable the anti-spam system."
-	antispamEnabled := fmt.Sprintf("**Anti-spam enabled:** %s\n%s",
-		utils.Iif(settings.AntiSpamEnabled, "yes", "no"), antispamEnabledInfo)
+	antispamEnabled := fmt.Sprintf(
+		"**Anti-spam enabled:** %s\n%s",
+		utils.Iif(settings.AntiSpamEnabled, "yes", "no"), antispamEnabledInfo,
+	)
 
 	antispamCountInfo := "> This is the number of messages needed for Heimdallr to take action (within the cooldown period)."
-	antispamCount := fmt.Sprintf("**Anti-spam count:** %d\n%s",
-		settings.AntiSpamCount, antispamCountInfo)
+	antispamCount := fmt.Sprintf(
+		"**Anti-spam count:** %d\n%s",
+		settings.AntiSpamCount, antispamCountInfo,
+	)
 
 	antispamCooldownInfo := "> This is the time in seconds to wait before resetting the message count."
-	antispamCooldown := fmt.Sprintf("**Anti-spam cooldown:** %d\n%s",
-		settings.AntiSpamCooldownSeconds, antispamCooldownInfo)
+	antispamCooldown := fmt.Sprintf(
+		"**Anti-spam cooldown:** %d\n%s",
+		settings.AntiSpamCooldownSeconds, antispamCooldownInfo,
+	)
 
-	return fmt.Sprintf("## Anti-spam settings\n%s\n\n%s\n\n%s",
-		antispamEnabled, antispamCount, antispamCooldown)
+	return fmt.Sprintf(
+		"## Anti-spam settings\n%s\n\n%s\n\n%s",
+		antispamEnabled, antispamCount, antispamCooldown,
+	)
 }
 
 func AdminModChannelHandler(e *handler.CommandEvent) error {
 	data := e.SlashCommandInteractionData()
 	guild, isGuild := e.Guild()
 	if !isGuild {
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 
 	channel, hasChannel := data.OptChannel("channel")
@@ -292,11 +364,13 @@ func AdminModChannelHandler(e *handler.CommandEvent) error {
 	}
 
 	if !hasChannel {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContent(modChannelInfo(settings)).
-			SetEphemeral(true).
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			Build())
+		return e.CreateMessage(
+			discord.NewMessageCreateBuilder().
+				SetContent(modChannelInfo(settings)).
+				SetEphemeral(true).
+				SetAllowedMentions(&discord.AllowedMentions{}).
+				Build(),
+		)
 	}
 
 	settings.ModeratorChannel = channel.ID
@@ -305,18 +379,20 @@ func AdminModChannelHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContentf("Moderator channel set to <#%d>", channel.ID).
-		SetEphemeral(true).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		Build())
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetContentf("Moderator channel set to <#%d>", channel.ID).
+			SetEphemeral(true).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build(),
+	)
 }
 
 func AdminInfractionsHandler(e *handler.CommandEvent) error {
 	data := e.SlashCommandInteractionData()
 	guild, isGuild := e.Guild()
 	if !isGuild {
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 
 	settings, err := model.GetGuildSettings(guild.ID)
@@ -345,11 +421,13 @@ func AdminInfractionsHandler(e *handler.CommandEvent) error {
 	}
 
 	if !utils.Any(hasHalfLife, hasNotifyThreshold, hasNotifyOnWarnedUserJoin) {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContent(infractionInfo(settings)).
-			SetEphemeral(true).
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			Build())
+		return e.CreateMessage(
+			discord.NewMessageCreateBuilder().
+				SetContent(infractionInfo(settings)).
+				SetEphemeral(true).
+				SetAllowedMentions(&discord.AllowedMentions{}).
+				Build(),
+		)
 	}
 
 	err = model.SetGuildSettings(settings)
@@ -357,11 +435,13 @@ func AdminInfractionsHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContent(message).
-		SetEphemeral(true).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		Build())
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetContent(message).
+			SetEphemeral(true).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build(),
+	)
 }
 
 func AdminGatekeepHandler(e *handler.CommandEvent) error {
@@ -370,7 +450,7 @@ func AdminGatekeepHandler(e *handler.CommandEvent) error {
 	data := e.SlashCommandInteractionData()
 	guild, isGuild := e.Guild()
 	if !isGuild {
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 
 	settings, err := model.GetGuildSettings(guild.ID)
@@ -405,11 +485,13 @@ func AdminGatekeepHandler(e *handler.CommandEvent) error {
 	}
 
 	if !utils.Any(hasEnabled, hasPendingRole, hasApprovedRole, hasUsePendingRole) {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContent(gatekeepInfo(settings)).
-			SetEphemeral(true).
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			Build())
+		return e.CreateMessage(
+			discord.NewMessageCreateBuilder().
+				SetContent(gatekeepInfo(settings)).
+				SetEphemeral(true).
+				SetAllowedMentions(&discord.AllowedMentions{}).
+				Build(),
+		)
 	}
 
 	err = model.SetGuildSettings(settings)
@@ -417,11 +499,13 @@ func AdminGatekeepHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContent(message).
-		SetEphemeral(true).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		Build())
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetContent(message).
+			SetEphemeral(true).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build(),
+	)
 }
 
 func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
@@ -429,7 +513,7 @@ func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
 
 	guild, isGuild := e.Guild()
 	if !isGuild {
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 
 	settings, err := model.GetGuildSettings(guild.ID)
@@ -447,13 +531,15 @@ func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
 		SetDescription(utils.MessageTemplateInfo).
 		Build()
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetEmbeds(embed, templateInfoEmbed).
-		AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/gatekeep-message/button")).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		SetEphemeral(true).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		Build())
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetEmbeds(embed, templateInfoEmbed).
+			AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/gatekeep-message/button")).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			SetEphemeral(true).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build(),
+	)
 }
 
 func messageModal(customID, title, contents string) discord.ModalCreate {
@@ -469,7 +555,7 @@ func AdminGatekeepMessageButtonHandler(e *handler.ComponentEvent) error {
 
 	guild, isGuild := e.Guild()
 	if !isGuild {
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 
 	settings, err := model.GetGuildSettings(guild.ID)
@@ -477,11 +563,13 @@ func AdminGatekeepMessageButtonHandler(e *handler.ComponentEvent) error {
 		return err
 	}
 
-	return e.Modal(messageModal(
-		"/admin/gatekeep-message/modal",
-		"Gatekeep approved message",
-		settings.GatekeepApprovedMessage,
-	))
+	return e.Modal(
+		messageModal(
+			"/admin/gatekeep-message/modal",
+			"Gatekeep approved message",
+			settings.GatekeepApprovedMessage,
+		),
+	)
 }
 
 func AdminGatekeepMessageModalHandler(e *handler.ModalEvent) error {
@@ -500,10 +588,12 @@ func AdminGatekeepMessageModalHandler(e *handler.ModalEvent) error {
 
 	_, err = mustache.RenderRaw(message, true, utils.MessageTemplateData{})
 	if err != nil {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContentf("The message contains data that is invalid; this may be caused by invalid placeholders.").
-			SetEphemeral(true).
-			Build())
+		return e.CreateMessage(
+			discord.NewMessageCreateBuilder().
+				SetContentf("The message contains data that is invalid; this may be caused by invalid placeholders.").
+				SetEphemeral(true).
+				Build(),
+		)
 	}
 
 	settings.GatekeepApprovedMessage = message
@@ -513,11 +603,13 @@ func AdminGatekeepMessageModalHandler(e *handler.ModalEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContent("Gatekeep approved message updated.").
-		SetEphemeral(true).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		Build())
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetContent("Gatekeep approved message updated.").
+			SetEphemeral(true).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build(),
+	)
 }
 
 func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
@@ -554,11 +646,13 @@ func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
 	}
 
 	if !utils.Any(hasJoinEnabled, hasLeaveEnabled, hasChannel) {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContent(joinLeaveInfo(settings)).
-			SetEphemeral(true).
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			Build())
+		return e.CreateMessage(
+			discord.NewMessageCreateBuilder().
+				SetContent(joinLeaveInfo(settings)).
+				SetEphemeral(true).
+				SetAllowedMentions(&discord.AllowedMentions{}).
+				Build(),
+		)
 	}
 
 	err = model.SetGuildSettings(settings)
@@ -566,18 +660,20 @@ func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContent(message).
-		SetEphemeral(true).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		Build())
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetContent(message).
+			SetEphemeral(true).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build(),
+	)
 }
 
 func AdminJoinMessageHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("admin join-message", e)
 	guild, isGuild := e.Guild()
 	if !isGuild {
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 
 	settings, err := model.GetGuildSettings(guild.ID)
@@ -595,12 +691,14 @@ func AdminJoinMessageHandler(e *handler.CommandEvent) error {
 		SetDescription(utils.MessageTemplateInfo).
 		Build()
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetEmbeds(embed, templateInfoEmbed).
-		AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/join-message/button")).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		SetEphemeral(true).
-		Build())
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetEmbeds(embed, templateInfoEmbed).
+			AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/join-message/button")).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			SetEphemeral(true).
+			Build(),
+	)
 }
 
 func AdminJoinMessageButtonHandler(e *handler.ComponentEvent) error {
@@ -608,7 +706,7 @@ func AdminJoinMessageButtonHandler(e *handler.ComponentEvent) error {
 
 	guild, isGuild := e.Guild()
 	if !isGuild {
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 
 	settings, err := model.GetGuildSettings(guild.ID)
@@ -616,11 +714,13 @@ func AdminJoinMessageButtonHandler(e *handler.ComponentEvent) error {
 		return err
 	}
 
-	return e.Modal(messageModal(
-		"/admin/join-message/modal",
-		"Join message",
-		settings.JoinMessage,
-	))
+	return e.Modal(
+		messageModal(
+			"/admin/join-message/modal",
+			"Join message",
+			settings.JoinMessage,
+		),
+	)
 }
 
 func AdminJoinMessageModalHandler(e *handler.ModalEvent) error {
@@ -639,10 +739,12 @@ func AdminJoinMessageModalHandler(e *handler.ModalEvent) error {
 
 	_, err = mustache.RenderRaw(message, true, utils.MessageTemplateData{})
 	if err != nil {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContentf("The message contains data that is invalid; this may be caused by invalid placeholders.").
-			SetEphemeral(true).
-			Build())
+		return e.CreateMessage(
+			discord.NewMessageCreateBuilder().
+				SetContentf("The message contains data that is invalid; this may be caused by invalid placeholders.").
+				SetEphemeral(true).
+				Build(),
+		)
 	}
 
 	settings.JoinMessage = message
@@ -652,11 +754,13 @@ func AdminJoinMessageModalHandler(e *handler.ModalEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContent("Join message updated.").
-		SetEphemeral(true).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		Build())
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetContent("Join message updated.").
+			SetEphemeral(true).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build(),
+	)
 }
 
 func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
@@ -664,7 +768,7 @@ func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
 
 	guild, isGuild := e.Guild()
 	if !isGuild {
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 
 	settings, err := model.GetGuildSettings(guild.ID)
@@ -682,12 +786,14 @@ func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
 		SetDescription(utils.MessageTemplateInfo).
 		Build()
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetEmbeds(embed, templateInfoEmbed).
-		AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/leave-message/button")).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		SetEphemeral(true).
-		Build())
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetEmbeds(embed, templateInfoEmbed).
+			AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/leave-message/button")).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			SetEphemeral(true).
+			Build(),
+	)
 }
 
 func AdminLeaveMessageButtonHandler(e *handler.ComponentEvent) error {
@@ -695,7 +801,7 @@ func AdminLeaveMessageButtonHandler(e *handler.ComponentEvent) error {
 
 	guild, isGuild := e.Guild()
 	if !isGuild {
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 
 	settings, err := model.GetGuildSettings(guild.ID)
@@ -703,11 +809,13 @@ func AdminLeaveMessageButtonHandler(e *handler.ComponentEvent) error {
 		return err
 	}
 
-	return e.Modal(messageModal(
-		"/admin/leave-message/modal",
-		"Leave message",
-		settings.LeaveMessage,
-	))
+	return e.Modal(
+		messageModal(
+			"/admin/leave-message/modal",
+			"Leave message",
+			settings.LeaveMessage,
+		),
+	)
 }
 
 func AdminLeaveMessageModalHandler(e *handler.ModalEvent) error {
@@ -726,10 +834,12 @@ func AdminLeaveMessageModalHandler(e *handler.ModalEvent) error {
 
 	_, err = mustache.RenderRaw(message, true, utils.MessageTemplateData{})
 	if err != nil {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContentf("The message contains data that is invalid; this may be caused by invalid placeholders.").
-			SetEphemeral(true).
-			Build())
+		return e.CreateMessage(
+			discord.NewMessageCreateBuilder().
+				SetContentf("The message contains data that is invalid; this may be caused by invalid placeholders.").
+				SetEphemeral(true).
+				Build(),
+		)
 	}
 
 	settings.LeaveMessage = message
@@ -739,18 +849,20 @@ func AdminLeaveMessageModalHandler(e *handler.ModalEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContent("Leave message updated.").
-		SetEphemeral(true).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		Build())
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetContent("Leave message updated.").
+			SetEphemeral(true).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build(),
+	)
 }
 func AdminAntiSpamHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("admin anti-spam", e)
 	data := e.SlashCommandInteractionData()
 	guild, isGuild := e.Guild()
 	if !isGuild {
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 
 	settings, err := model.GetGuildSettings(guild.ID)
@@ -780,11 +892,13 @@ func AdminAntiSpamHandler(e *handler.CommandEvent) error {
 	}
 
 	if !utils.Any(hasEnabled, hasCount, hasCooldown) {
-		return e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContent(antiSpamInfo(settings)).
-			SetEphemeral(true).
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			Build())
+		return e.CreateMessage(
+			discord.NewMessageCreateBuilder().
+				SetContent(antiSpamInfo(settings)).
+				SetEphemeral(true).
+				SetAllowedMentions(&discord.AllowedMentions{}).
+				Build(),
+		)
 	}
 
 	err = model.SetGuildSettings(settings)
@@ -793,9 +907,11 @@ func AdminAntiSpamHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContent(message).
-		SetEphemeral(true).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		Build())
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetContent(message).
+			SetEphemeral(true).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build(),
+	)
 }

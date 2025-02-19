@@ -1,4 +1,4 @@
-package components
+package role_button
 
 import (
 	"fmt"
@@ -42,21 +42,26 @@ func RoleAssignButtonHandler(e *handler.ComponentEvent) error {
 		}
 	}
 
-	err = e.Client().Rest().AddMemberRole(*e.GuildID(), e.User().ID, roleID,
+	err = e.Client().Rest().AddMemberRole(
+		*e.GuildID(), e.User().ID, roleID,
 		rest.WithReason(fmt.Sprintf("User pressed %s in channel \"%s\"", componentLabel, e.Channel().Name())),
 	)
 
 	if err != nil {
-		_ = e.CreateMessage(discord.NewMessageCreateBuilder().
-			SetContent("Failed to assign role. This is likely due to the bot not having the required permissions.").
-			SetEphemeral(true).
-			Build())
+		_ = e.CreateMessage(
+			discord.NewMessageCreateBuilder().
+				SetContent("Failed to assign role. This is likely due to the bot not having the required permissions.").
+				SetEphemeral(true).
+				Build(),
+		)
 		return err
 	}
 
-	return e.CreateMessage(discord.NewMessageCreateBuilder().
-		SetContent("Role assigned!").
-		SetEphemeral(true).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		Build())
+	return e.CreateMessage(
+		discord.NewMessageCreateBuilder().
+			SetContent("Role assigned!").
+			SetEphemeral(true).
+			SetAllowedMentions(&discord.AllowedMentions{}).
+			Build(),
+	)
 }

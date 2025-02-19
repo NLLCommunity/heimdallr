@@ -1,4 +1,4 @@
-package commands
+package ban
 
 import (
 	"fmt"
@@ -9,9 +9,21 @@ import (
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/json"
 
+	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
+
+func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+	r.Route(
+		"/ban", func(r handler.Router) {
+			r.Command("/with-message", BanWithMessageHandler)
+			r.Command("/until", BanUntilHandler)
+		},
+	)
+
+	return []discord.ApplicationCommandCreate{BanCommand}
+}
 
 var BanCommand = discord.SlashCommandCreate{
 	Name:                     "ban",
@@ -146,7 +158,7 @@ func BanUntilHandler(e *handler.CommandEvent) error {
 func banHandlerInner(e *handler.CommandEvent, user discord.User, sendReason bool, reason, duration string) error {
 	guild, isGuild := e.Guild()
 	if !isGuild {
-		return ErrEventNoGuildID
+		return interactions.ErrEventNoGuildID
 	}
 	dur, err := utils.ParseLongDuration(duration)
 	var banExp string
@@ -162,30 +174,38 @@ func banHandlerInner(e *handler.CommandEvent, user discord.User, sendReason bool
 			SetContentf(
 				"You have been banned from %s.\n"+
 					utils.Iif(duration != "", fmt.Sprintf("This ban will expire %s.\n", banExp), "")+
-					utils.Iif(sendReason,
-						fmt.Sprintf("Along with the ban, this message was added:\n\n %s\n\n", reason), "")+
+					utils.Iif(
+						sendReason,
+						fmt.Sprintf("Along with the ban, this message was added:\n\n %s\n\n", reason), "",
+					)+
 					"(You cannot respond to this message.)",
 				guild.Name,
 			).Build()
 
-		_, err := SendDirectMessage(e.Client(), user, mc)
+		_, err := interactions.SendDirectMessage(e.Client(), user, mc)
 		if err != nil {
 			failedToMessage = true
 		}
 	}
 
-	err = e.Client().Rest().AddBan(guild.ID, user.ID, 0,
-		rest.WithReason(fmt.Sprintf("Banned by: %s (%s) %s, with message: %s",
-			e.User().Username, e.User().ID,
-			utils.Iif(duration != "", fmt.Sprintf("for %s", duration), ""),
-			reason,
-		)))
+	err = e.Client().Rest().AddBan(
+		guild.ID, user.ID, 0,
+		rest.WithReason(
+			fmt.Sprintf(
+				"Banned by: %s (%s) %s, with message: %s",
+				e.User().Username, e.User().ID,
+				utils.Iif(duration != "", fmt.Sprintf("for %s", duration), ""),
+				reason,
+			),
+		),
+	)
 	if err != nil {
 		return e.CreateMessage(
 			discord.NewMessageCreateBuilder().
 				SetEphemeral(true).
 				SetContent("Failed to ban user").
-				Build())
+				Build(),
+		)
 	}
 
 	if failedToMessage {
@@ -193,13 +213,15 @@ func banHandlerInner(e *handler.CommandEvent, user discord.User, sendReason bool
 			discord.NewMessageCreateBuilder().
 				SetEphemeral(true).
 				SetContent("User was banned but message failed to send.").
-				Build())
+				Build(),
+		)
 	}
 
 	return e.CreateMessage(
 		discord.NewMessageCreateBuilder().
 			SetEphemeral(true).
 			SetContent("User was banned.").
-			Build())
+			Build(),
+	)
 
 }
