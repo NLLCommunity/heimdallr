@@ -1,9 +1,9 @@
 *
-!commands
 !components
 !config
 !globals
 !listeners
+!interactions
 !model
 !scheduled_tasks
 !task
