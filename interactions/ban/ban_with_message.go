@@ -4,6 +4,7 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 
+	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
@@ -27,9 +28,21 @@ var banWithMessageSubCommand = discord.ApplicationCommandOptionSubCommand{
 func BanWithMessageHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("ban with-message", e)
 
+	guild, isGuild := e.Guild()
+	if !isGuild {
+		return interactions.ErrEventNoGuildID
+	}
+
 	data := e.SlashCommandInteractionData()
 	user := data.User("user")
 	message := data.String("message")
 
-	return banHandlerInner(e, user, true, message, "")
+	banData := banHandlerData{
+		user:       &user,
+		guild:      &guild,
+		duration:   "",
+		reason:     message,
+		sendReason: true,
+	}
+	return banHandlerInner(e, banData)
 }

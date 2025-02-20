@@ -35,73 +35,70 @@ var BanCommand = discord.SlashCommandCreate{
 	},
 }
 
-func banHandlerInner(e *handler.CommandEvent, user discord.User, sendReason bool, reason, duration string) error {
+type banHandlerData struct {
+	user       *discord.User
+	guild      *discord.Guild
+	duration   string
+	reason     string
+	sendReason bool
+}
+
+func banHandlerInner(e *handler.CommandEvent, data banHandlerData) error {
 	guild, isGuild := e.Guild()
 	if !isGuild {
 		return interactions.ErrEventNoGuildID
 	}
-	dur, err := utils.ParseLongDuration(duration)
-	var banExp string
-	if err == nil {
-		banExp = fmt.Sprintf("<t:%d:R>", time.Now().Add(dur).Unix())
-	} else {
-		banExp = duration
-	}
 
 	failedToMessage := false
-	if sendReason || duration != "" {
-		mc := discord.NewMessageCreateBuilder().
-			SetContentf(
-				"You have been banned from %s.\n"+
-					utils.Iif(duration != "", fmt.Sprintf("This ban will expire %s.\n", banExp), "")+
-					utils.Iif(
-						sendReason,
-						fmt.Sprintf("Along with the ban, this message was added:\n\n %s\n\n", reason), "",
-					)+
-					"(You cannot respond to this message.)",
-				guild.Name,
-			).Build()
-
-		_, err := interactions.SendDirectMessage(e.Client(), user, mc)
+	if data.sendReason || data.duration != "" {
+		mc := createBanDMMessage(data)
+		_, err := interactions.SendDirectMessage(e.Client(), *data.user, mc)
 		if err != nil {
 			failedToMessage = true
 		}
 	}
 
-	err = e.Client().Rest().AddBan(
-		guild.ID, user.ID, 0,
+	err := e.Client().Rest().AddBan(
+		guild.ID, data.user.ID, 0,
 		rest.WithReason(
 			fmt.Sprintf(
 				"Banned by: %s (%s) %s, with message: %s",
 				e.User().Username, e.User().ID,
-				utils.Iif(duration != "", fmt.Sprintf("for %s", duration), ""),
-				reason,
+				utils.Iif(data.duration != "", fmt.Sprintf("for %s", data.duration), ""),
+				data.reason,
 			),
 		),
 	)
 	if err != nil {
-		return e.CreateMessage(
-			discord.NewMessageCreateBuilder().
-				SetEphemeral(true).
-				SetContent("Failed to ban user").
-				Build(),
-		)
+		return interactions.RespondWithContentEph(e, "Failed to ban user")
 	}
-
 	if failedToMessage {
-		return e.CreateMessage(
-			discord.NewMessageCreateBuilder().
-				SetEphemeral(true).
-				SetContent("User was banned but message failed to send.").
-				Build(),
-		)
+		return interactions.RespondWithContentEph(e, "User was banned but message failed to send.")
 	}
 
-	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("User was banned.").
-			Build(),
-	)
+	return interactions.RespondWithContentEph(e, "User was banned.")
 
+}
+
+func createBanDMMessage(data banHandlerData) discord.MessageCreate {
+	banExp := durationToRelTimestamp(data.duration)
+
+	expiryText := fmt.Sprintf("This ban will expire %s.", banExp)
+	reasonText := fmt.Sprintf("Along with the ban, this message was added:\n\n %s\n\n",
+		data.reason)
+
+	return discord.NewMessageCreateBuilder().
+		SetContentf("You have been banned from %s.\n%s%s\n\n(You cannot respond to this message)",
+			data.guild.Name,
+			utils.Iif(data.duration != "", expiryText, ""),
+			utils.Iif(data.sendReason, reasonText, ""),
+		).Build()
+}
+
+func durationToRelTimestamp(duration string) string {
+	dur, err := utils.ParseLongDuration(duration)
+	if err != nil {
+		return duration
+	}
+	return fmt.Sprintf("<t:%d:R>", time.Now().Add(dur).Unix())
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 
+	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
@@ -42,13 +43,26 @@ var banUntilSubcommand = discord.ApplicationCommandOptionSubCommand{
 func BanUntilHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("ban until", e)
 
+	guild, isGuild := e.Guild()
+	if !isGuild {
+		return interactions.ErrEventNoGuildID
+	}
+
 	data := e.SlashCommandInteractionData()
 	user := data.User("user")
 	duration := data.String("duration")
 	reason := data.String("reason")
 	sendReason := data.Bool("send-reason")
 
-	err := banHandlerInner(e, user, sendReason, reason, duration)
+	banData := banHandlerData{
+		user:       &user,
+		guild:      &guild,
+		duration:   duration,
+		reason:     reason,
+		sendReason: sendReason,
+	}
+
+	err := banHandlerInner(e, banData)
 	if err != nil {
 		return err
 	}
