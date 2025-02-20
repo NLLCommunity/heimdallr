@@ -10,6 +10,7 @@ import (
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
 
+	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
@@ -57,23 +58,11 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 			"guild_id", guild.ID,
 			"err", err,
 		)
-		_, err = e.CreateFollowupMessage(
-			discord.NewMessageCreateBuilder().
-				SetContent("Failed to get guild information.").
-				SetEphemeral(true).
-				Build(),
-		)
-		return err
+		return interactions.RespondWithContentEph(e, "Failed to get guild information.")
 	}
 
 	if !guildSettings.GatekeepEnabled {
-		_, err := e.CreateFollowupMessage(
-			discord.NewMessageCreateBuilder().
-				SetContentf("Gatekeep is not enabled in this server.").
-				SetEphemeral(true).
-				Build(),
-		)
-		return err
+		return interactions.RespondWithContentEph(e, "Gatekeep is not enabled in this server.")
 	}
 
 	hasApprovedRole := false
@@ -87,14 +76,7 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 	}
 
 	if hasApprovedRole && (!hasPendingRole || !guildSettings.GatekeepAddPendingRoleOnJoin) {
-		_, err := e.CreateFollowupMessage(
-			discord.NewMessageCreateBuilder().
-				SetContentf("User %s is already approved.", member.Mention()).
-				SetEphemeral(true).
-				Build(),
-		)
-		return err
-
+		return interactions.RespondWithContentEph(e, fmt.Sprintf("User %s is already approved.", member.Mention()))
 	}
 
 	if guildSettings.GatekeepApprovedRole != 0 {
@@ -137,13 +119,9 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 
 	if guildSettings.GatekeepApprovedMessage == "" {
 		slog.Info("No approved message set; not sending message.")
-		_, err := e.CreateFollowupMessage(
-			discord.NewMessageCreateBuilder().
-				SetContentf("No approved message set; not sending message. Roles have been set.").
-				SetEphemeral(true).
-				Build(),
+		return interactions.RespondWithContentEph(
+			e, "No approved message set; not sending message. Roles have been set.",
 		)
-		return err
 	}
 
 	channel := guildSettings.JoinLeaveChannel
@@ -174,19 +152,8 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 			Build(),
 	)
 	if err != nil {
-		_, err := e.CreateFollowupMessage(
-			discord.NewMessageCreateBuilder().
-				SetEphemeral(true).
-				SetContent("Failed to send message to approved user.").
-				Build(),
-		)
-		return err
+		return interactions.RespondWithContentEph(e, "Failed to send message to approved user.")
 	}
-	_, err = e.CreateFollowupMessage(
-		discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("User has been approved!").
-			Build(),
-	)
-	return err
+
+	return interactions.FollowupWithContentEph(e, "User has been approved!")
 }

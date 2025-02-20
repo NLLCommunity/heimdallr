@@ -78,3 +78,13 @@ func RespondWithContentEph(e *handler.CommandEvent, content string) error {
 			Build(),
 	)
 }
+
+func FollowupWithContentEph(e *handler.CommandEvent, content string) error {
+	_, err := e.CreateFollowupMessage(
+		discord.NewMessageCreateBuilder().
+			SetContent(content).
+			SetEphemeral(true).
+			Build(),
+	)
+	return err
+}
