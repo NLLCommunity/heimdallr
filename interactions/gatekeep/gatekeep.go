@@ -8,7 +8,6 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/disgo/rest"
-	"github.com/disgoorg/json"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/model"
@@ -20,67 +19,6 @@ func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
 	r.Command("/Approve", ApproveUserCommandHandler)
 
 	return []discord.ApplicationCommandCreate{ApproveSlashCommand, ApproveUserCommand}
-}
-
-var ApproveUserCommand = discord.UserCommandCreate{
-	Name:                     "Approve",
-	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
-	Contexts: []discord.InteractionContextType{
-		discord.InteractionContextTypeGuild,
-	},
-}
-
-var ApproveSlashCommand = discord.SlashCommandCreate{
-	Name:                     "approve",
-	Description:              "Approve a user to join the server",
-	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
-	Contexts: []discord.InteractionContextType{
-		discord.InteractionContextTypeGuild,
-	},
-
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionUser{
-			Name:        "user",
-			Description: "The user to approve",
-			Required:    true,
-		},
-	},
-}
-
-func ApproveUserCommandHandler(e *handler.CommandEvent) error {
-	utils.LogInteractionContext("approve", e, e.Ctx)
-
-	guild, success, inGuild := getGuild(e)
-	if !inGuild {
-		slog.Warn("approve command supplied in DMs or guild ID is otherwise nil")
-		return nil
-	}
-	if !success {
-		slog.Warn("approve command: failed to get guild")
-		return nil
-	}
-
-	member := e.UserCommandInteractionData().TargetMember()
-
-	return approvedInnerHandler(e, guild, member)
-}
-
-func ApproveSlashCommandHandler(e *handler.CommandEvent) error {
-	utils.LogInteractionContext("Approve", e, e.Ctx)
-
-	guild, success, inGuild := getGuild(e)
-	if !inGuild {
-		slog.Warn("approve command supplied in DMs or guild ID is otherwise nil")
-		return nil
-	}
-	if !success {
-		slog.Warn("approve command: failed to get guild")
-		return nil
-	}
-
-	member := e.SlashCommandInteractionData().Member("user")
-
-	return approvedInnerHandler(e, guild, member)
 }
 
 func getGuild(e *handler.CommandEvent) (guild discord.Guild, success bool, inGuild bool) {
