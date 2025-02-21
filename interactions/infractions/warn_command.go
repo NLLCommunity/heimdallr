@@ -113,7 +113,7 @@ func WarnHandler(e *handler.CommandEvent) error {
 
 	inf, err := model.CreateInfraction(guild.ID, user.ID, e.User().ID, reason, severity, silent)
 	if err != nil {
-		_ = interactions.RespondWithContentEph(e, "Failed to create infraction.")
+		_ = interactions.MessageEphWithContentf(e, "Failed to create infraction.")
 		return fmt.Errorf("failed to create infraction: %w", err)
 	}
 
@@ -169,5 +169,5 @@ func WarnHandler(e *handler.CommandEvent) error {
 		}
 	}
 
-	return interactions.RespondWithContentEph(e, fmt.Sprintf("Warning created for %s.", user.Mention()))
+	return interactions.MessageEphWithContentf(e, fmt.Sprintf("Warning created for %s.", user.Mention()))
 }

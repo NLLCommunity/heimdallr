@@ -70,13 +70,13 @@ func banHandlerInner(e *handler.CommandEvent, data banHandlerData) error {
 		),
 	)
 	if err != nil {
-		return interactions.RespondWithContentEph(e, "Failed to ban user")
+		return interactions.MessageEphWithContentf(e, "Failed to ban user")
 	}
 	if failedToMessage {
-		return interactions.RespondWithContentEph(e, "User was banned but message failed to send.")
+		return interactions.MessageEphWithContentf(e, "User was banned but message failed to send.")
 	}
 
-	return interactions.RespondWithContentEph(e, "User was banned.")
+	return interactions.MessageEphWithContentf(e, "User was banned.")
 
 }
 
@@ -84,11 +84,14 @@ func createBanDMMessage(data banHandlerData) discord.MessageCreate {
 	banExp := durationToRelTimestamp(data.duration)
 
 	expiryText := fmt.Sprintf("This ban will expire %s.", banExp)
-	reasonText := fmt.Sprintf("Along with the ban, this message was added:\n\n %s\n\n",
-		data.reason)
+	reasonText := fmt.Sprintf(
+		"Along with the ban, this message was added:\n\n %s\n\n",
+		data.reason,
+	)
 
 	return discord.NewMessageCreateBuilder().
-		SetContentf("You have been banned from %s.\n%s%s\n\n(You cannot respond to this message)",
+		SetContentf(
+			"You have been banned from %s.\n%s%s\n\n(You cannot respond to this message)",
 			data.guild.Name,
 			utils.Iif(data.duration != "", expiryText, ""),
 			utils.Iif(data.sendReason, reasonText, ""),

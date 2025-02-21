@@ -58,11 +58,11 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 			"guild_id", guild.ID,
 			"err", err,
 		)
-		return interactions.RespondWithContentEph(e, "Failed to get guild information.")
+		return interactions.MessageEphWithContentf(e, "Failed to get guild information.")
 	}
 
 	if !guildSettings.GatekeepEnabled {
-		return interactions.RespondWithContentEph(e, "Gatekeep is not enabled in this server.")
+		return interactions.MessageEphWithContentf(e, "Gatekeep is not enabled in this server.")
 	}
 
 	hasApprovedRole := false
@@ -76,7 +76,7 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 	}
 
 	if hasApprovedRole && (!hasPendingRole || !guildSettings.GatekeepAddPendingRoleOnJoin) {
-		return interactions.RespondWithContentEph(e, "User %s is already approved.", member.Mention())
+		return interactions.MessageEphWithContentf(e, "User %s is already approved.", member.Mention())
 	}
 
 	if guildSettings.GatekeepApprovedRole != 0 {
@@ -119,7 +119,7 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 
 	if guildSettings.GatekeepApprovedMessage == "" {
 		slog.Info("No approved message set; not sending message.")
-		return interactions.RespondWithContentEph(
+		return interactions.MessageEphWithContentf(
 			e, "No approved message set; not sending message. Roles have been set.",
 		)
 	}
@@ -152,8 +152,8 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 			Build(),
 	)
 	if err != nil {
-		return interactions.RespondWithContentEph(e, "Failed to send message to approved user.")
+		return interactions.MessageEphWithContentf(e, "Failed to send message to approved user.")
 	}
 
-	return interactions.FollowupWithContentEph(e, "User has been approved!")
+	return interactions.FollowupEphWithContentf(e, "User has been approved!")
 }

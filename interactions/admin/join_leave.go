@@ -68,7 +68,7 @@ func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
 	}
 
 	if !utils.Any(hasJoinEnabled, hasLeaveEnabled, hasChannel) {
-		return interactions.RespondWithContentEph(e, joinLeaveInfo(settings))
+		return interactions.MessageEphWithContentf(e, joinLeaveInfo(settings))
 	}
 
 	err = model.SetGuildSettings(settings)
@@ -76,7 +76,7 @@ func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return interactions.RespondWithContentEph(e, message)
+	return interactions.MessageEphWithContentf(e, message)
 }
 
 func joinLeaveInfo(settings *model.GuildSettings) string {

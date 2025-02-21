@@ -72,7 +72,7 @@ func SendDirectMessage(client bot.Client, user discord.User, messageCreate disco
 
 	return msg, nil
 }
-func RespondWithContentEph(e InteractionMessager, content string, fmt ...any) error {
+func MessageEphWithContentf(e InteractionMessager, content string, fmt ...any) error {
 	return e.CreateMessage(
 		discord.NewMessageCreateBuilder().
 			SetContentf(content, fmt...).
@@ -82,7 +82,7 @@ func RespondWithContentEph(e InteractionMessager, content string, fmt ...any) er
 	)
 }
 
-func FollowupWithContentEph(e InteractionMessager, content string, fmt ...any) error {
+func FollowupEphWithContentf(e InteractionMessager, content string, fmt ...any) error {
 	_, err := e.CreateFollowupMessage(
 		discord.NewMessageCreateBuilder().
 			SetContentf(content, fmt...).
@@ -100,6 +100,8 @@ type InteractionMessager interface {
 	DeleteInteractionResponse(opts ...rest.RequestOpt) error
 	GetFollowupMessage(messageID snowflake.ID, opts ...rest.RequestOpt) (*discord.Message, error)
 	CreateFollowupMessage(messageCreate discord.MessageCreate, opts ...rest.RequestOpt) (*discord.Message, error)
-	UpdateFollowupMessage(messageID snowflake.ID, messageUpdate discord.MessageUpdate, opts ...rest.RequestOpt) (*discord.Message, error)
+	UpdateFollowupMessage(
+		messageID snowflake.ID, messageUpdate discord.MessageUpdate, opts ...rest.RequestOpt,
+	) (*discord.Message, error)
 	DeleteFollowupMessage(messageID snowflake.ID, opts ...rest.RequestOpt) error
 }

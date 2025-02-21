@@ -90,7 +90,9 @@ func AdminJoinMessageModalHandler(e *handler.ModalEvent) error {
 
 	_, err = mustache.RenderRaw(message, true, utils.MessageTemplateData{})
 	if err != nil {
-		return interactions.RespondWithContentEph(e, "The message contains data that is invalid; this may be caused by invalid placeholders.")
+		return interactions.MessageEphWithContentf(
+			e, "The message contains data that is invalid; this may be caused by invalid placeholders.",
+		)
 	}
 
 	settings.JoinMessage = message
@@ -100,7 +102,7 @@ func AdminJoinMessageModalHandler(e *handler.ModalEvent) error {
 		return err
 	}
 
-	return interactions.RespondWithContentEph(e, "Join message updated.")
+	return interactions.MessageEphWithContentf(e, "Join message updated.")
 }
 
 func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
@@ -174,7 +176,9 @@ func AdminLeaveMessageModalHandler(e *handler.ModalEvent) error {
 
 	_, err = mustache.RenderRaw(message, true, utils.MessageTemplateData{})
 	if err != nil {
-		return interactions.RespondWithContentEph(e, "The message contains data that is invalid; this may be caused by invalid placeholders.")
+		return interactions.MessageEphWithContentf(
+			e, "The message contains data that is invalid; this may be caused by invalid placeholders.",
+		)
 	}
 
 	settings.LeaveMessage = message
@@ -184,5 +188,5 @@ func AdminLeaveMessageModalHandler(e *handler.ModalEvent) error {
 		return err
 	}
 
-	return interactions.RespondWithContentEph(e, "Leave message updated.")
+	return interactions.MessageEphWithContentf(e, "Leave message updated.")
 }

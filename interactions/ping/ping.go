@@ -19,5 +19,5 @@ var PingCommand = discord.SlashCommandCreate{
 }
 
 func PingHandler(e *handler.CommandEvent) error {
-	return interactions.RespondWithContentEph(e, "Pong!")
+	return interactions.MessageEphWithContentf(e, "Pong!")
 }

@@ -100,17 +100,17 @@ func InfractionsListHandler(e *handler.CommandEvent) error {
 	userIDString, hasUserID := data.OptString("user-id")
 
 	if !hasUser && !hasUserID {
-		return interactions.RespondWithContentEph(e, "You must specify either a user or a user ID.")
+		return interactions.MessageEphWithContentf(e, "You must specify either a user or a user ID.")
 	}
 
 	if hasUser && hasUserID {
-		return interactions.RespondWithContentEph(e, "You can only specify either a user or a user ID.")
+		return interactions.MessageEphWithContentf(e, "You can only specify either a user or a user ID.")
 	}
 
 	if !hasUser {
 		userID, err := snowflake.Parse(userIDString)
 		if err != nil {
-			_ = interactions.RespondWithContentEph(e, "Failed to parse user id.")
+			_ = interactions.MessageEphWithContentf(e, "Failed to parse user id.")
 			return fmt.Errorf("failed to parse user id: %w", err)
 		}
 
@@ -151,10 +151,10 @@ func InfractionsRemoveHandler(e *handler.CommandEvent) error {
 
 	err := model.DeleteInfractionBySqid(infID)
 	if err != nil {
-		return interactions.RespondWithContentEph(e, "Failed to delete infraction.")
+		return interactions.MessageEphWithContentf(e, "Failed to delete infraction.")
 	}
 
-	return interactions.RespondWithContentEph(e, "Infraction deleted.")
+	return interactions.MessageEphWithContentf(e, "Infraction deleted.")
 }
 
 func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
@@ -184,7 +184,7 @@ func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
 	}
 
 	if e.User().ID != parentIx.User.ID {
-		return interactions.RespondWithContentEph(e, "You can only paginate responses from your own commands.")
+		return interactions.MessageEphWithContentf(e, "You can only paginate responses from your own commands.")
 	}
 
 	mcb, mub, err := getUserInfractionsAndUpdateMessage(false, offset, &guild, user)

@@ -85,17 +85,17 @@ func QuoteHandler(e *handler.CommandEvent) error {
 
 	parts, err := parseMessageLink(url)
 	if err != nil {
-		_ = interactions.RespondWithContentEph(e, "Invalid message link.")
+		_ = interactions.MessageEphWithContentf(e, "Invalid message link.")
 		return err
 	}
 
 	if parts.GuildId != guildID {
-		return interactions.RespondWithContentEph(e, "Message link is not in this server.")
+		return interactions.MessageEphWithContentf(e, "Message link is not in this server.")
 	}
 
 	message, err := e.Client().Rest().GetMessage(parts.ChannelId, parts.MessageId)
 	if err != nil {
-		_ = interactions.RespondWithContentEph(e, "Failed to fetch message.")
+		_ = interactions.MessageEphWithContentf(e, "Failed to fetch message.")
 		return err
 	}
 
@@ -113,7 +113,7 @@ func QuoteHandler(e *handler.CommandEvent) error {
 	}
 
 	if canRead, _ := userCanReadChannelMessages(e.User().ID, message.ChannelID, e.Client()); !canRead {
-		_ = interactions.RespondWithContentEph(e, "You don't have permission to read messages in that channel.")
+		_ = interactions.MessageEphWithContentf(e, "You don't have permission to read messages in that channel.")
 		return nil
 	}
 

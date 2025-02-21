@@ -87,7 +87,9 @@ func AdminGatekeepMessageModalHandler(e *handler.ModalEvent) error {
 
 	_, err = mustache.RenderRaw(message, true, utils.MessageTemplateData{})
 	if err != nil {
-		return interactions.RespondWithContentEph(e, "The message contains data that is invalid; this may be caused by invalid placeholders.")
+		return interactions.MessageEphWithContentf(
+			e, "The message contains data that is invalid; this may be caused by invalid placeholders.",
+		)
 	}
 
 	settings.GatekeepApprovedMessage = message
@@ -97,5 +99,5 @@ func AdminGatekeepMessageModalHandler(e *handler.ModalEvent) error {
 		return err
 	}
 
-	return interactions.RespondWithContentEph(e, "Gatekeep approved message updated.")
+	return interactions.MessageEphWithContentf(e, "Gatekeep approved message updated.")
 }
