@@ -169,5 +169,5 @@ func WarnHandler(e *handler.CommandEvent) error {
 		}
 	}
 
-	return interactions.MessageEphWithContentf(e, fmt.Sprintf("Warning created for %s.", user.Mention()))
+	return interactions.MessageEphWithContentf(e, "Warning created for %s.", user.Mention())
 }

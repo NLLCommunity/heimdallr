@@ -70,7 +70,7 @@ func AdminInfractionsHandler(e *handler.CommandEvent) error {
 	}
 
 	if !utils.Any(hasHalfLife, hasNotifyThreshold, hasNotifyOnWarnedUserJoin) {
-		return interactions.MessageEphWithContentf(e, infractionInfo(settings))
+		return interactions.MessageEphWithContent(e, infractionInfo(settings))
 	}
 
 	err = model.SetGuildSettings(settings)
@@ -78,7 +78,7 @@ func AdminInfractionsHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return interactions.MessageEphWithContentf(e, message)
+	return interactions.MessageEphWithContent(e, message)
 }
 
 func infractionInfo(settings *model.GuildSettings) string {

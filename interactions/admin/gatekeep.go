@@ -79,7 +79,7 @@ func AdminGatekeepHandler(e *handler.CommandEvent) error {
 	}
 
 	if !utils.Any(hasEnabled, hasPendingRole, hasApprovedRole, hasUsePendingRole) {
-		return interactions.MessageEphWithContentf(e, gatekeepInfo(settings))
+		return interactions.MessageEphWithContent(e, gatekeepInfo(settings))
 	}
 
 	err = model.SetGuildSettings(settings)
@@ -87,7 +87,7 @@ func AdminGatekeepHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return interactions.MessageEphWithContentf(e, message)
+	return interactions.MessageEphWithContent(e, message)
 }
 
 func gatekeepInfo(settings *model.GuildSettings) string {

@@ -2,6 +2,7 @@ package interactions
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
@@ -72,25 +73,31 @@ func SendDirectMessage(client bot.Client, user discord.User, messageCreate disco
 
 	return msg, nil
 }
-func MessageEphWithContentf(e InteractionMessager, content string, fmt ...any) error {
+func MessageEphWithContent(e InteractionMessager, content string) error {
 	return e.CreateMessage(
 		discord.NewMessageCreateBuilder().
-			SetContentf(content, fmt...).
+			SetContent(content).
 			SetEphemeral(true).
 			SetAllowedMentions(&discord.AllowedMentions{}).
 			Build(),
 	)
 }
+func MessageEphWithContentf(e InteractionMessager, content string, fmtArgs ...any) error {
+	return MessageEphWithContent(e, fmt.Sprintf(content, fmtArgs...))
+}
 
-func FollowupEphWithContentf(e InteractionMessager, content string, fmt ...any) error {
+func FollowupEphWithContent(e InteractionMessager, content string) error {
 	_, err := e.CreateFollowupMessage(
 		discord.NewMessageCreateBuilder().
-			SetContentf(content, fmt...).
+			SetContent(content).
 			SetEphemeral(true).
 			SetAllowedMentions(&discord.AllowedMentions{}).
 			Build(),
 	)
 	return err
+}
+func FollowupEphWithContentf(e InteractionMessager, content string, fmtArgs ...any) error {
+	return FollowupEphWithContent(e, fmt.Sprintf(content, fmtArgs...))
 }
 
 type InteractionMessager interface {

@@ -148,7 +148,7 @@ func dryRunPruneMembers(e *handler.CommandEvent, members []*discord.Member) erro
 		adminMessage += fmt.Sprintf("-# %s (%s)\n", member.User.Username, member.User.ID)
 	}
 
-	return interactions.FollowupEphWithContentf(e, adminMessage)
+	return interactions.FollowupEphWithContent(e, adminMessage)
 }
 
 func kickMembers(e *handler.CommandEvent, members []*discord.Member) (kickedMembers []*discord.Member, err error) {
