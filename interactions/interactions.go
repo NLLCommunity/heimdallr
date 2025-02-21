@@ -6,6 +6,8 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
+	"github.com/disgoorg/disgo/rest"
+	"github.com/disgoorg/snowflake/v2"
 )
 
 type AppCommandRegisterer interface {
@@ -70,21 +72,34 @@ func SendDirectMessage(client bot.Client, user discord.User, messageCreate disco
 
 	return msg, nil
 }
-func RespondWithContentEph(e *handler.CommandEvent, content string) error {
+func RespondWithContentEph(e InteractionMessager, content string, fmt ...any) error {
 	return e.CreateMessage(
 		discord.NewMessageCreateBuilder().
-			SetContent(content).
+			SetContentf(content, fmt...).
 			SetEphemeral(true).
+			SetAllowedMentions(&discord.AllowedMentions{}).
 			Build(),
 	)
 }
 
-func FollowupWithContentEph(e *handler.CommandEvent, content string) error {
+func FollowupWithContentEph(e InteractionMessager, content string, fmt ...any) error {
 	_, err := e.CreateFollowupMessage(
 		discord.NewMessageCreateBuilder().
-			SetContent(content).
+			SetContentf(content, fmt...).
 			SetEphemeral(true).
+			SetAllowedMentions(&discord.AllowedMentions{}).
 			Build(),
 	)
 	return err
+}
+
+type InteractionMessager interface {
+	CreateMessage(messageCreate discord.MessageCreate, opts ...rest.RequestOpt) error
+	GetInteractionResponse(opts ...rest.RequestOpt) (*discord.Message, error)
+	UpdateInteractionResponse(messageUpdate discord.MessageUpdate, opts ...rest.RequestOpt) (*discord.Message, error)
+	DeleteInteractionResponse(opts ...rest.RequestOpt) error
+	GetFollowupMessage(messageID snowflake.ID, opts ...rest.RequestOpt) (*discord.Message, error)
+	CreateFollowupMessage(messageCreate discord.MessageCreate, opts ...rest.RequestOpt) (*discord.Message, error)
+	UpdateFollowupMessage(messageID snowflake.ID, messageUpdate discord.MessageUpdate, opts ...rest.RequestOpt) (*discord.Message, error)
+	DeleteFollowupMessage(messageID snowflake.ID, opts ...rest.RequestOpt) error
 }
