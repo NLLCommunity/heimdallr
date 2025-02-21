@@ -6,6 +6,7 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 
+	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
@@ -67,13 +68,7 @@ func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
 	}
 
 	if !utils.Any(hasJoinEnabled, hasLeaveEnabled, hasChannel) {
-		return e.CreateMessage(
-			discord.NewMessageCreateBuilder().
-				SetContent(joinLeaveInfo(settings)).
-				SetEphemeral(true).
-				SetAllowedMentions(&discord.AllowedMentions{}).
-				Build(),
-		)
+		return interactions.RespondWithContentEph(e, joinLeaveInfo(settings))
 	}
 
 	err = model.SetGuildSettings(settings)
@@ -81,13 +76,7 @@ func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
-			SetContent(message).
-			SetEphemeral(true).
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			Build(),
-	)
+	return interactions.RespondWithContentEph(e, message)
 }
 
 func joinLeaveInfo(settings *model.GuildSettings) string {

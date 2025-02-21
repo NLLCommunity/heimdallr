@@ -98,13 +98,7 @@ func AdminAntiSpamHandler(e *handler.CommandEvent) error {
 	}
 
 	if !utils.Any(hasEnabled, hasCount, hasCooldown) {
-		return e.CreateMessage(
-			discord.NewMessageCreateBuilder().
-				SetContent(antiSpamInfo(settings)).
-				SetEphemeral(true).
-				SetAllowedMentions(&discord.AllowedMentions{}).
-				Build(),
-		)
+		return interactions.RespondWithContentEph(e, antiSpamInfo(settings))
 	}
 
 	err = model.SetGuildSettings(settings)
@@ -113,11 +107,5 @@ func AdminAntiSpamHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
-			SetContent(message).
-			SetEphemeral(true).
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			Build(),
-	)
+	return interactions.RespondWithContentEph(e, message)
 }

@@ -76,7 +76,7 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 	}
 
 	if hasApprovedRole && (!hasPendingRole || !guildSettings.GatekeepAddPendingRoleOnJoin) {
-		return interactions.RespondWithContentEph(e, fmt.Sprintf("User %s is already approved.", member.Mention()))
+		return interactions.RespondWithContentEph(e, "User %s is already approved.", member.Mention())
 	}
 
 	if guildSettings.GatekeepApprovedRole != 0 {

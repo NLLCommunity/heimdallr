@@ -75,22 +75,12 @@ func PruneHandler(e *handler.CommandEvent) error {
 
 	guildSettings, err := model.GetGuildSettings(*e.GuildID())
 	if err != nil {
-		_ = e.CreateMessage(
-			discord.NewMessageCreateBuilder().
-				SetEphemeral(true).
-				SetContent("Failed to prune members: could not get guild settings.").
-				Build(),
-		)
+		_ = interactions.RespondWithContentEph(e, "Failed to prune members: could not get guild settings.")
 		return err
 	}
 
 	if guildSettings.GatekeepPendingRole == 0 {
-		return e.CreateMessage(
-			discord.NewMessageCreateBuilder().
-				SetEphemeral(true).
-				SetContent("Failed to prune members: no pending role set. This command will only prune pending members.").
-				Build(),
-		)
+		return interactions.RespondWithContentEph(e, "Failed to prune members: no pending role set. This command will only prune pending members.")
 	}
 
 	_ = e.DeferCreateMessage(true)
@@ -149,13 +139,7 @@ func pruneMembers(e *handler.CommandEvent, guildSettings model.GuildSettings, me
 		}
 	}
 
-	_, err = e.CreateFollowupMessage(
-		discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContentf("Pruned %d users.", numKicked).
-			Build(),
-	)
-	return err
+	return interactions.FollowupWithContentEph(e, "Pruned %d users.", numKicked)
 }
 
 func dryRunPruneMembers(e *handler.CommandEvent, members []*discord.Member) error {
@@ -168,13 +152,7 @@ func dryRunPruneMembers(e *handler.CommandEvent, members []*discord.Member) erro
 		adminMessage += fmt.Sprintf("-# %s (%s)\n", member.User.Username, member.User.ID)
 	}
 
-	_, err := e.CreateFollowupMessage(
-		discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent(adminMessage).
-			Build(),
-	)
-	return err
+	return interactions.FollowupWithContentEph(e, adminMessage)
 }
 
 func kickMembers(e *handler.CommandEvent, members []*discord.Member) (kickedMembers []*discord.Member, err error) {

@@ -79,35 +79,12 @@ func KickWithMessageHandler(e *handler.CommandEvent) error {
 		rest.WithReason(fmt.Sprintf("Kicked by: %s (%s), with message: %s", e.User().Username, e.User().ID, message)),
 	)
 	if err != nil {
-		return e.CreateMessage(
-			discord.NewMessageCreateBuilder().
-				SetEphemeral(true).
-				SetContentf("Failed to kick user %s.", user.Mention()).
-				SetAllowedMentions(
-					&discord.AllowedMentions{
-						RepliedUser: true,
-					},
-				).Build(),
-		)
+		return interactions.RespondWithContentEph(e, "Failed to kick user %s.", user.Mention())
 	}
 
 	if failedToMessage {
-		return e.CreateMessage(
-			discord.NewMessageCreateBuilder().
-				SetEphemeral(true).
-				SetContent("User was kicked but message failed to send.").
-				Build(),
-		)
+		return interactions.RespondWithContentEph(e, "User was kicked but message failed to send.")
 	}
 
-	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContentf("User %s was kicked.", user.Mention()).
-			SetAllowedMentions(
-				&discord.AllowedMentions{
-					RepliedUser: true,
-				},
-			).Build(),
-	)
+	return interactions.RespondWithContentEph(e, "User %s was kicked.", user.Mention())
 }

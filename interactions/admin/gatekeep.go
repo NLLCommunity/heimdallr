@@ -79,13 +79,7 @@ func AdminGatekeepHandler(e *handler.CommandEvent) error {
 	}
 
 	if !utils.Any(hasEnabled, hasPendingRole, hasApprovedRole, hasUsePendingRole) {
-		return e.CreateMessage(
-			discord.NewMessageCreateBuilder().
-				SetContent(gatekeepInfo(settings)).
-				SetEphemeral(true).
-				SetAllowedMentions(&discord.AllowedMentions{}).
-				Build(),
-		)
+		return interactions.RespondWithContentEph(e, gatekeepInfo(settings))
 	}
 
 	err = model.SetGuildSettings(settings)
@@ -93,13 +87,7 @@ func AdminGatekeepHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
-			SetContent(message).
-			SetEphemeral(true).
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			Build(),
-	)
+	return interactions.RespondWithContentEph(e, message)
 }
 
 func gatekeepInfo(settings *model.GuildSettings) string {

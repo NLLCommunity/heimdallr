@@ -3,6 +3,8 @@ package ping
 import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
+
+	"github.com/NLLCommunity/heimdallr/interactions"
 )
 
 func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
@@ -17,9 +19,5 @@ var PingCommand = discord.SlashCommandCreate{
 }
 
 func PingHandler(e *handler.CommandEvent) error {
-	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Pong!").Build(),
-	)
+	return interactions.RespondWithContentEph(e, "Pong!")
 }

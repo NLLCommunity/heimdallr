@@ -8,6 +8,8 @@ import (
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
+
+	"github.com/NLLCommunity/heimdallr/interactions"
 )
 
 func RoleAssignButtonHandler(e *handler.ComponentEvent) error {
@@ -48,20 +50,9 @@ func RoleAssignButtonHandler(e *handler.ComponentEvent) error {
 	)
 
 	if err != nil {
-		_ = e.CreateMessage(
-			discord.NewMessageCreateBuilder().
-				SetContent("Failed to assign role. This is likely due to the bot not having the required permissions.").
-				SetEphemeral(true).
-				Build(),
-		)
+		_ = interactions.RespondWithContentEph(e, "Failed to assign role. This is likely due to the bot not having the required permissions.")
 		return err
 	}
 
-	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
-			SetContent("Role assigned!").
-			SetEphemeral(true).
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			Build(),
-	)
+	return interactions.RespondWithContentEph(e, "Role assigned!")
 }

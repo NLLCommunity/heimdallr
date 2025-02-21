@@ -70,13 +70,7 @@ func AdminInfractionsHandler(e *handler.CommandEvent) error {
 	}
 
 	if !utils.Any(hasHalfLife, hasNotifyThreshold, hasNotifyOnWarnedUserJoin) {
-		return e.CreateMessage(
-			discord.NewMessageCreateBuilder().
-				SetContent(infractionInfo(settings)).
-				SetEphemeral(true).
-				SetAllowedMentions(&discord.AllowedMentions{}).
-				Build(),
-		)
+		return interactions.RespondWithContentEph(e, infractionInfo(settings))
 	}
 
 	err = model.SetGuildSettings(settings)
@@ -84,13 +78,7 @@ func AdminInfractionsHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
-			SetContent(message).
-			SetEphemeral(true).
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			Build(),
-	)
+	return interactions.RespondWithContentEph(e, message)
 }
 
 func infractionInfo(settings *model.GuildSettings) string {
