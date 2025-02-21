@@ -86,13 +86,7 @@ func PruneHandler(e *handler.CommandEvent) error {
 	_ = e.DeferCreateMessage(true)
 	prunableMembers, err := getPrunableMembers(e, days, guildSettings)
 	if err != nil {
-		_, err = e.CreateFollowupMessage(
-			discord.NewMessageCreateBuilder().
-				SetEphemeral(true).
-				SetContent("Failed to prune members: could not get member list.").
-				Build(),
-		)
-		return err
+		return interactions.FollowupWithContentEph(e, "Failed to prune members: could not get member list.")
 	}
 
 	if dryRun {
