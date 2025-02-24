@@ -1,7 +1,6 @@
 package utils
 
 import (
-	"cmp"
 	"errors"
 	"iter"
 	"log/slog"
@@ -25,20 +24,6 @@ func CalcHalfLife(timeSince time.Duration, halfLifeTimeDays, weight float64) flo
 		return weight
 	}
 	return weight * (math.Pow(0.5, timeSince.Hours()/(halfLifeTimeDays*24)))
-}
-
-func Max[T cmp.Ordered](a, b T) T {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func Min[T cmp.Ordered](a, b T) T {
-	if a < b {
-		return a
-	}
-	return b
 }
 
 func WrapRef[T any](v *T) (T, bool) {
@@ -140,18 +125,22 @@ func GetMembersIter(r rest.Rest, guildID snowflake.ID) iter.Seq[IterResult[disco
 		for {
 			members, err := r.GetMembers(guildID, LIMIT, memberOffset)
 			if err != nil {
-				yield(IterResult[discord.Member]{
-					Error: err,
-				})
+				yield(
+					IterResult[discord.Member]{
+						Error: err,
+					},
+				)
 			}
 
 			count := len(members)
 			totalMembers += count
 
 			for _, member := range members {
-				if !yield(IterResult[discord.Member]{
-					Value: member,
-				}) {
+				if !yield(
+					IterResult[discord.Member]{
+						Value: member,
+					},
+				) {
 					return
 				}
 			}
