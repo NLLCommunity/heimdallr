@@ -100,17 +100,20 @@ func InfractionsListHandler(e *handler.CommandEvent) error {
 	userIDString, hasUserID := data.OptString("user-id")
 
 	if !hasUser && !hasUserID {
-		return interactions.MessageEphWithContentf(e, "You must specify either a user or a user ID.")
+		return e.CreateMessage(interactions.EphemeralMessageContent(
+			"You must specify either a user or a user ID.").Build())
 	}
 
 	if hasUser && hasUserID {
-		return interactions.MessageEphWithContentf(e, "You can only specify either a user or a user ID.")
+		return e.CreateMessage(interactions.EphemeralMessageContent(
+			"You can only specify either a user or a user ID.").Build())
 	}
 
 	if !hasUser {
 		userID, err := snowflake.Parse(userIDString)
 		if err != nil {
-			_ = interactions.MessageEphWithContentf(e, "Failed to parse user id.")
+			_ = e.CreateMessage(interactions.EphemeralMessageContent(
+				"Failed to parse user id.").Build())
 			return fmt.Errorf("failed to parse user id: %w", err)
 		}
 
@@ -151,10 +154,12 @@ func InfractionsRemoveHandler(e *handler.CommandEvent) error {
 
 	err := model.DeleteInfractionBySqid(infID)
 	if err != nil {
-		return interactions.MessageEphWithContentf(e, "Failed to delete infraction.")
+		return e.CreateMessage(interactions.EphemeralMessageContent(
+			"Failed to delete infraction.").Build())
 	}
 
-	return interactions.MessageEphWithContentf(e, "Infraction deleted.")
+	return e.CreateMessage(interactions.EphemeralMessageContent(
+		"Infraction deleted.").Build())
 }
 
 func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
@@ -184,7 +189,8 @@ func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
 	}
 
 	if e.User().ID != parentIx.User.ID {
-		return interactions.MessageEphWithContentf(e, "You can only paginate responses from your own commands.")
+		return e.CreateMessage(interactions.EphemeralMessageContent(
+			"You can only paginate responses from your own commands.").Build())
 	}
 
 	mcb, mub, err := getUserInfractionsAndUpdateMessage(false, offset, &guild, user)

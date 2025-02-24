@@ -98,7 +98,7 @@ func AdminAntiSpamHandler(e *handler.CommandEvent) error {
 	}
 
 	if !utils.Any(hasEnabled, hasCount, hasCooldown) {
-		return interactions.MessageEphWithContent(e, antiSpamInfo(settings))
+		return e.CreateMessage(interactions.EphemeralMessageContent(antiSpamInfo(settings)).Build())
 	}
 
 	err = model.SetGuildSettings(settings)
@@ -107,5 +107,5 @@ func AdminAntiSpamHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return interactions.MessageEphWithContent(e, message)
+	return e.CreateMessage(interactions.EphemeralMessageContent(message).Build())
 }

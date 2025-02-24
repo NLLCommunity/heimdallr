@@ -37,7 +37,7 @@ func AdminModChannelHandler(e *handler.CommandEvent) error {
 	}
 
 	if !hasChannel {
-		return interactions.MessageEphWithContent(e, modChannelInfo(settings))
+		return e.CreateMessage(interactions.EphemeralMessageContent(modChannelInfo(settings)).Build())
 	}
 
 	settings.ModeratorChannel = channel.ID
@@ -46,7 +46,10 @@ func AdminModChannelHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return interactions.MessageEphWithContentf(e, "Moderator channel set to <#%d>", channel.ID)
+	return e.CreateMessage(
+		interactions.EphemeralMessageContentf("Moderator channel set to <#%d>", channel.ID).
+			Build(),
+	)
 }
 
 func modChannelInfo(settings *model.GuildSettings) string {

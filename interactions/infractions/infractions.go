@@ -11,6 +11,7 @@ import (
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/snowflake/v2"
 
+	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
@@ -197,18 +198,11 @@ func getUserInfractionsAndMakeMessage(
 ) (*discord.MessageCreateBuilder, error) {
 	infrData, err := getUserInfractions(guild.ID, user.ID, pageSize, 0)
 	if err != nil {
-		return discord.NewMessageCreateBuilder().
-				SetEphemeral(true).
-				SetContent("Failed to retrieve infractions."),
-			fmt.Errorf("failed to get user infractions: %w", err)
+		return interactions.EphemeralMessageContent("Failed to retrieve infractions."), err
 	}
 
 	if infrData.TotalCount == 0 {
-		return discord.NewMessageCreateBuilder().
-				SetAllowedMentions(&discord.AllowedMentions{}).
-				SetEphemeral(true).
-				SetContentf("%s has no infractions.", user.Mention()),
-			nil
+		return interactions.EphemeralMessageContentf("%s has no infractions.", user.Mention()), nil
 	}
 
 	modText := fmt.Sprintf(
@@ -221,21 +215,17 @@ func getUserInfractionsAndMakeMessage(
 		infrData.TotalCount,
 	)
 
-	message := discord.NewMessageCreateBuilder().
-		SetEphemeral(true).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		SetEmbeds(infrData.Embeds...).
-		SetContentf(
-			"%s (Viewing %d-%d)\nTotal strikes: %s",
-			utils.Iif(modView, modText, userText),
-			infrData.Offset+1,
-			infrData.Offset+infrData.CurrentCount,
-			fmt.Sprintf(
-				"%s (%s)",
-				severityToDots(infrData.TotalSeverity),
-				utils.FormatFloatUpToPrec(infrData.TotalSeverity, 2),
-			),
-		)
+	message := interactions.EphemeralMessageContentf(
+		"%s (Viewing %d-%d)\nTotal strikes: %s",
+		utils.Iif(modView, modText, userText),
+		infrData.Offset+1,
+		infrData.Offset+infrData.CurrentCount,
+		fmt.Sprintf(
+			"%s (%s)",
+			severityToDots(infrData.TotalSeverity),
+			utils.FormatFloatUpToPrec(infrData.TotalSeverity, 2),
+		),
+	).SetEmbeds(infrData.Embeds...)
 
 	if infrData.Components != nil {
 		message.AddActionRow(infrData.Components...)
@@ -251,17 +241,12 @@ func getUserInfractionsAndUpdateMessage(
 
 	infrData, err := getUserInfractions(guild.ID, user.ID, pageSize, offset)
 	if err != nil {
-		mcb = discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("Failed to retrieve infractions.")
+		mcb = interactions.EphemeralMessageContent("Failed to retrieve infractions.")
 		return
 	}
 
 	if infrData.TotalCount == 0 {
-		mcb = discord.NewMessageCreateBuilder().
-			SetEphemeral(true).
-			SetContent("You have no infractions.").
-			SetEphemeral(true)
+		mcb = interactions.EphemeralMessageContent("You have no infractions.")
 		return
 	}
 

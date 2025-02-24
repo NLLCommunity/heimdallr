@@ -7,8 +7,6 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/disgo/rest"
-	"github.com/disgoorg/snowflake/v2"
 )
 
 type AppCommandRegisterer interface {
@@ -73,42 +71,14 @@ func SendDirectMessage(client bot.Client, user discord.User, messageCreate disco
 
 	return msg, nil
 }
-func MessageEphWithContent(e InteractionMessager, content string) error {
-	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
-			SetContent(content).
-			SetEphemeral(true).
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			Build(),
-	)
-}
-func MessageEphWithContentf(e InteractionMessager, content string, fmtArgs ...any) error {
-	return MessageEphWithContent(e, fmt.Sprintf(content, fmtArgs...))
+
+func EphemeralMessageContent(content string) *discord.MessageCreateBuilder {
+	return discord.NewMessageCreateBuilder().
+		SetContent(content).
+		SetEphemeral(true).
+		SetAllowedMentions(&discord.AllowedMentions{})
 }
 
-func FollowupEphWithContent(e InteractionMessager, content string) error {
-	_, err := e.CreateFollowupMessage(
-		discord.NewMessageCreateBuilder().
-			SetContent(content).
-			SetEphemeral(true).
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			Build(),
-	)
-	return err
-}
-func FollowupEphWithContentf(e InteractionMessager, content string, fmtArgs ...any) error {
-	return FollowupEphWithContent(e, fmt.Sprintf(content, fmtArgs...))
-}
-
-type InteractionMessager interface {
-	CreateMessage(messageCreate discord.MessageCreate, opts ...rest.RequestOpt) error
-	GetInteractionResponse(opts ...rest.RequestOpt) (*discord.Message, error)
-	UpdateInteractionResponse(messageUpdate discord.MessageUpdate, opts ...rest.RequestOpt) (*discord.Message, error)
-	DeleteInteractionResponse(opts ...rest.RequestOpt) error
-	GetFollowupMessage(messageID snowflake.ID, opts ...rest.RequestOpt) (*discord.Message, error)
-	CreateFollowupMessage(messageCreate discord.MessageCreate, opts ...rest.RequestOpt) (*discord.Message, error)
-	UpdateFollowupMessage(
-		messageID snowflake.ID, messageUpdate discord.MessageUpdate, opts ...rest.RequestOpt,
-	) (*discord.Message, error)
-	DeleteFollowupMessage(messageID snowflake.ID, opts ...rest.RequestOpt) error
+func EphemeralMessageContentf(content string, fmtArgs ...any) *discord.MessageCreateBuilder {
+	return EphemeralMessageContent(fmt.Sprintf(content, fmtArgs...))
 }

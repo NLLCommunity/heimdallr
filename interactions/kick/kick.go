@@ -79,12 +79,15 @@ func KickWithMessageHandler(e *handler.CommandEvent) error {
 		rest.WithReason(fmt.Sprintf("Kicked by: %s (%s), with message: %s", e.User().Username, e.User().ID, message)),
 	)
 	if err != nil {
-		return interactions.MessageEphWithContentf(e, "Failed to kick user %s.", user.Mention())
+		return e.CreateMessage(interactions.EphemeralMessageContentf(
+			"Failed to kick user %s.", user.Mention()).Build())
 	}
 
 	if failedToMessage {
-		return interactions.MessageEphWithContentf(e, "User was kicked but message failed to send.")
+		return e.CreateMessage(interactions.EphemeralMessageContentf(
+			"User was kicked but message failed to send.").Build())
 	}
 
-	return interactions.MessageEphWithContentf(e, "User %s was kicked.", user.Mention())
+	return e.CreateMessage(interactions.EphemeralMessageContentf(
+		"User %s was kicked.", user.Mention()).Build())
 }

@@ -85,17 +85,20 @@ func QuoteHandler(e *handler.CommandEvent) error {
 
 	parts, err := parseMessageLink(url)
 	if err != nil {
-		_ = interactions.MessageEphWithContentf(e, "Invalid message link.")
+		_ = e.CreateMessage(interactions.EphemeralMessageContent("Invalid message link.").
+			Build())
 		return err
 	}
 
 	if parts.GuildId != guildID {
-		return interactions.MessageEphWithContentf(e, "Message link is not in this server.")
+		return e.CreateMessage(interactions.EphemeralMessageContent(
+			"Message link is not in this server.").Build())
 	}
 
 	message, err := e.Client().Rest().GetMessage(parts.ChannelId, parts.MessageId)
 	if err != nil {
-		_ = interactions.MessageEphWithContentf(e, "Failed to fetch message.")
+		_ = e.CreateMessage(interactions.EphemeralMessageContent(
+			"Failed to fetch message.").Build())
 		return err
 	}
 
@@ -113,8 +116,8 @@ func QuoteHandler(e *handler.CommandEvent) error {
 	}
 
 	if canRead, _ := userCanReadChannelMessages(e.User().ID, message.ChannelID, e.Client()); !canRead {
-		_ = interactions.MessageEphWithContentf(e, "You don't have permission to read messages in that channel.")
-		return nil
+		return e.CreateMessage(interactions.EphemeralMessageContent(
+			"You don't have permission to read messages in that channel.").Build())
 	}
 
 	embed := discord.NewEmbedBuilder().
