@@ -75,20 +75,24 @@ func PruneHandler(e *handler.CommandEvent) error {
 
 	guildSettings, err := model.GetGuildSettings(*e.GuildID())
 	if err != nil {
-		_ = interactions.MessageEphWithContentf(e, "Failed to prune members: could not get guild settings.")
+		_ = e.CreateMessage(interactions.EphemeralMessageContent(
+			"Failed to prune members: could not get guild settings.").Build())
 		return err
 	}
 
 	if guildSettings.GatekeepPendingRole == 0 {
-		return interactions.MessageEphWithContentf(
-			e, "Failed to prune members: no pending role set. This command will only prune pending members.",
-		)
+		return e.CreateMessage(interactions.EphemeralMessageContent(
+			"Failed to prune members: no pending role set. This command will only prune pending members.",
+		).Build())
 	}
 
 	_ = e.DeferCreateMessage(true)
 	prunableMembers, err := getPrunableMembers(e, days, guildSettings)
 	if err != nil {
-		return interactions.FollowupEphWithContentf(e, "Failed to prune members: could not get member list.")
+		_, err = e.CreateFollowupMessage(interactions.EphemeralMessageContent(
+			"Failed to prune members: could not get member list.",
+		).Build())
+		return err
 	}
 
 	if dryRun {
@@ -135,7 +139,9 @@ func pruneMembers(e *handler.CommandEvent, guildSettings model.GuildSettings, me
 		}
 	}
 
-	return interactions.FollowupEphWithContentf(e, "Pruned %d users.", numKicked)
+	_, err = e.CreateFollowupMessage(interactions.EphemeralMessageContentf(
+		"Pruned %d users.", numKicked).Build())
+	return err
 }
 
 func dryRunPruneMembers(e *handler.CommandEvent, members []*discord.Member) error {
@@ -148,7 +154,9 @@ func dryRunPruneMembers(e *handler.CommandEvent, members []*discord.Member) erro
 		adminMessage += fmt.Sprintf("-# %s (%s)\n", member.User.Username, member.User.ID)
 	}
 
-	return interactions.FollowupEphWithContent(e, adminMessage)
+	_, err := e.CreateFollowupMessage(interactions.EphemeralMessageContent(adminMessage).
+		Build())
+	return err
 }
 
 func kickMembers(e *handler.CommandEvent, members []*discord.Member) (kickedMembers []*discord.Member, err error) {

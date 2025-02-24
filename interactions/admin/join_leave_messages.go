@@ -43,11 +43,9 @@ func AdminJoinMessageHandler(e *handler.CommandEvent) error {
 		Build()
 
 	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
+		interactions.EphemeralMessageContent("").
 			SetEmbeds(embed, templateInfoEmbed).
 			AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/join-message/button")).
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			SetEphemeral(true).
 			Build(),
 	)
 }
@@ -90,8 +88,11 @@ func AdminJoinMessageModalHandler(e *handler.ModalEvent) error {
 
 	_, err = mustache.RenderRaw(message, true, utils.MessageTemplateData{})
 	if err != nil {
-		return interactions.MessageEphWithContentf(
-			e, "The message contains data that is invalid; this may be caused by invalid placeholders.",
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"The message contains data that is invalid; this may be caused by invalid placeholders.",
+			).
+				Build(),
 		)
 	}
 
@@ -102,7 +103,7 @@ func AdminJoinMessageModalHandler(e *handler.ModalEvent) error {
 		return err
 	}
 
-	return interactions.MessageEphWithContentf(e, "Join message updated.")
+	return e.CreateMessage(interactions.EphemeralMessageContent("Join message updated.").Build())
 }
 
 func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
@@ -129,11 +130,9 @@ func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
 		Build()
 
 	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
+		interactions.EphemeralMessageContent("").
 			SetEmbeds(embed, templateInfoEmbed).
 			AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/leave-message/button")).
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			SetEphemeral(true).
 			Build(),
 	)
 }
@@ -176,8 +175,11 @@ func AdminLeaveMessageModalHandler(e *handler.ModalEvent) error {
 
 	_, err = mustache.RenderRaw(message, true, utils.MessageTemplateData{})
 	if err != nil {
-		return interactions.MessageEphWithContentf(
-			e, "The message contains data that is invalid; this may be caused by invalid placeholders.",
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"The message contains data that is invalid; this may be caused by invalid placeholders.",
+			).
+				Build(),
 		)
 	}
 
@@ -188,5 +190,5 @@ func AdminLeaveMessageModalHandler(e *handler.ModalEvent) error {
 		return err
 	}
 
-	return interactions.MessageEphWithContentf(e, "Leave message updated.")
+	return e.CreateMessage(interactions.EphemeralMessageContent("Leave message updated.").Build())
 }

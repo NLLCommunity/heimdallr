@@ -70,13 +70,13 @@ func banHandlerInner(e *handler.CommandEvent, data banHandlerData) error {
 		),
 	)
 	if err != nil {
-		return interactions.MessageEphWithContentf(e, "Failed to ban user")
+		return e.CreateMessage(interactions.EphemeralMessageContent("Failed to ban user").Build())
 	}
 	if failedToMessage {
-		return interactions.MessageEphWithContentf(e, "User was banned but message failed to send.")
+		return e.CreateMessage(interactions.EphemeralMessageContent("User was banned but message failed to send.").Build())
 	}
 
-	return interactions.MessageEphWithContentf(e, "User was banned.")
+	return e.CreateMessage(interactions.EphemeralMessageContent("User was banned.").Build())
 
 }
 

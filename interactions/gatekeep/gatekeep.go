@@ -58,11 +58,11 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 			"guild_id", guild.ID,
 			"err", err,
 		)
-		return interactions.MessageEphWithContentf(e, "Failed to get guild information.")
+		return e.CreateMessage(interactions.EphemeralMessageContent("Failed to get guild information.").Build())
 	}
 
 	if !guildSettings.GatekeepEnabled {
-		return interactions.MessageEphWithContentf(e, "Gatekeep is not enabled in this server.")
+		return e.CreateMessage(interactions.EphemeralMessageContent("Gatekeep is not enabled in this server.").Build())
 	}
 
 	hasApprovedRole := false
@@ -76,7 +76,11 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 	}
 
 	if hasApprovedRole && (!hasPendingRole || !guildSettings.GatekeepAddPendingRoleOnJoin) {
-		return interactions.MessageEphWithContentf(e, "User %s is already approved.", member.Mention())
+		return e.CreateMessage(
+			interactions.EphemeralMessageContentf(
+				"User %s is already approved.", member.Mention(),
+			).Build(),
+		)
 	}
 
 	if guildSettings.GatekeepApprovedRole != 0 {
@@ -119,9 +123,9 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 
 	if guildSettings.GatekeepApprovedMessage == "" {
 		slog.Info("No approved message set; not sending message.")
-		return interactions.MessageEphWithContentf(
-			e, "No approved message set; not sending message. Roles have been set.",
-		)
+		return e.CreateMessage(interactions.EphemeralMessageContent(
+			"No approved message set; not sending message. Roles have been set.").
+			Build())
 	}
 
 	channel := guildSettings.JoinLeaveChannel
@@ -152,8 +156,11 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 			Build(),
 	)
 	if err != nil {
-		return interactions.MessageEphWithContentf(e, "Failed to send message to approved user.")
+		return e.CreateMessage(interactions.EphemeralMessageContent(
+			"Failed to send message to approved user.").Build())
 	}
 
-	return interactions.FollowupEphWithContentf(e, "User has been approved!")
+	_, err = e.CreateFollowupMessage(interactions.EphemeralMessageContent(
+		"User has been approved!").Build())
+	return err
 }

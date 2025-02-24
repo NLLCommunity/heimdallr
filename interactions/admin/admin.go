@@ -7,6 +7,7 @@ import (
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/json"
 
+	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
@@ -86,11 +87,8 @@ func AdminInfoHandler(e *handler.CommandEvent) error {
 	)
 
 	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
-			SetContent(message).
-			SetEphemeral(true).
+		interactions.EphemeralMessageContent(message).
 			AddActionRow(discord.NewPrimaryButton("Display for everyone", "/admin/show-all-button")).
-			SetAllowedMentions(&discord.AllowedMentions{}).
 			Build(),
 	)
 }
@@ -99,10 +97,8 @@ func AdminShowAllButtonHandler(e *handler.ComponentEvent) error {
 	utils.LogInteraction("admin show all button", e)
 
 	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
-			SetContent(e.Message.Content).
+		interactions.EphemeralMessageContent(e.Message.Content).
 			SetEmbeds(e.Message.Embeds...).
-			SetAllowedMentions(&discord.AllowedMentions{}).
 			Build(),
 	)
 }

@@ -39,12 +39,9 @@ func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
 		Build()
 
 	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
+		interactions.EphemeralMessageContent("").
 			SetEmbeds(embed, templateInfoEmbed).
 			AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/gatekeep-message/button")).
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			SetEphemeral(true).
-			SetAllowedMentions(&discord.AllowedMentions{}).
 			Build(),
 	)
 }
@@ -87,8 +84,9 @@ func AdminGatekeepMessageModalHandler(e *handler.ModalEvent) error {
 
 	_, err = mustache.RenderRaw(message, true, utils.MessageTemplateData{})
 	if err != nil {
-		return interactions.MessageEphWithContentf(
-			e, "The message contains data that is invalid; this may be caused by invalid placeholders.",
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent("The message contains data that is invalid; this may be caused by invalid placeholders.").
+				Build(),
 		)
 	}
 
@@ -99,5 +97,5 @@ func AdminGatekeepMessageModalHandler(e *handler.ModalEvent) error {
 		return err
 	}
 
-	return interactions.MessageEphWithContentf(e, "Gatekeep approved message updated.")
+	return e.CreateMessage(interactions.EphemeralMessageContent("Gatekeep approved message updated.").Build())
 }

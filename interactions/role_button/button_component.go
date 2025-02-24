@@ -50,11 +50,11 @@ func RoleAssignButtonHandler(e *handler.ComponentEvent) error {
 	)
 
 	if err != nil {
-		_ = interactions.MessageEphWithContentf(
-			e, "Failed to assign role. This is likely due to the bot not having the required permissions.",
-		)
+		_ = e.CreateMessage(interactions.EphemeralMessageContent(
+			"Failed to assign role. This is likely due to the bot not having the required permissions.",
+		).Build())
 		return err
 	}
 
-	return interactions.MessageEphWithContentf(e, "Role assigned!")
+	return e.CreateMessage(interactions.EphemeralMessageContent("Role assigned!").Build())
 }
