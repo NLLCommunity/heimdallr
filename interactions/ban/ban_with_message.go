@@ -26,7 +26,7 @@ var banWithMessageSubCommand = discord.ApplicationCommandOptionSubCommand{
 }
 
 func BanWithMessageHandler(e *handler.CommandEvent) error {
-	utils.LogInteraction("ban with-message", e)
+	utils.LogInteraction("ban", e)
 
 	guild, isGuild := e.Guild()
 	if !isGuild {

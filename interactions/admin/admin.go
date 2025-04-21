@@ -63,7 +63,7 @@ var AdminCommand = discord.SlashCommandCreate{
 }
 
 func AdminInfoHandler(e *handler.CommandEvent) error {
-	utils.LogInteraction("admin info", e)
+	utils.LogInteraction("admin", e)
 
 	guild, inGuild := e.Guild()
 	if !inGuild {
@@ -94,7 +94,7 @@ func AdminInfoHandler(e *handler.CommandEvent) error {
 }
 
 func AdminShowAllButtonHandler(e *handler.ComponentEvent) error {
-	utils.LogInteraction("admin show all button", e)
+	utils.LogInteraction("admin", e)
 
 	return e.CreateMessage(
 		interactions.EphemeralMessageContent(e.Message.Content).

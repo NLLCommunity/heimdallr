@@ -35,7 +35,7 @@ var joinLeaveSubcommand = discord.ApplicationCommandOptionSubCommand{
 }
 
 func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
-	utils.LogInteraction("admin join-leave", e)
+	utils.LogInteraction("admin", e)
 
 	guild, inGuild := e.Guild()
 	if !inGuild {

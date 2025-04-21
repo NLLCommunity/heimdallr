@@ -28,7 +28,7 @@ var ApproveSlashCommand = discord.SlashCommandCreate{
 }
 
 func ApproveSlashCommandHandler(e *handler.CommandEvent) error {
-	utils.LogInteractionContext("Approve", e, e.Ctx)
+	utils.LogInteractionContext("gatekeep", e, e.Ctx)
 
 	guild, success, inGuild := getGuild(e)
 	if !inGuild {
