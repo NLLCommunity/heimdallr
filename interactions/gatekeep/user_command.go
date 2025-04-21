@@ -19,7 +19,7 @@ var ApproveUserCommand = discord.UserCommandCreate{
 }
 
 func ApproveUserCommandHandler(e *handler.CommandEvent) error {
-	utils.LogInteractionContext("approve", e, e.Ctx)
+	utils.LogInteractionContext("gatekeep", e, e.Ctx)
 
 	guild, success, inGuild := getGuild(e)
 	if !inGuild {

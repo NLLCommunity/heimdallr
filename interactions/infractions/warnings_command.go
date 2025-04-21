@@ -27,7 +27,7 @@ var UserInfractionsCommand = discord.SlashCommandCreate{
 }
 
 func UserInfractionsHandler(e *handler.CommandEvent) error {
-	utils.LogInteraction("warnings", e)
+	utils.LogInteraction("infractions", e)
 
 	user := e.User()
 	guild, ok := e.Guild()
@@ -45,7 +45,7 @@ func UserInfractionsHandler(e *handler.CommandEvent) error {
 }
 
 func UserInfractionButtonHandler(e *handler.ComponentEvent) error {
-	utils.LogInteraction("warnings button", e)
+	utils.LogInteraction("infractions", e)
 	offsetStr := e.Vars["offset"]
 	offset, err := strconv.Atoi(offsetStr)
 	if err != nil {

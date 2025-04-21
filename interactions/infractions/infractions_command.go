@@ -92,7 +92,7 @@ var InfractionsCommand = discord.SlashCommandCreate{
 
 // InfractionsListHandler handles the `/infractions list` command.
 func InfractionsListHandler(e *handler.CommandEvent) error {
-	utils.LogInteraction("infractions list", e)
+	utils.LogInteraction("infractions", e)
 
 	slog.Info("interaction `/infractions list` called.")
 	data := e.SlashCommandInteractionData()
@@ -142,7 +142,7 @@ func InfractionsListHandler(e *handler.CommandEvent) error {
 }
 
 func InfractionsRemoveHandler(e *handler.CommandEvent) error {
-	utils.LogInteraction("infractions remove", e)
+	utils.LogInteraction("infractions", e)
 
 	data := e.SlashCommandInteractionData()
 	infID := data.String("infraction-id")
@@ -163,7 +163,7 @@ func InfractionsRemoveHandler(e *handler.CommandEvent) error {
 }
 
 func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
-	utils.LogInteraction("infractions list component", e)
+	utils.LogInteraction("infractions", e)
 
 	parentIx := e.Message.Interaction
 	if parentIx == nil {

@@ -48,7 +48,7 @@ var KickCommand = discord.SlashCommandCreate{
 }
 
 func KickWithMessageHandler(e *handler.CommandEvent) error {
-	utils.LogInteraction("kick with-message", e)
+	utils.LogInteraction("kick", e)
 
 	data := e.SlashCommandInteractionData()
 	guild, isGuild := e.Guild()

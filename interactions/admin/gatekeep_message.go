@@ -16,7 +16,7 @@ var gatekeepMessageSubcommand = discord.ApplicationCommandOptionSubCommand{
 }
 
 func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
-	utils.LogInteraction("admin gatekeep message", e)
+	utils.LogInteraction("admin", e)
 
 	guild, isGuild := e.Guild()
 	if !isGuild {
@@ -47,7 +47,7 @@ func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
 }
 
 func AdminGatekeepMessageButtonHandler(e *handler.ComponentEvent) error {
-	utils.LogInteraction("admin gatekeep message button", e)
+	utils.LogInteraction("admin", e)
 
 	guild, isGuild := e.Guild()
 	if !isGuild {
@@ -69,7 +69,7 @@ func AdminGatekeepMessageButtonHandler(e *handler.ComponentEvent) error {
 }
 
 func AdminGatekeepMessageModalHandler(e *handler.ModalEvent) error {
-	utils.LogInteraction("admin gatekeep message modal", e)
+	utils.LogInteraction("admin", e)
 
 	guild, inGuild := e.Guild()
 	if !inGuild {

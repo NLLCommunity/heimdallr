@@ -21,7 +21,7 @@ var leaveMessageSubcommand = discord.ApplicationCommandOptionSubCommand{
 }
 
 func AdminJoinMessageHandler(e *handler.CommandEvent) error {
-	utils.LogInteraction("admin join-message", e)
+	utils.LogInteraction("admin", e)
 	guild, isGuild := e.Guild()
 	if !isGuild {
 		return interactions.ErrEventNoGuildID
@@ -51,7 +51,7 @@ func AdminJoinMessageHandler(e *handler.CommandEvent) error {
 }
 
 func AdminJoinMessageButtonHandler(e *handler.ComponentEvent) error {
-	utils.LogInteraction("admin join-message button", e)
+	utils.LogInteraction("admin", e)
 
 	guild, isGuild := e.Guild()
 	if !isGuild {
@@ -73,7 +73,7 @@ func AdminJoinMessageButtonHandler(e *handler.ComponentEvent) error {
 }
 
 func AdminJoinMessageModalHandler(e *handler.ModalEvent) error {
-	utils.LogInteraction("admin join-message modal", e)
+	utils.LogInteraction("admin", e)
 
 	guild, inGuild := e.Guild()
 	if !inGuild {
@@ -107,7 +107,7 @@ func AdminJoinMessageModalHandler(e *handler.ModalEvent) error {
 }
 
 func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
-	utils.LogInteraction("admin leave-message", e)
+	utils.LogInteraction("admin", e)
 
 	guild, isGuild := e.Guild()
 	if !isGuild {
@@ -138,7 +138,7 @@ func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
 }
 
 func AdminLeaveMessageButtonHandler(e *handler.ComponentEvent) error {
-	utils.LogInteraction("admin leave-message button", e)
+	utils.LogInteraction("admin", e)
 
 	guild, isGuild := e.Guild()
 	if !isGuild {
@@ -160,7 +160,7 @@ func AdminLeaveMessageButtonHandler(e *handler.ComponentEvent) error {
 }
 
 func AdminLeaveMessageModalHandler(e *handler.ModalEvent) error {
-	utils.LogInteraction("admin leave-message modal", e)
+	utils.LogInteraction("admin", e)
 
 	guild, inGuild := e.Guild()
 	if !inGuild {
