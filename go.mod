@@ -10,7 +10,7 @@ require (
 	github.com/disgoorg/snowflake/v2 v2.0.3
 	github.com/glebarez/sqlite v1.11.0
 	github.com/jellydator/ttlcache/v3 v3.3.0
-	github.com/spf13/viper v1.20.0
+	github.com/spf13/viper v1.20.1
 	github.com/sqids/sqids-go v0.4.1
 	gorm.io/gorm v1.25.12
 )
