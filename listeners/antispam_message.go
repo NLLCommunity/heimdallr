@@ -26,7 +26,7 @@ var whitespaceReplacer = strings.NewReplacer(
 	" ", "",
 	" ", "",
 	"\t", "",
-	"​", "",
+	"\u200b", "",
 	" ", "",
 	" ", "",
 	" ", "",
