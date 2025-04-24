@@ -68,9 +68,10 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 	hasApprovedRole := false
 	hasPendingRole := false
 	for _, roleID := range member.RoleIDs {
-		if roleID == guildSettings.GatekeepApprovedRole {
+		switch roleID {
+		case guildSettings.GatekeepApprovedRole:
 			hasApprovedRole = true
-		} else if roleID == guildSettings.GatekeepPendingRole {
+		case guildSettings.GatekeepPendingRole:
 			hasPendingRole = true
 		}
 	}
