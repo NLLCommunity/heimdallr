@@ -7,6 +7,7 @@ require (
 	github.com/cbroglie/mustache v1.4.0
 	github.com/disgoorg/disgo v0.18.15
 	github.com/disgoorg/json v1.2.0
+	github.com/disgoorg/json/v2 v2.0.0
 	github.com/disgoorg/snowflake/v2 v2.0.3
 	github.com/glebarez/sqlite v1.11.0
 	github.com/jellydator/ttlcache/v3 v3.3.0
