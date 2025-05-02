@@ -3,6 +3,7 @@ package gatekeep
 import (
 	"fmt"
 	"log/slog"
+	"sync"
 
 	"github.com/cbroglie/mustache"
 	"github.com/disgoorg/disgo/discord"
@@ -14,6 +15,9 @@ import (
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
+
+var activeApprovalProcesses = make(map[snowflake.ID]bool)
+var activeApprovalMutex = &sync.Mutex{}
 
 func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
 	r.Command("/approve", ApproveSlashCommandHandler)
@@ -45,6 +49,26 @@ func getGuild(e *handler.CommandEvent) (guild discord.Guild, success bool, inGui
 }
 
 func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member discord.ResolvedMember) error {
+	// Ensure that the user is not already being approved
+	// by another command invocation.
+	activeApprovalMutex.Lock()
+	if activeApprovalProcesses[member.User.ID] {
+		activeApprovalMutex.Unlock()
+		return e.CreateMessage(
+			interactions.EphemeralMessageContentf(
+				"%s is already being approved.", member.Mention(),
+			).Build(),
+		)
+	}
+	activeApprovalProcesses[member.User.ID] = true
+	activeApprovalMutex.Unlock()
+
+	defer func() {
+		activeApprovalMutex.Lock()
+		delete(activeApprovalProcesses, member.User.ID)
+		activeApprovalMutex.Unlock()
+	}()
+
 	slog.InfoContext(e.Ctx, "Entered approvedInnerHandler")
 	err := e.DeferCreateMessage(true)
 	if err != nil {
