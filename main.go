@@ -28,6 +28,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/interactions/gatekeep"
 	"github.com/NLLCommunity/heimdallr/interactions/infractions"
 	"github.com/NLLCommunity/heimdallr/interactions/kick"
+	"github.com/NLLCommunity/heimdallr/interactions/modmail"
 	"github.com/NLLCommunity/heimdallr/interactions/ping"
 	"github.com/NLLCommunity/heimdallr/interactions/prune"
 	"github.com/NLLCommunity/heimdallr/interactions/quote"
@@ -90,6 +91,7 @@ func main() {
 		prune.Register,
 		quote.Register,
 		role_button.Register,
+		modmail.Register,
 	}
 
 	var commandCreates []discord.ApplicationCommandCreate

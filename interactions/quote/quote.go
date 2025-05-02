@@ -102,22 +102,31 @@ func QuoteHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
+	if canRead, _ := userCanReadChannelMessages(e.User().ID, message.ChannelID, e.Client()); !canRead {
+		return e.CreateMessage(interactions.EphemeralMessageContent(
+			"You don't have permission to read messages in that channel.").Build())
+	}
+
+	embed := CreateMessageQuoteEmbed(e.Client(), message, showReplyTo)
+
+	resp := discord.NewMessageCreateBuilder().SetEmbeds(embed)
+	resp.AddContainerComponents(discord.NewActionRow(discord.NewLinkButton("Jump to message", url)))
+	resp.SetAllowedMentions(&discord.AllowedMentions{})
+
+	return e.CreateMessage(resp.Build())
+}
+
+func CreateMessageQuoteEmbed(client bot.Client, message *discord.Message, showReferenced bool) discord.Embed {
 	channelName := "unknown channel"
-	channel, err := e.Client().Rest().GetChannel(parts.ChannelId)
+	channel, err := client.Rest().GetChannel(message.ChannelID)
 	if err == nil {
 		prefix := getChannelTypePrefix(channel)
 		channelName = prefix + channel.Name()
 	} else {
 		slog.Warn(
 			"Failed to fetch channel",
-			"guild_id", parts.GuildId,
-			"channel_id", parts.ChannelId,
+			"channel_id", message.ChannelID,
 		)
-	}
-
-	if canRead, _ := userCanReadChannelMessages(e.User().ID, message.ChannelID, e.Client()); !canRead {
-		return e.CreateMessage(interactions.EphemeralMessageContent(
-			"You don't have permission to read messages in that channel.").Build())
 	}
 
 	embed := discord.NewEmbedBuilder().
@@ -136,7 +145,7 @@ func QuoteHandler(e *handler.CommandEvent) error {
 		}
 		embed.AddField("Attachments", strings.Join(lines, "\n"), false)
 	}
-	if message.ReferencedMessage != nil && showReplyTo {
+	if message.ReferencedMessage != nil && showReferenced {
 		ref := message.ReferencedMessage
 
 		msg := fmt.Sprintf("message by %s", ref.Author.Mention())
@@ -153,11 +162,8 @@ func QuoteHandler(e *handler.CommandEvent) error {
 		embed.AddField("Reply to", msg, false)
 	}
 
-	resp := discord.NewMessageCreateBuilder().SetEmbeds(embed.Build())
-	resp.AddContainerComponents(discord.NewActionRow(discord.NewLinkButton("Jump to message", url)))
-	resp.SetAllowedMentions(&discord.AllowedMentions{})
+	return embed.Build()
 
-	return e.CreateMessage(resp.Build())
 }
 
 func getChannelTypePrefix(channel discord.Channel) string {

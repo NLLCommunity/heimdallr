@@ -29,6 +29,7 @@ func InitDB(path string) (*gorm.DB, error) {
 	err = db.AutoMigrate(
 		&Infraction{},
 		&GuildSettings{},
+		&ModmailSettings{},
 		&TempBan{},
 	)
 	if err != nil {
