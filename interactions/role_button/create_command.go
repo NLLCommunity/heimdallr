@@ -63,7 +63,7 @@ var CreateRoleButtonCommand = discord.SlashCommandCreate{
 }
 
 func CreateRoleButtonHandler(e *handler.CommandEvent) error {
-	utils.LogInteraction("create-role-button", e)
+	utils.LogInteraction("role button", e)
 
 	if e.GuildID() == nil {
 		slog.Warn("Received create role button command in DMs or guild ID is otherwise nil")

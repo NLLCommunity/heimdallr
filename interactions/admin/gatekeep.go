@@ -39,7 +39,7 @@ var gatekeepSubcommand = discord.ApplicationCommandOptionSubCommand{
 }
 
 func AdminGatekeepHandler(e *handler.CommandEvent) error {
-	utils.LogInteraction("admin gatekeep", e)
+	utils.LogInteraction("admin", e)
 
 	data := e.SlashCommandInteractionData()
 	guild, isGuild := e.Guild()

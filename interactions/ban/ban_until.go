@@ -41,7 +41,7 @@ var banUntilSubcommand = discord.ApplicationCommandOptionSubCommand{
 }
 
 func BanUntilHandler(e *handler.CommandEvent) error {
-	utils.LogInteraction("ban until", e)
+	utils.LogInteraction("ban", e)
 
 	guild, isGuild := e.Guild()
 	if !isGuild {

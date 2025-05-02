@@ -64,7 +64,7 @@ func antiSpamInfo(settings *model.GuildSettings) string {
 }
 
 func AdminAntiSpamHandler(e *handler.CommandEvent) error {
-	utils.LogInteraction("admin anti-spam", e)
+	utils.LogInteraction("admin", e)
 	data := e.SlashCommandInteractionData()
 	guild, isGuild := e.Guild()
 	if !isGuild {

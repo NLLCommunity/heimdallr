@@ -81,7 +81,7 @@ var WarnCommand = discord.SlashCommandCreate{
 }
 
 func WarnHandler(e *handler.CommandEvent) error {
-	utils.LogInteraction("warn", e)
+	utils.LogInteraction("infractions", e)
 
 	ctx := context.Background()
 	data := e.SlashCommandInteractionData()
