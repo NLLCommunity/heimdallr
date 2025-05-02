@@ -163,7 +163,7 @@ func createReportThreadAndMessage(data *reportData) error {
 
 	messageText := user.Mention()
 	if data.modmailSettings.ReportPingRole != 0 {
-		messageText = fmt.Sprintf(" <@&%s>", data.modmailSettings.ReportPingRole)
+		messageText += fmt.Sprintf(" <@&%s>", data.modmailSettings.ReportPingRole)
 	}
 
 	reportMessage, err := data.event.Client().Rest().CreateMessage(thread.ID(),
