@@ -110,7 +110,7 @@ func ModmailSettingsHandler(e *handler.CommandEvent) error {
 	}
 	if notificationChannelOK {
 		settings.ReportNotificationChannel = notificationChannel.ID
-		message += fmt.Sprintf("Notification Channel set to <#%s>\n", reportChannel.ID)
+		message += fmt.Sprintf("Notification Channel set to <#%s>\n", notificationChannel.ID)
 	}
 
 	err = model.SetModmailSettings(settings)
