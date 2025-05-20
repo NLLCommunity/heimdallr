@@ -35,6 +35,17 @@ var antiSpamSubcommand = discord.ApplicationCommandOptionSubCommand{
 			MinValue:    utils.Ref(1),
 			MaxValue:    utils.Ref(60),
 		},
+		discord.ApplicationCommandOptionString{
+			Name:        "reset",
+			Description: "Reset a setting to its default value",
+			Required:    false,
+			Choices: []discord.ApplicationCommandOptionChoiceString{
+				{Name: "Enabled", Value: "enabled"},
+				{Name: "Count", Value: "count"},
+				{Name: "Cooldown", Value: "cooldown"},
+				{Name: "All", Value: "all"},
+			},
+		},
 	},
 }
 
@@ -79,6 +90,26 @@ func AdminAntiSpamHandler(e *handler.CommandEvent) error {
 
 	message := ""
 
+	resetOption, hasReset := data.OptString("reset")
+	if hasReset {
+		switch resetOption {
+		case "enabled":
+			settings.AntiSpamEnabled = false
+			message += "Anti-spam enabled has been reset.\n"
+		case "count":
+			settings.AntiSpamCount = 5 // Default value
+			message += "Anti-spam count has been reset.\n"
+		case "cooldown":
+			settings.AntiSpamCooldownSeconds = 20 // Default value
+			message += "Anti-spam cooldown has been reset.\n"
+		case "all":
+			settings.AntiSpamEnabled = false
+			settings.AntiSpamCount = 5            // Default value
+			settings.AntiSpamCooldownSeconds = 20 // Default value
+			message += "All anti-spam settings have been reset.\n"
+		}
+	}
+
 	enabled, hasEnabled := data.OptBool("enabled")
 	if hasEnabled {
 		settings.AntiSpamEnabled = enabled
@@ -97,7 +128,7 @@ func AdminAntiSpamHandler(e *handler.CommandEvent) error {
 		message += fmt.Sprintf("Anti-spam cooldown (seconds) set to %d\n", cooldown)
 	}
 
-	if !utils.Any(hasEnabled, hasCount, hasCooldown) {
+	if !utils.Any(hasEnabled, hasCount, hasCooldown, hasReset) {
 		return e.CreateMessage(interactions.EphemeralMessageContent(antiSpamInfo(settings)).Build())
 	}
 
