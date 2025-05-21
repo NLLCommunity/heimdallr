@@ -5,7 +5,7 @@ go 1.24.0
 require (
 	github.com/agnivade/levenshtein v1.2.1
 	github.com/cbroglie/mustache v1.4.0
-	github.com/disgoorg/disgo v0.18.15
+	github.com/disgoorg/disgo v0.18.16
 	github.com/disgoorg/json v1.2.0
 	github.com/disgoorg/snowflake/v2 v2.0.3
 	github.com/glebarez/sqlite v1.11.0

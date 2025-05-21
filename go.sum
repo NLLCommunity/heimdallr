@@ -10,6 +10,8 @@ github.com/dgryski/trifles v0.0.0-20230903005119-f50d829f2e54 h1:SG7nF6SRlWhcT7c
 github.com/dgryski/trifles v0.0.0-20230903005119-f50d829f2e54/go.mod h1:if7Fbed8SFyPtHLHbg49SI7NAdJiC5WIA09pe59rfAA=
 github.com/disgoorg/disgo v0.18.15 h1:T24I/NdUUody4FDvb8YkhSxHtsgRKD8Ui5Vi5PXnIrQ=
 github.com/disgoorg/disgo v0.18.15/go.mod h1:dXYVH059d6aK7mI+Nh/3svSRWedNd09P7C2VX3RqbJY=
+github.com/disgoorg/disgo v0.18.16 h1:Yk6pA9TaGbuM4hWfWafH0jAfmkWvZBFY7rh49DgljGE=
+github.com/disgoorg/disgo v0.18.16/go.mod h1:dXYVH059d6aK7mI+Nh/3svSRWedNd09P7C2VX3RqbJY=
 github.com/disgoorg/json v1.2.0 h1:6e/j4BCfSHIvucG1cd7tJPAOp1RgnnMFSqkvZUtEd1Y=
 github.com/disgoorg/json v1.2.0/go.mod h1:BHDwdde0rpQFDVsRLKhma6Y7fTbQKub/zdGO5O9NqqA=
 github.com/disgoorg/snowflake/v2 v2.0.3 h1:3B+PpFjr7j4ad7oeJu4RlQ+nYOTadsKapJIzgvSI2Ro=
