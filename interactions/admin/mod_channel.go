@@ -8,6 +8,7 @@ import (
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 var modChannelSubcommand = discord.ApplicationCommandOptionSubCommand{
@@ -73,7 +74,8 @@ func AdminModChannelHandler(e *handler.CommandEvent) error {
 func modChannelInfo(settings *model.GuildSettings) string {
 	modChannelInfo := "> This is the channel in which notifications and other information for moderators and administrators are sent."
 	return fmt.Sprintf(
-		"**Moderator channel:** <#%d>\n%s",
-		settings.ModeratorChannel, modChannelInfo,
+		"**Moderator channel:** %s\n%s",
+		utils.MentionChannelOrDefault(&settings.ModeratorChannel, "not set"),
+		modChannelInfo,
 	)
 }

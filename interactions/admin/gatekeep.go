@@ -135,14 +135,16 @@ func gatekeepInfo(settings *model.GuildSettings) string {
 
 	gatekeepPendingRoleInfo := "> This is the role given to users pending approval."
 	gatekeepPendingRole := fmt.Sprintf(
-		"**Gatekeep pending role:** <@&%d>\n%s",
-		settings.GatekeepPendingRole, gatekeepPendingRoleInfo,
+		"**Gatekeep pending role:** %s\n%s",
+		utils.MentionRoleOrDefault(&settings.GatekeepPendingRole, "not set"),
+		gatekeepPendingRoleInfo,
 	)
 
 	gatekeepApprovedRoleInfo := "> This is the role given to approved users."
 	gatekeepApprovedRole := fmt.Sprintf(
-		"**Gatekeep approved role:** <@&%d>\n%s",
-		settings.GatekeepApprovedRole, gatekeepApprovedRoleInfo,
+		"**Gatekeep approved role:** %s\n%s",
+		utils.MentionRoleOrDefault(&settings.GatekeepApprovedRole, "not set"),
+		gatekeepApprovedRoleInfo,
 	)
 
 	gatekeepAddPendingRoleOnJoinInfo := "> This determines whether to give the pending role to users when they join."

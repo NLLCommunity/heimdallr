@@ -85,6 +85,10 @@ func ModmailSettingsHandler(e *handler.CommandEvent) error {
 	}
 
 	if !reportChannelOK && !pingRoleOK && !notificationChannelOK && !resetOptionOK {
+		reportThreadsChannel := utils.MentionChannelOrDefault(&settings.ReportThreadsChannel, "not set")
+		reportNotificationChannel := utils.MentionChannelOrDefault(&settings.ReportNotificationChannel, "not set")
+		reportPingRole := utils.MentionRoleOrDefault(&settings.ReportPingRole, "not set")
+
 		return e.CreateMessage(
 			ix.EphemeralMessageContentf(
 				"## Modmail Settings\n"+
@@ -95,21 +99,9 @@ func ModmailSettingsHandler(e *handler.CommandEvent) error {
 					"**Ping Role:** %s\n"+
 					"> Role that will be pinged when a new thread is created.",
 
-				utils.Iif(
-					settings.ReportThreadsChannel != 0,
-					fmt.Sprintf("<#%s>", settings.ReportThreadsChannel),
-					"not set",
-				),
-				utils.Iif(
-					settings.ReportNotificationChannel != 0,
-					fmt.Sprintf("<#%s>", settings.ReportNotificationChannel),
-					"not set",
-				),
-				utils.Iif(
-					settings.ReportPingRole != 0,
-					fmt.Sprintf("<@&%s>", settings.ReportPingRole),
-					"not set",
-				),
+				reportThreadsChannel,
+				reportNotificationChannel,
+				reportPingRole,
 			).
 				Build(),
 		)

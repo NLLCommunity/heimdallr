@@ -126,8 +126,9 @@ func joinLeaveInfo(settings *model.GuildSettings) string {
 
 	joinLeaveChannelInfo := "> This is the channel in which join and leave messages are sent."
 	joinLeaveChannel := fmt.Sprintf(
-		"**Join/leave channel:** <#%d>\n%s",
-		settings.JoinLeaveChannel, joinLeaveChannelInfo,
+		"**Join/leave channel:** %s\n%s",
+		utils.MentionChannelOrDefault(&settings.JoinLeaveChannel, "not set"),
+		joinLeaveChannelInfo,
 	)
 
 	joinLeaveMessageInfo := "The join/leave messages can be viewed by using the `/admin join-message` and `/admin leave-message` commands."
