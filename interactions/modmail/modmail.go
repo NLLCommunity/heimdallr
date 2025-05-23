@@ -57,6 +57,16 @@ var settingsSubcommand = discord.ApplicationCommandOptionSubCommand{
 			Description:  "Channel that report notifications will be posted to",
 			ChannelTypes: []discord.ChannelType{discord.ChannelTypeGuildText},
 		},
+		discord.ApplicationCommandOptionString{
+			Name:        "reset",
+			Description: "Reset a setting to its default value.",
+			Choices: []discord.ApplicationCommandOptionChoiceString{
+				{Name: "report-channel", Value: "report-channel"},
+				{Name: "notification-channel", Value: "notification-channel"},
+				{Name: "report-ping-role", Value: "report-ping-role"},
+				{Name: "all", Value: "all"},
+			},
+		},
 	},
 }
 
@@ -66,6 +76,7 @@ func ModmailSettingsHandler(e *handler.CommandEvent) error {
 	reportChannel, reportChannelOK := data.OptChannel("report-channel")
 	pingRole, pingRoleOK := data.OptRole("report-ping-role")
 	notificationChannel, notificationChannelOK := data.OptChannel("notification-channel")
+	resetOption, resetOptionOK := data.OptString("reset")
 
 	settings, err := model.GetModmailSettings(*e.GuildID())
 	if err != nil {
@@ -73,7 +84,11 @@ func ModmailSettingsHandler(e *handler.CommandEvent) error {
 		return e.CreateMessage(ix.EphemeralMessageContent("Failed to load settings.").Build())
 	}
 
-	if !reportChannelOK && !pingRoleOK && !notificationChannelOK {
+	if !reportChannelOK && !pingRoleOK && !notificationChannelOK && !resetOptionOK {
+		reportThreadsChannel := utils.MentionChannelOrDefault(&settings.ReportThreadsChannel, "not set")
+		reportNotificationChannel := utils.MentionChannelOrDefault(&settings.ReportNotificationChannel, "not set")
+		reportPingRole := utils.MentionRoleOrDefault(&settings.ReportPingRole, "not set")
+
 		return e.CreateMessage(
 			ix.EphemeralMessageContentf(
 				"## Modmail Settings\n"+
@@ -84,21 +99,34 @@ func ModmailSettingsHandler(e *handler.CommandEvent) error {
 					"**Ping Role:** %s\n"+
 					"> Role that will be pinged when a new thread is created.",
 
-				utils.Iif(settings.ReportThreadsChannel != 0,
-					fmt.Sprintf("<#%s>", settings.ReportThreadsChannel),
-					"not set"),
-				utils.Iif(settings.ReportNotificationChannel != 0,
-					fmt.Sprintf("<#%s>", settings.ReportNotificationChannel),
-					"not set"),
-				utils.Iif(settings.ReportPingRole != 0,
-					fmt.Sprintf("<@&%s>", settings.ReportPingRole),
-					"not set"),
+				reportThreadsChannel,
+				reportNotificationChannel,
+				reportPingRole,
 			).
 				Build(),
 		)
 	}
 
 	message := ""
+
+	if resetOptionOK {
+		switch resetOption {
+		case "report-channel":
+			settings.ReportThreadsChannel = 0
+			message += "Report Channel has been reset.\n"
+		case "notification-channel":
+			settings.ReportNotificationChannel = 0
+			message += "Notification Channel has been reset.\n"
+		case "report-ping-role":
+			settings.ReportPingRole = 0
+			message += "Ping Role has been reset.\n"
+		case "all":
+			settings.ReportThreadsChannel = 0
+			settings.ReportNotificationChannel = 0
+			settings.ReportPingRole = 0
+			message += "All settings have been reset.\n"
+		}
+	}
 
 	if reportChannelOK {
 		settings.ReportThreadsChannel = reportChannel.ID
@@ -110,7 +138,7 @@ func ModmailSettingsHandler(e *handler.CommandEvent) error {
 	}
 	if notificationChannelOK {
 		settings.ReportNotificationChannel = notificationChannel.ID
-		message += fmt.Sprintf("Notification Channel set to <#%s>\n", reportChannel.ID)
+		message += fmt.Sprintf("Notification Channel set to <#%s>\n", notificationChannel.ID)
 	}
 
 	err = model.SetModmailSettings(settings)

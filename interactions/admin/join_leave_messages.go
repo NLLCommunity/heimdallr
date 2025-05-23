@@ -13,11 +13,31 @@ import (
 var joinMessageSubcommand = discord.ApplicationCommandOptionSubCommand{
 	Name:        "join-message",
 	Description: "Set the message to send when a user joins",
+	Options: []discord.ApplicationCommandOption{
+		discord.ApplicationCommandOptionString{
+			Name:        "reset",
+			Description: "Reset the message to its default value",
+			Required:    false,
+			Choices: []discord.ApplicationCommandOptionChoiceString{
+				{Name: "Reset", Value: "reset"},
+			},
+		},
+	},
 }
 
 var leaveMessageSubcommand = discord.ApplicationCommandOptionSubCommand{
 	Name:        "leave-message",
 	Description: "Set the message to send when a user leaves",
+	Options: []discord.ApplicationCommandOption{
+		discord.ApplicationCommandOptionString{
+			Name:        "reset",
+			Description: "Reset the message to its default value",
+			Required:    false,
+			Choices: []discord.ApplicationCommandOptionChoiceString{
+				{Name: "Reset", Value: "reset"},
+			},
+		},
+	},
 }
 
 func AdminJoinMessageHandler(e *handler.CommandEvent) error {
@@ -27,9 +47,22 @@ func AdminJoinMessageHandler(e *handler.CommandEvent) error {
 		return interactions.ErrEventNoGuildID
 	}
 
+	data := e.SlashCommandInteractionData()
+	resetOption, hasReset := data.OptString("reset")
+
 	settings, err := model.GetGuildSettings(guild.ID)
 	if err != nil {
 		return err
+	}
+
+	if hasReset && resetOption == "reset" {
+		// Reset the message to default
+		settings.JoinMessage = "Welcome to the server, {{user}}!"
+		err = model.SetGuildSettings(settings)
+		if err != nil {
+			return err
+		}
+		return e.CreateMessage(interactions.EphemeralMessageContent("Join message has been reset.").Build())
 	}
 
 	embed := discord.NewEmbedBuilder().
@@ -114,9 +147,22 @@ func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
 		return interactions.ErrEventNoGuildID
 	}
 
+	data := e.SlashCommandInteractionData()
+	resetOption, hasReset := data.OptString("reset")
+
 	settings, err := model.GetGuildSettings(guild.ID)
 	if err != nil {
 		return err
+	}
+
+	if hasReset && resetOption == "reset" {
+		// Reset the message to default
+		settings.LeaveMessage = "{{user}} has left the server."
+		err = model.SetGuildSettings(settings)
+		if err != nil {
+			return err
+		}
+		return e.CreateMessage(interactions.EphemeralMessageContent("Leave message has been reset.").Build())
 	}
 
 	embed := discord.NewEmbedBuilder().

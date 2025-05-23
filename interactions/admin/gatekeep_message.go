@@ -13,6 +13,16 @@ import (
 var gatekeepMessageSubcommand = discord.ApplicationCommandOptionSubCommand{
 	Name:        "gatekeep-message",
 	Description: "Set the message to send to approved users",
+	Options: []discord.ApplicationCommandOption{
+		discord.ApplicationCommandOptionString{
+			Name:        "reset",
+			Description: "Reset the message to its default value",
+			Required:    false,
+			Choices: []discord.ApplicationCommandOptionChoiceString{
+				{Name: "Reset", Value: "reset"},
+			},
+		},
+	},
 }
 
 func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
@@ -23,9 +33,22 @@ func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
 		return interactions.ErrEventNoGuildID
 	}
 
+	data := e.SlashCommandInteractionData()
+	resetOption, hasReset := data.OptString("reset")
+
 	settings, err := model.GetGuildSettings(guild.ID)
 	if err != nil {
 		return err
+	}
+
+	if hasReset && resetOption == "reset" {
+		// Reset the message to default
+		settings.GatekeepApprovedMessage = "Welcome to the server, {{user}}!"
+		err = model.SetGuildSettings(settings)
+		if err != nil {
+			return err
+		}
+		return e.CreateMessage(interactions.EphemeralMessageContent("Gatekeep approved message has been reset.").Build())
 	}
 
 	embed := discord.NewEmbedBuilder().

@@ -31,6 +31,17 @@ var joinLeaveSubcommand = discord.ApplicationCommandOptionSubCommand{
 			Required:     false,
 			ChannelTypes: []discord.ChannelType{discord.ChannelTypeGuildText},
 		},
+		discord.ApplicationCommandOptionString{
+			Name:        "reset",
+			Description: "Reset a setting to its default value",
+			Required:    false,
+			Choices: []discord.ApplicationCommandOptionChoiceString{
+				{Name: "Join enabled", Value: "join-enabled"},
+				{Name: "Leave enabled", Value: "leave-enabled"},
+				{Name: "Channel", Value: "channel"},
+				{Name: "All", Value: "all"},
+			},
+		},
 	},
 }
 
@@ -49,25 +60,46 @@ func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
 
 	message := ""
 
-	joinEnabled, hasJoinEnabled := e.SlashCommandInteractionData().OptBool("join-enabled")
+	data := e.SlashCommandInteractionData()
+	resetOption, hasReset := data.OptString("reset")
+	if hasReset {
+		switch resetOption {
+		case "join-enabled":
+			settings.JoinMessageEnabled = false
+			message += "Join message enabled has been reset.\n"
+		case "leave-enabled":
+			settings.LeaveMessageEnabled = false
+			message += "Leave message enabled has been reset.\n"
+		case "channel":
+			settings.JoinLeaveChannel = 0
+			message += "Join/leave channel has been reset.\n"
+		case "all":
+			settings.JoinMessageEnabled = false
+			settings.LeaveMessageEnabled = false
+			settings.JoinLeaveChannel = 0
+			message += "All join/leave settings have been reset.\n"
+		}
+	}
+
+	joinEnabled, hasJoinEnabled := data.OptBool("join-enabled")
 	if hasJoinEnabled {
 		settings.JoinMessageEnabled = joinEnabled
 		message += fmt.Sprintf("Join message enabled set to %s\n", utils.Iif(joinEnabled, "yes", "no"))
 	}
 
-	leaveEnabled, hasLeaveEnabled := e.SlashCommandInteractionData().OptBool("leave-enabled")
+	leaveEnabled, hasLeaveEnabled := data.OptBool("leave-enabled")
 	if hasLeaveEnabled {
 		settings.LeaveMessageEnabled = leaveEnabled
 		message += fmt.Sprintf("Leave message enabled set to %s\n", utils.Iif(leaveEnabled, "yes", "no"))
 	}
 
-	channel, hasChannel := e.SlashCommandInteractionData().OptChannel("channel")
+	channel, hasChannel := data.OptChannel("channel")
 	if hasChannel {
 		settings.JoinLeaveChannel = channel.ID
 		message += fmt.Sprintf("Join/leave channel set to <#%d>\n", channel.ID)
 	}
 
-	if !utils.Any(hasJoinEnabled, hasLeaveEnabled, hasChannel) {
+	if !utils.Any(hasJoinEnabled, hasLeaveEnabled, hasChannel, hasReset) {
 		return e.CreateMessage(interactions.EphemeralMessageContent(joinLeaveInfo(settings)).Build())
 	}
 
@@ -94,8 +126,9 @@ func joinLeaveInfo(settings *model.GuildSettings) string {
 
 	joinLeaveChannelInfo := "> This is the channel in which join and leave messages are sent."
 	joinLeaveChannel := fmt.Sprintf(
-		"**Join/leave channel:** <#%d>\n%s",
-		settings.JoinLeaveChannel, joinLeaveChannelInfo,
+		"**Join/leave channel:** %s\n%s",
+		utils.MentionChannelOrDefault(&settings.JoinLeaveChannel, "not set"),
+		joinLeaveChannelInfo,
 	)
 
 	joinLeaveMessageInfo := "The join/leave messages can be viewed by using the `/admin join-message` and `/admin leave-message` commands."

@@ -8,6 +8,7 @@ import (
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 var modChannelSubcommand = discord.ApplicationCommandOptionSubCommand{
@@ -20,6 +21,14 @@ var modChannelSubcommand = discord.ApplicationCommandOptionSubCommand{
 			Required:     false,
 			ChannelTypes: []discord.ChannelType{discord.ChannelTypeGuildText},
 		},
+		discord.ApplicationCommandOptionString{
+			Name:        "reset",
+			Description: "Reset the moderator channel setting",
+			Required:    false,
+			Choices: []discord.ApplicationCommandOptionChoiceString{
+				{Name: "Reset", Value: "reset"},
+			},
+		},
 	},
 }
 
@@ -31,23 +40,33 @@ func AdminModChannelHandler(e *handler.CommandEvent) error {
 	}
 
 	channel, hasChannel := data.OptChannel("channel")
+	resetOption, hasReset := data.OptString("reset")
 	settings, err := model.GetGuildSettings(guild.ID)
 	if err != nil {
 		return err
 	}
 
-	if !hasChannel {
+	if !hasChannel && !hasReset {
 		return e.CreateMessage(interactions.EphemeralMessageContent(modChannelInfo(settings)).Build())
 	}
 
-	settings.ModeratorChannel = channel.ID
+	message := ""
+
+	if hasReset && resetOption == "reset" {
+		settings.ModeratorChannel = 0
+		message = "Moderator channel has been reset."
+	} else if hasChannel {
+		settings.ModeratorChannel = channel.ID
+		message = fmt.Sprintf("Moderator channel set to <#%d>", channel.ID)
+	}
+
 	err = model.SetGuildSettings(settings)
 	if err != nil {
 		return err
 	}
 
 	return e.CreateMessage(
-		interactions.EphemeralMessageContentf("Moderator channel set to <#%d>", channel.ID).
+		interactions.EphemeralMessageContent(message).
 			Build(),
 	)
 }
@@ -55,7 +74,8 @@ func AdminModChannelHandler(e *handler.CommandEvent) error {
 func modChannelInfo(settings *model.GuildSettings) string {
 	modChannelInfo := "> This is the channel in which notifications and other information for moderators and administrators are sent."
 	return fmt.Sprintf(
-		"**Moderator channel:** <#%d>\n%s",
-		settings.ModeratorChannel, modChannelInfo,
+		"**Moderator channel:** %s\n%s",
+		utils.MentionChannelOrDefault(&settings.ModeratorChannel, "not set"),
+		modChannelInfo,
 	)
 }

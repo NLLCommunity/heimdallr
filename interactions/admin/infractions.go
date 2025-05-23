@@ -34,6 +34,17 @@ var infractionsSubCommand = discord.ApplicationCommandOptionSubCommand{
 			MinValue:    utils.Ref(0.0),
 			MaxValue:    utils.Ref(100.0),
 		},
+		discord.ApplicationCommandOptionString{
+			Name:        "reset",
+			Description: "Reset a setting to its default value",
+			Required:    false,
+			Choices: []discord.ApplicationCommandOptionChoiceString{
+				{Name: "Half-life", Value: "half-life"},
+				{Name: "Notify on warned user join", Value: "notify-warned-user-join"},
+				{Name: "Notify threshold", Value: "notify-threshold"},
+				{Name: "All", Value: "all"},
+			},
+		},
 	},
 }
 
@@ -50,6 +61,26 @@ func AdminInfractionsHandler(e *handler.CommandEvent) error {
 	}
 
 	message := ""
+
+	resetOption, hasReset := data.OptString("reset")
+	if hasReset {
+		switch resetOption {
+		case "half-life":
+			settings.InfractionHalfLifeDays = 0
+			message += "Infraction half-life has been reset.\n"
+		case "notify-warned-user-join":
+			settings.NotifyOnWarnedUserJoin = false
+			message += "Notify on warned user join has been reset.\n"
+		case "notify-threshold":
+			settings.NotifyWarnSeverityThreshold = 0
+			message += "Notify warn severity threshold has been reset.\n"
+		case "all":
+			settings.InfractionHalfLifeDays = 0
+			settings.NotifyOnWarnedUserJoin = false
+			settings.NotifyWarnSeverityThreshold = 0
+			message += "All infraction settings have been reset.\n"
+		}
+	}
 
 	halfLife, hasHalfLife := data.OptFloat("half-life")
 	if hasHalfLife {
@@ -69,7 +100,7 @@ func AdminInfractionsHandler(e *handler.CommandEvent) error {
 		message += fmt.Sprintf("Notify warn severity threshold set to %.1f\n", notifyThreshold)
 	}
 
-	if !utils.Any(hasHalfLife, hasNotifyThreshold, hasNotifyOnWarnedUserJoin) {
+	if !utils.Any(hasHalfLife, hasNotifyThreshold, hasNotifyOnWarnedUserJoin, hasReset) {
 		return e.CreateMessage(interactions.EphemeralMessageContent(infractionInfo(settings)).Build())
 	}
 

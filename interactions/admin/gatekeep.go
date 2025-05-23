@@ -35,6 +35,18 @@ var gatekeepSubcommand = discord.ApplicationCommandOptionSubCommand{
 			Description: "Whether to give the pending role to users when they join",
 			Required:    false,
 		},
+		discord.ApplicationCommandOptionString{
+			Name:        "reset",
+			Description: "Reset a setting to its default value",
+			Required:    false,
+			Choices: []discord.ApplicationCommandOptionChoiceString{
+				{Name: "Enabled", Value: "enabled"},
+				{Name: "Pending role", Value: "pending-role"},
+				{Name: "Approved role", Value: "approved-role"},
+				{Name: "Use pending role", Value: "use-pending-role"},
+				{Name: "All", Value: "all"},
+			},
+		},
 	},
 }
 
@@ -53,6 +65,30 @@ func AdminGatekeepHandler(e *handler.CommandEvent) error {
 	}
 
 	message := ""
+
+	resetOption, hasReset := data.OptString("reset")
+	if hasReset {
+		switch resetOption {
+		case "enabled":
+			settings.GatekeepEnabled = false
+			message += "Gatekeep enabled has been reset.\n"
+		case "pending-role":
+			settings.GatekeepPendingRole = 0
+			message += "Gatekeep pending role has been reset.\n"
+		case "approved-role":
+			settings.GatekeepApprovedRole = 0
+			message += "Gatekeep approved role has been reset.\n"
+		case "use-pending-role":
+			settings.GatekeepAddPendingRoleOnJoin = false
+			message += "Give pending role on join has been reset.\n"
+		case "all":
+			settings.GatekeepEnabled = false
+			settings.GatekeepPendingRole = 0
+			settings.GatekeepApprovedRole = 0
+			settings.GatekeepAddPendingRoleOnJoin = false
+			message += "All gatekeep settings have been reset.\n"
+		}
+	}
 
 	enabled, hasEnabled := data.OptBool("enabled")
 	if hasEnabled {
@@ -78,7 +114,7 @@ func AdminGatekeepHandler(e *handler.CommandEvent) error {
 		message += fmt.Sprintf("Give pending role on join set to %s\n", utils.Iif(usePendingRole, "yes", "no"))
 	}
 
-	if !utils.Any(hasEnabled, hasPendingRole, hasApprovedRole, hasUsePendingRole) {
+	if !utils.Any(hasEnabled, hasPendingRole, hasApprovedRole, hasUsePendingRole, hasReset) {
 		return e.CreateMessage(interactions.EphemeralMessageContent(gatekeepInfo(settings)).Build())
 	}
 
@@ -99,14 +135,16 @@ func gatekeepInfo(settings *model.GuildSettings) string {
 
 	gatekeepPendingRoleInfo := "> This is the role given to users pending approval."
 	gatekeepPendingRole := fmt.Sprintf(
-		"**Gatekeep pending role:** <@&%d>\n%s",
-		settings.GatekeepPendingRole, gatekeepPendingRoleInfo,
+		"**Gatekeep pending role:** %s\n%s",
+		utils.MentionRoleOrDefault(&settings.GatekeepPendingRole, "not set"),
+		gatekeepPendingRoleInfo,
 	)
 
 	gatekeepApprovedRoleInfo := "> This is the role given to approved users."
 	gatekeepApprovedRole := fmt.Sprintf(
-		"**Gatekeep approved role:** <@&%d>\n%s",
-		settings.GatekeepApprovedRole, gatekeepApprovedRoleInfo,
+		"**Gatekeep approved role:** %s\n%s",
+		utils.MentionRoleOrDefault(&settings.GatekeepApprovedRole, "not set"),
+		gatekeepApprovedRoleInfo,
 	)
 
 	gatekeepAddPendingRoleOnJoinInfo := "> This determines whether to give the pending role to users when they join."
