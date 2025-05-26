@@ -12,7 +12,7 @@ require (
 	github.com/jellydator/ttlcache/v3 v3.3.0
 	github.com/spf13/viper v1.20.1
 	github.com/sqids/sqids-go v0.4.1
-	gorm.io/gorm v1.26.1
+	gorm.io/gorm v1.30.0
 )
 
 require golang.org/x/sync v0.11.0 // indirect
