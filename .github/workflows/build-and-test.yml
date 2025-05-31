@@ -1,0 +1,48 @@
+name: Build and Test
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - README.md
+      - .github/workflows/lint.yml
+      - .github/workflows/build-image.yml
+      - .github/workflows/test-build-image.yml
+      - Procfile
+      - Aptfile
+      - .editorconfig
+      - .prettierrc
+      - renovate.json
+      - air.conf
+      - config.template.toml
+      - .vscode/
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  merge_group:
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: go build -v ./...
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: go test -v ./...

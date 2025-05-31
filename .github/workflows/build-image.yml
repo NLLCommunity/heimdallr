@@ -10,6 +10,19 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - README.md
+      - .github/workflows/lint.yml
+      - .github/workflows/build-and-test.yml
+      - .github/workflows/test-build-image.yml
+      - Procfile
+      - Aptfile
+      - .editorconfig
+      - .prettierrc
+      - renovate.json
+      - air.conf
+      - config.template.toml
+      - .vscode/
 
 concurrency:
   group: build-and-push
