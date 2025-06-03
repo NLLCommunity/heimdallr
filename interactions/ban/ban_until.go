@@ -50,16 +50,19 @@ func BanUntilHandler(e *handler.CommandEvent) error {
 
 	data := e.SlashCommandInteractionData()
 	user := data.User("user")
+	banningUser := e.User()
 	duration := data.String("duration")
 	reason := data.String("reason")
 	sendReason := data.Bool("send-reason")
 
-	banData := banHandlerData{
-		user:       &user,
-		guild:      &guild,
-		duration:   duration,
-		reason:     reason,
-		sendReason: sendReason,
+	banData := BanHandlerData{
+		User:          &user,
+		BanningUserID: banningUser.ID,
+		BanningUser:   &banningUser,
+		Guild:         &guild,
+		Duration:      duration,
+		Reason:        reason,
+		Message:       utils.Iif(sendReason, reason, ""),
 	}
 
 	err := banHandlerInner(e, banData)

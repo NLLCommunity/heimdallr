@@ -2,12 +2,15 @@ package ban
 
 import (
 	"fmt"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/json"
+	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/utils"
@@ -35,42 +38,99 @@ var BanCommand = discord.SlashCommandCreate{
 	},
 }
 
-type banHandlerData struct {
-	user       *discord.User
-	guild      *discord.Guild
-	duration   string
-	reason     string
-	sendReason bool
+type BanHandlerData struct {
+	User *discord.User
+	// BanningUserID is used when parsing the ID, when there is no REST client
+	// available.
+	BanningUserID snowflake.ID
+	BanningUser   *discord.User
+	Guild         *discord.Guild
+	Duration      string
+	Reason        string
+	Message       string
 }
 
-func banHandlerInner(e *handler.CommandEvent, data banHandlerData) error {
+func (data BanHandlerData) String() string {
+	content := fmt.Sprintf(
+		"%s\n\x1F\x1F\x1F\nBanned by: %s (%s)",
+		data.Reason,
+		data.BanningUser.Username,
+		data.BanningUserID,
+	)
+
+	if data.Duration != "" {
+		content += fmt.Sprintf("\nDuration: %s", data.Duration)
+	}
+
+	if data.Reason != "" && data.Message != "" {
+		content += fmt.Sprintf("\nMessage: %s", data.Duration)
+	}
+
+	return content
+}
+
+func BanHandlerDataFromString(s string) (data BanHandlerData) {
+	reasonSplit := strings.Split(s, "\n\x1F\x1F\x1F\n")
+	data.Reason = reasonSplit[0]
+
+	if len(reasonSplit) < 2 {
+		return
+	}
+
+	trailers := strings.Split(reasonSplit[1], "\n")
+
+	for _, trailer := range trailers {
+		parts := strings.SplitN(trailer, ":", 2)
+
+		if len(parts) != 2 {
+			continue
+		}
+
+		key := strings.Trim(parts[0], " ")
+		key = strings.ToLower(key)
+
+		value := strings.Trim(parts[1], " ")
+		value = strings.ToLower(value)
+
+		switch key {
+		case "duration":
+			data.Duration = value
+		case "message":
+			data.Message = value
+		case "banned by":
+			re := regexp.MustCompile(`\((\d+)\)`)
+			id := re.FindStringSubmatch(value)
+			if len(id) < 2 {
+				break
+			}
+			data.BanningUserID = snowflake.MustParse(id[1])
+		}
+	}
+
+	return
+}
+
+func banHandlerInner(e *handler.CommandEvent, data BanHandlerData) error {
 	guild, isGuild := e.Guild()
 	if !isGuild {
 		return interactions.ErrEventNoGuildID
 	}
 
 	failedToMessage := false
-	if data.sendReason || data.duration != "" {
+	if data.Message != "" || data.Duration != "" {
 		mc := createBanDMMessage(data)
-		_, err := interactions.SendDirectMessage(e.Client(), *data.user, mc)
+		_, err := interactions.SendDirectMessage(e.Client(), *data.User, mc)
 		if err != nil {
 			failedToMessage = true
 		}
 	}
 
 	err := e.Client().Rest().AddBan(
-		guild.ID, data.user.ID, 0,
-		rest.WithReason(
-			fmt.Sprintf(
-				"Banned by: %s (%s) %s, with message: %s",
-				e.User().Username, e.User().ID,
-				utils.Iif(data.duration != "", fmt.Sprintf("for %s", data.duration), ""),
-				data.reason,
-			),
-		),
+		guild.ID, data.User.ID, 0,
+		rest.WithReason(data.String()),
 	)
 	if err != nil {
-		return e.CreateMessage(interactions.EphemeralMessageContent("Failed to ban user").Build())
+		return e.CreateMessage(interactions.EphemeralMessageContent("Failed to ban User").Build())
 	}
 	if failedToMessage {
 		return e.CreateMessage(interactions.EphemeralMessageContent("User was banned but message failed to send.").Build())
@@ -80,21 +140,21 @@ func banHandlerInner(e *handler.CommandEvent, data banHandlerData) error {
 
 }
 
-func createBanDMMessage(data banHandlerData) discord.MessageCreate {
-	banExp := durationToRelTimestamp(data.duration)
+func createBanDMMessage(data BanHandlerData) discord.MessageCreate {
+	banExp := durationToRelTimestamp(data.Duration)
 
 	expiryText := fmt.Sprintf("This ban will expire %s.", banExp)
-	reasonText := fmt.Sprintf(
+	messageText := fmt.Sprintf(
 		"Along with the ban, this message was added:\n\n %s\n\n",
-		data.reason,
+		data.Message,
 	)
 
 	return discord.NewMessageCreateBuilder().
 		SetContentf(
 			"You have been banned from %s.\n%s%s\n\n(You cannot respond to this message)",
-			data.guild.Name,
-			utils.Iif(data.duration != "", expiryText, ""),
-			utils.Iif(data.sendReason, reasonText, ""),
+			data.Guild.Name,
+			utils.Iif(data.Duration != "", expiryText, ""),
+			utils.Iif(data.Message != "", messageText, ""),
 		).Build()
 }
 

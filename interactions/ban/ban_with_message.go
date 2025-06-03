@@ -35,14 +35,17 @@ func BanWithMessageHandler(e *handler.CommandEvent) error {
 
 	data := e.SlashCommandInteractionData()
 	user := data.User("user")
+	banningUser := e.User()
 	message := data.String("message")
 
-	banData := banHandlerData{
-		user:       &user,
-		guild:      &guild,
-		duration:   "",
-		reason:     message,
-		sendReason: true,
+	banData := BanHandlerData{
+		User:          &user,
+		BanningUserID: banningUser.ID,
+		BanningUser:   &banningUser,
+		Guild:         &guild,
+		Duration:      "",
+		Reason:        message,
+		Message:       message,
 	}
 	return banHandlerInner(e, banData)
 }
