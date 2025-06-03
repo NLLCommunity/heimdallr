@@ -15,6 +15,9 @@ type GuildSettings struct {
 	// information for moderators and administrators are sent.
 	ModeratorChannel snowflake.ID
 
+	// LogChannel is where various, less important information and data is logged.
+	LogChannel snowflake.ID
+
 	// InfractionHalfLifeDays is the half-life time of infractions in days.
 	InfractionHalfLifeDays      float64
 	NotifyOnWarnedUserJoin      bool
