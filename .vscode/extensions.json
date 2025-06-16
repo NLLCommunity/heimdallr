@@ -2,6 +2,8 @@
   "recommendations": [
     "esbenp.prettier-vscode",
     "golang.go",
-    "tamasfe.even-better-toml"
+    "tamasfe.even-better-toml",
+    "github.vscode-github-actions",
+    "GitHub.vscode-pull-request-github"
   ]
 }
