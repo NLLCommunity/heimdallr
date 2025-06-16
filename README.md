@@ -9,7 +9,7 @@ It is developed in Go, and uses the Disgo library for Discord.
 As a [Go](https://golang.org) project, you'll need to have Go installed on your machine. You can download it from the [official website](https://golang.org/dl/).
 
 > [!TIP]
-> You can use a Go version manager like [g](https://github.com/voidint/g) to easily manage multiple versions of Go on your machine.
+> You can use a Go version manager like [g](https://github.com/voidint/g) to easily manage multiple versions of Go on your machine. If you are using a dev container (see below), Go will already be installed for you.
 
 1. To contribute to Heimdallr, you'll need to fork the repository and clone it to your machine. You can do this by running the following command:
 
@@ -17,6 +17,11 @@ As a [Go](https://golang.org) project, you'll need to have Go installed on your 
     git clone https://github.com/NLLCommunity/heimdallr.git
     cd heimdallr
     ```
+
+> [!TIP]
+> If you are using an IDE that supports dev containers, such as [Visual Studio Code](https://code.visualstudio.com/docs/devcontainers/containers) or [JetBrains IDEs](https://www.jetbrains.com/help/go/dev-containers-starting-page.html), you may be prompted to open the project in a dev container.
+>
+> This will plop you right into a development environment with all the dependencies installed and configured for you, without needing to install Go or any other dependencies on your machine. You can then run the bot and make changes to the code as you would normally.
 
 2. Create a new branch to work on your changes:
 
