@@ -162,9 +162,11 @@ func BanHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	_, err = model.CreateTempBan(*e.GuildID(), user.ID, e.User().ID, reason, time.Now().Add(dur))
-	if err != nil {
-		return err
+	if dur > 0 {
+		_, err = model.CreateTempBan(*e.GuildID(), user.ID, e.User().ID, reason, time.Now().Add(dur))
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

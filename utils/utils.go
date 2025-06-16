@@ -69,6 +69,8 @@ var LongDurationRegex = regexp.MustCompile(`^(?:(?P<years>\d+)y)? *(?:(?P<months
 // ParseLongDuration parses a string into a time.Duration.
 // It supports the following format:
 //   - 1y2mo3w4d5h6m3s (year, month, week, day, hour, minute, second)
+//
+// Note: an empty duration string will be a duration of 0.
 func ParseLongDuration(s string) (time.Duration, error) {
 	names := LongDurationRegex.SubexpNames()
 	matches := LongDurationRegex.FindStringSubmatch(s)
