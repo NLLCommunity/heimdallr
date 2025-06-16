@@ -1,0 +1,40 @@
+{
+  "name": "Heimdallr",
+  "image": "mcr.microsoft.com/devcontainers/go:1.24",
+  "remoteUser": "vscode",
+  "mounts": [
+    "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,readonly"
+  ],
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "terminal.integrated.defaultProfile.linux": "zsh",
+        "terminal.integrated.profiles.linux": {
+          "zsh": {
+            "path": "/bin/zsh"
+          }
+        }
+      },
+      "extensions": [
+        "esbenp.prettier-vscode",
+        "golang.go",
+        "tamasfe.even-better-toml",
+        "github.vscode-github-actions",
+        "GitHub.vscode-pull-request-github"
+      ]
+    },
+    "jetbrains": {
+      "settings": {
+        "org.jetbrains.plugins.terminal:app:TerminalOptionsProvider.myShellPath": "/bin/zsh"
+      },
+      "plugins": [
+        "intellij.prettierJS",
+        "org.jetbrains.plugins.go",
+        "org.jetbrains.plugins.go-template",
+        "org.toml.lang",
+        "org.jetbrains.plugins.github"
+      ]
+    }
+  },
+  "postCreateCommand": "go mod download"
+}

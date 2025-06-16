@@ -18,6 +18,11 @@ As a [Go](https://golang.org) project, you'll need to have Go installed on your 
     cd heimdallr
     ```
 
+> [!TIP]
+> If you are using an IDE that supports dev containers, such as [Visual Studio Code](https://code.visualstudio.com/docs/devcontainers/containers) or [JetBrains IDEs](https://www.jetbrains.com/help/go/dev-containers-starting-page.html), you may be prompted to open the project in a dev container.
+>
+> This will plop you right into a development environment with all the dependencies installed and configured for you, without needing to install Go or any other dependencies on your machine. You can then run the bot and make changes to the code as you would normally.
+
 2. Create a new branch to work on your changes:
 
     ```bash
