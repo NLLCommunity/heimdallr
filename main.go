@@ -125,6 +125,9 @@ func main() {
 		bot.WithEventListenerFunc(listeners.OnMemberBan),
 		bot.WithEventListenerFunc(listeners.OnAuditLog),
 		bot.WithEventListenerFunc(listeners.OnAntispamMessageCreate),
+		bot.WithEventListenerFunc(listeners.OnUserVoiceJoin),
+		bot.WithEventListenerFunc(listeners.OnUserVoiceLeave),
+		bot.WithEventListenerFunc(listeners.OnUserVoiceMove),
 		bot.WithGatewayConfigOpts(gateway.WithIntents(intents)),
 		bot.WithCacheConfigOpts(
 			cache.WithCaches(cache.FlagsAll),
