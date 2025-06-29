@@ -20,6 +20,20 @@
         "isDefault": true
       },
       "problemMatcher": ["$go"]
+    },
+    {
+      "type": "shell",
+      "label": "go test -race",
+      "command": "go test -race ./...",
+      "group": "test",
+      "problemMatcher": ["$go"]
+    },
+    {
+      "type": "shell",
+      "label": "go test -cover",
+      "command": "go test -cover ./...",
+      "group": "test",
+      "problemMatcher": ["$go"]
     }
   ]
 }
