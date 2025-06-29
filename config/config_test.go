@@ -100,7 +100,7 @@ func TestConfigPaths(t *testing.T) {
 	// We can't easily test the paths directly, but we can test that ReadInConfig doesn't panic when
 	// no config file is found.
 	assert.NotPanics(t, func() {
-		viper.ReadInConfig() // This will return an error but shouldn't panic.
+		_ = viper.ReadInConfig() // This will return an error but shouldn't panic.
 	})
 }
 
