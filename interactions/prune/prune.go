@@ -3,21 +3,26 @@ package prune
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
+	"github.com/cbroglie/mustache"
+	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/json"
+	"github.com/disgoorg/snowflake/v2"
+	"github.com/google/uuid"
 
-	"github.com/NLLCommunity/heimdallr/globals"
-	"github.com/NLLCommunity/heimdallr/interactions"
+	ix "github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
 	r.Command("/prune-pending-members", PruneHandler)
+	r.Component("/button/prune-members/confirm/{pruneID}", PruneConfirmHandler)
+	r.Component("/button/prune-members/cancel/{pruneID}", PruneCancelHandler)
 
 	return []discord.ApplicationCommandCreate{PruneCommand}
 }
@@ -53,141 +58,277 @@ var PruneCommand = discord.SlashCommandCreate{
 			},
 			Required: true,
 
-			MinValue: utils.Ref(3),
+			MinValue: utils.Ref(0),
 			MaxValue: utils.Ref(90),
-		},
-		discord.ApplicationCommandOptionBool{
-			Name:        "dry-run",
-			Description: "If true, will show members that would be pruned without actually pruning them. (Default: true)",
 		},
 	},
 }
 
+func PruneConfirmHandler(e *handler.ComponentEvent) error {
+	if e.GuildID() == nil {
+		return ix.ErrEventNoGuildID
+	}
+	guildID := *e.GuildID()
+
+	pruneIDString, ok := e.Vars["pruneID"]
+	if !ok {
+		return e.CreateMessage(ix.EphemeralMessageContent("An error occurred.").Build())
+	}
+
+	pruneID, err := uuid.Parse(pruneIDString)
+	if err != nil {
+		slog.Warn(
+			"failed to parse prune ID",
+			"guild_id", guildID,
+			"prune_id", pruneIDString,
+		)
+		return e.CreateMessage(ix.EphemeralMessageContent("An error occurred.").Build())
+	}
+
+	messages := kickMembers(e.Client(), guildID, pruneID)
+
+	err = removeKickedMembersAndNotify(e, guildID, pruneID, messages)
+
+	return err
+}
+
+func removeKickedMembersAndNotify(e *handler.ComponentEvent, guildID snowflake.ID, pruneID uuid.UUID, messages string) (
+	err error,
+) {
+	members, err := model.GetPrunedMembers(pruneID, guildID)
+	if err != nil {
+		err = fmt.Errorf("failed to retrieve pruned members: %w", err)
+		return
+	}
+
+	settings, err := model.GetGuildSettings(guildID)
+	if err != nil {
+		err = fmt.Errorf("failed to retrieve guild settings: %w", err)
+		return
+	}
+	modChannelMessages := make([]string, len(members))
+	joinleaveMessages := make([]string, len(members))
+
+	for i, member := range members {
+		modChannelMessages[i] = fmt.Sprintf("-# %s", getUsernameOrID(e.Client(), guildID, member.UserID))
+		text, err := renderLeaveMessage(e.Client(), guildID, member.UserID)
+		if err == nil {
+			joinleaveMessages[i] = text
+		} else {
+			joinleaveMessages[i] = fmt.Sprintf(
+				"-# `%s` (ID: `%s`) left the server.",
+				getUsernameOrID(e.Client(), guildID, member.UserID),
+				member.UserID,
+			)
+		}
+	}
+
+	moderatorMessage := discord.NewMessageCreateBuilder().
+		SetContentf(
+			"## The following users have been pruned:\n%s\n\n%s",
+			strings.Join(modChannelMessages, "\n"),
+			utils.Iif(messages == "", "", "### Messages:\n"+messages),
+		)
+	joinleaveMessage := discord.NewMessageCreateBuilder().
+		SetContent(strings.Join(joinleaveMessages, "\n"))
+
+	if settings.ModeratorChannel != 0 {
+		err := e.UpdateMessage(
+			discord.NewMessageUpdateBuilder().
+				SetContent("Users have been pruned").SetContainerComponents().Build(),
+		)
+		if err != nil {
+			slog.Warn(
+				"failed to create prune message",
+				"guild_id", guildID,
+				"channel_id", settings.ModeratorChannel,
+				"err", err,
+			)
+		}
+
+		_, err = e.Client().Rest().CreateMessage(settings.ModeratorChannel, moderatorMessage.Build())
+		if err != nil {
+			slog.Warn("failed to create prune interaction response", "guild_id", guildID, "err", err)
+		}
+	} else {
+		err := e.CreateMessage(moderatorMessage.SetEphemeral(true).Build())
+		if err != nil {
+			slog.Warn("failed to create prune interaction response", "guild_id", guildID, "err", err)
+		}
+	}
+
+	if settings.JoinLeaveChannel != 0 && settings.LeaveMessageEnabled {
+		_, err := e.Client().Rest().CreateMessage(settings.JoinLeaveChannel, joinleaveMessage.Build())
+		if err != nil {
+			slog.Error(
+				"failed to send leave message for pruned users",
+				"guild_id", guildID,
+				"channel_id", settings.JoinLeaveChannel,
+				"err", err,
+			)
+		}
+	}
+
+	err = model.RemovePrunedMembers(guildID)
+	if err != nil {
+		slog.Error("failed to remove pruned members from prune table", "err", err)
+	}
+
+	err = model.RemoveMembersByPruneID(pruneID, guildID)
+	if err != nil {
+		slog.Error("failed to remove members from prune table", "err", err)
+	}
+
+	return
+}
+
+func kickMembers(client bot.Client, guildID snowflake.ID, pruneID uuid.UUID) (messages string) {
+	members, err := model.GetMembersToPrune(pruneID, guildID)
+	if err != nil {
+		slog.Warn(
+			"failed to get members to prune.",
+			"guild_id", guildID,
+			"prune_id", pruneID,
+			"err", err,
+		)
+	}
+
+	for _, member := range members {
+		err := model.SetMemberPruned(guildID, member.UserID, true)
+		//time.Sleep(250 * time.Millisecond)
+		if err != nil {
+			messages += fmt.Sprintf("Failed to kick %s", getUsernameOrID(client, guildID, member.UserID))
+			slog.Warn(
+				"failed to set user to pruned",
+				"guild_id", guildID,
+				"user_id", member.UserID,
+			)
+			continue
+		}
+
+		err = client.Rest().RemoveMember(guildID, member.UserID)
+		if err != nil {
+			_ = model.SetMemberPruned(guildID, member.UserID, false)
+			slog.Warn(
+				"failed to prune/kick member",
+				"guild_id", guildID,
+				"user_id", member.UserID,
+			)
+			messages += fmt.Sprintf("Failed to kick %s", getUsernameOrID(client, guildID, member.UserID))
+		}
+	}
+
+	return messages
+}
+
+func PruneCancelHandler(e *handler.ComponentEvent) error {
+	if e.GuildID() == nil {
+		return ix.ErrEventNoGuildID
+	}
+	pruneIDString, ok := e.Vars["pruneID"]
+	if !ok {
+		return e.CreateMessage(ix.EphemeralMessageContent("An error occurred.").Build())
+	}
+
+	pruneID, err := uuid.Parse(pruneIDString)
+	if err != nil {
+		slog.Warn(
+			"failed to parse prune ID",
+			"guild_id", *e.GuildID(),
+			"prune_id", pruneIDString,
+		)
+		return e.CreateMessage(ix.EphemeralMessageContent("An error occurred.").Build())
+	}
+
+	err = model.RemoveMembersByPruneID(pruneID, *e.GuildID())
+	if err != nil {
+		slog.Warn(
+			"failed to discard members pending prune",
+			"guild_id", *e.GuildID(),
+			"pruneID", pruneID,
+		)
+		return e.CreateMessage(ix.EphemeralMessageContent("Failed to discard prune list").Build())
+	}
+
+	return e.UpdateMessage(
+		discord.NewMessageUpdateBuilder().
+			SetContent(e.Message.Content + "\n\n**Cancelled!**").SetContainerComponents().Build(),
+	)
+}
+
 func PruneHandler(e *handler.CommandEvent) error {
 	if e.GuildID() == nil {
-		return interactions.ErrEventNoGuildID
+		return ix.ErrEventNoGuildID
 	}
 	days := e.SlashCommandInteractionData().Int("days")
-	dryRun, dryRunOk := e.SlashCommandInteractionData().OptBool("dry-run")
-	if !dryRunOk {
-		dryRun = true
-	}
 
 	guildSettings, err := model.GetGuildSettings(*e.GuildID())
 	if err != nil {
-		_ = e.CreateMessage(interactions.EphemeralMessageContent(
-			"Failed to prune members: could not get guild settings.").Build())
+		_ = e.CreateMessage(
+			ix.EphemeralMessageContent(
+				"Failed to prune members: could not get guild settings.",
+			).Build(),
+		)
 		return err
 	}
 
 	if guildSettings.GatekeepPendingRole == 0 {
-		return e.CreateMessage(interactions.EphemeralMessageContent(
-			"Failed to prune members: no pending role set. This command will only prune pending members.",
-		).Build())
+		return e.CreateMessage(
+			ix.EphemeralMessageContent(
+				"Failed to prune members: no pending role set. This command will only prune pending members.",
+			).Build(),
+		)
 	}
 
 	_ = e.DeferCreateMessage(true)
 	prunableMembers, err := getPrunableMembers(e, days, guildSettings)
 	if err != nil {
-		_, err = e.CreateFollowupMessage(interactions.EphemeralMessageContent(
-			"Failed to prune members: could not get member list.",
-		).Build())
+		_, err = e.CreateFollowupMessage(
+			ix.EphemeralMessageContent(
+				"Failed to prune members: could not get member list.",
+			).Build(),
+		)
 		return err
 	}
 
-	if dryRun {
-		err = dryRunPruneMembers(e, prunableMembers)
-	} else {
-		err = pruneMembers(e, *guildSettings, prunableMembers)
-	}
-
+	pruneID := uuid.New()
+	message, err := preparePruneMembers(pruneID, prunableMembers)
 	if err != nil {
-		slog.Error("Failed to prune members.", "dry_run", dryRun, "err", err)
-	}
-	return err
-}
-
-func pruneMembers(e *handler.CommandEvent, guildSettings model.GuildSettings, members []*discord.Member) error {
-	kickedMembers, err := kickMembers(e, members)
-	if err != nil {
+		slog.Error("Failed to prune members.", "err", err)
+		_, err = e.CreateFollowupMessage(ix.EphemeralMessageContent("Failed to prune members: could not process list.").Build())
 		return err
 	}
 
-	numKicked := len(kickedMembers)
-	adminMessage := fmt.Sprintf("Pruned %d members.\n\nMembers: \n", numKicked)
-	for _, member := range kickedMembers {
-		if member == nil {
-			continue
-		}
-		adminMessage += fmt.Sprintf("-# %s (%s)\n", member.User.Username, member.User.ID)
-	}
+	_, err = e.CreateFollowupMessage(message)
 
-	if numKicked > 0 && guildSettings.ModeratorChannel != 0 {
-		_, err = e.Client().Rest().CreateMessage(
-			guildSettings.ModeratorChannel, discord.NewMessageCreateBuilder().
-				SetContent(adminMessage).
-				Build(),
-		)
-		if err != nil {
-			slog.Error(
-				"Failed to send prune message to moderator channel.",
-				"err", err,
-				"guild_id", *e.GuildID(),
-				"channel_id", guildSettings.ModeratorChannel,
-				"user_id", e.User().ID,
-			)
-		}
-	}
-
-	_, err = e.CreateFollowupMessage(interactions.EphemeralMessageContentf(
-		"Pruned %d users.", numKicked).Build())
 	return err
 }
 
-func dryRunPruneMembers(e *handler.CommandEvent, members []*discord.Member) error {
-	numKicked := len(members)
-	adminMessage := fmt.Sprintf("Dry run: Pruned %d members.\n\nMembers:\n", numKicked)
-	for _, member := range members {
-		if member == nil {
-			continue
-		}
-		adminMessage += fmt.Sprintf("-# %s (%s)\n", member.User.Username, member.User.ID)
+func preparePruneMembers(pruneID uuid.UUID, members []discord.Member) (
+	discord.MessageCreate, error,
+) {
+	err := model.AddMembersToBePruned(pruneID, members)
+	if err != nil {
+		return discord.MessageCreate{}, err
 	}
 
-	_, err := e.CreateFollowupMessage(interactions.EphemeralMessageContent(adminMessage).
-		Build())
-	return err
-}
-
-func kickMembers(e *handler.CommandEvent, members []*discord.Member) (kickedMembers []*discord.Member, err error) {
+	content := fmt.Sprintf("## The following %d members will be pruned and kicked from the server\n", len(members))
 	for _, member := range members {
-		if member == nil {
-			slog.Warn("Member is nil.")
-			continue
-		}
-		globals.ExcludedFromModKickLog[member.User.ID] = struct{}{}
-
-		err = e.Client().Rest().RemoveMember(
-			member.GuildID, member.User.ID,
-			rest.WithReason(
-				fmt.Sprintf(
-					"User pruned with command. Pruned by %s (%s)",
-					e.User().Username, e.User().ID,
-				),
-			),
-		)
-		if err != nil {
-			slog.Error("Failed to prune member.", "err", err, "user_id", member.User.ID)
-			return
-		}
-		kickedMembers = append(kickedMembers, member)
+		content += fmt.Sprintf("- `%s` (`%s`)\n", member.User.Username, member.User.ID)
 	}
-	return
+
+	message := ix.EphemeralMessageContent(content).
+		AddActionRow(
+			discord.NewDangerButton("Prune members", fmt.Sprintf("/button/prune-members/confirm/%s", pruneID)),
+			discord.NewSecondaryButton("Cancel", fmt.Sprintf("/button/prune-members/cancel/%s", pruneID)),
+		).Build()
+
+	return message, nil
 }
 
 func getPrunableMembers(
 	e *handler.CommandEvent, days int, guildSettings *model.GuildSettings,
-) (members []*discord.Member, err error) {
+) (members []discord.Member, err error) {
 	maxTimeDiff := time.Duration(days) * time.Hour * 24
 
 	for member := range utils.GetMembersIter(e.Client().Rest(), *e.GuildID()) {
@@ -208,8 +349,54 @@ func getPrunableMembers(
 			continue
 		}
 
-		members = append(members, &member)
+		members = append(members, member)
 	}
 
 	return
+}
+
+func getUsernameOrID(c bot.Client, guildID, userID snowflake.ID) string {
+	member, ok := c.Caches().Member(guildID, userID)
+	if ok {
+		return member.User.Username
+	}
+	user, err := c.Rest().GetUser(userID)
+	if err != nil {
+		return "ID:" + userID.String()
+	}
+
+	return user.Username
+}
+func renderLeaveMessage(client bot.Client, guildID, userID snowflake.ID) (string, error) {
+	guild, err := client.Rest().GetGuild(guildID, false)
+	if err != nil || guild == nil {
+		return "", fmt.Errorf("failed to get guild: %w", err)
+	}
+
+	settings, err := model.GetGuildSettings(guildID)
+	if err != nil {
+		return "", fmt.Errorf("failed to get guild settings: %w", err)
+	}
+	if !settings.LeaveMessageEnabled {
+		return "", nil
+	}
+
+	user, err := client.Rest().GetUser(userID)
+	if err != nil || user == nil {
+		return "", fmt.Errorf("failed to get user: %w", err)
+	}
+
+	member, err := client.Rest().GetMember(guildID, userID)
+	if err != nil || member == nil {
+		member = new(discord.Member)
+	}
+	member.User = *user
+
+	joinleaveInfo := utils.NewMessageTemplateData(*member, guild.Guild)
+	contents, err := mustache.RenderRaw(settings.LeaveMessage, true, joinleaveInfo)
+	if err != nil {
+		return "", fmt.Errorf("failed to render template: %w", err)
+	}
+
+	return contents, nil
 }
