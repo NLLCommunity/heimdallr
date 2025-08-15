@@ -9,7 +9,6 @@ import (
 
 	"github.com/NLLCommunity/heimdallr/globals"
 	"github.com/NLLCommunity/heimdallr/model"
-	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 func OnAuditLog(e *events.GuildAuditLogEntryCreate) {
@@ -28,6 +27,10 @@ func OnAuditLog(e *events.GuildAuditLogEntryCreate) {
 			return
 		}
 
+		if pruned, _ := model.IsMemberPruned(e.GuildID, targetUser.ID); pruned {
+			return
+		}
+
 		if _, ok := globals.ExcludedFromModKickLog[targetUser.ID]; ok {
 			// User is excluded from mod kick log, likely because they were pruned.
 			// Remove from excluded list and don't log.
@@ -35,9 +38,16 @@ func OnAuditLog(e *events.GuildAuditLogEntryCreate) {
 			return
 		}
 
-		msg = fmt.Sprintf("User %s (`%d`) was kicked by %s.%s", targetUser.Username, targetUser.ID,
+		reason := ""
+		if entry.Reason != nil {
+			reason = fmt.Sprintf("\n>>> %s", *entry.Reason)
+		}
+
+		msg = fmt.Sprintf(
+			"User %s (`%d`) was kicked by %s.%s", targetUser.Username, targetUser.ID,
 			user.Mention(),
-			utils.Iif(entry.Reason != nil, fmt.Sprintf("\n\n>>> %s", *entry.Reason), ""))
+			reason,
+		)
 
 	default:
 		return
@@ -52,12 +62,16 @@ func OnAuditLog(e *events.GuildAuditLogEntryCreate) {
 		return
 	}
 
-	_, err = e.Client().Rest().CreateMessage(guildSettings.ModeratorChannel, discord.NewMessageCreateBuilder().
-		SetContent(msg).
-		SetAllowedMentions(&discord.AllowedMentions{
-			RepliedUser: false,
-		}).
-		Build())
+	_, err = e.Client().Rest().CreateMessage(
+		guildSettings.ModeratorChannel, discord.NewMessageCreateBuilder().
+			SetContent(msg).
+			SetAllowedMentions(
+				&discord.AllowedMentions{
+					RepliedUser: false,
+				},
+			).
+			Build(),
+	)
 
 	if err != nil {
 		slog.Error("Failed to send audit log message.", "err", err, "guild", e.GuildID)

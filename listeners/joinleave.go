@@ -39,16 +39,20 @@ func OnUserJoin(e *events.GuildMemberJoin) {
 
 	contents, err := mustache.RenderRaw(guildSettings.JoinMessage, true, joinleaveInfo)
 	if err != nil {
-		slog.Error("Failed to render join message template.",
+		slog.Error(
+			"Failed to render join message template.",
 			"err", err,
 			"guild_id", guildID,
 		)
 		return
 	}
 
-	_, err = e.Client().Rest().CreateMessage(joinLeaveChannel, discord.NewMessageCreateBuilder().SetContent(contents).Build())
+	_, err = e.Client().Rest().CreateMessage(
+		joinLeaveChannel, discord.NewMessageCreateBuilder().SetContent(contents).Build(),
+	)
 	if err != nil {
-		slog.Error("Failed to send join message.",
+		slog.Error(
+			"Failed to send join message.",
 			"guild_id", guildID,
 			"channel_id", joinLeaveChannel,
 			"err", err,
@@ -80,21 +84,29 @@ func OnUserLeave(e *events.GuildMemberLeave) {
 		return
 	}
 
+	if pruned, _ := model.IsMemberPruned(guildID, e.User.ID); pruned {
+		return
+	}
+
 	e.Member.User = e.User
 	joinleaveInfo := utils.NewMessageTemplateData(e.Member, guild.Guild)
 
 	contents, err := mustache.RenderRaw(guildSettings.LeaveMessage, true, joinleaveInfo)
 	if err != nil {
-		slog.Error("Failed to render leave message template.",
+		slog.Error(
+			"Failed to render leave message template.",
 			"err", err,
 			"guild_id", guildID,
 		)
 		return
 	}
 
-	_, err = e.Client().Rest().CreateMessage(joinLeaveChannel, discord.NewMessageCreateBuilder().SetContent(contents).Build())
+	_, err = e.Client().Rest().CreateMessage(
+		joinLeaveChannel, discord.NewMessageCreateBuilder().SetContent(contents).Build(),
+	)
 	if err != nil {
-		slog.Error("Failed to send leave message.",
+		slog.Error(
+			"Failed to send leave message.",
 			"guild_id", guildID,
 			"channel_id", joinLeaveChannel,
 			"err", err,
