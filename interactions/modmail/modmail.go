@@ -30,6 +30,7 @@ var ModmailAdminCommand = discord.SlashCommandCreate{
 	Name:                     "modmail-admin",
 	Description:              "Commands for receiving and sending Modmail.",
 	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
+	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
 	Contexts: []discord.InteractionContextType{
 		discord.InteractionContextTypeGuild,
 	},
