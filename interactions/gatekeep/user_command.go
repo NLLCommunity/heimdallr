@@ -13,6 +13,7 @@ import (
 var ApproveUserCommand = discord.UserCommandCreate{
 	Name:                     "Approve",
 	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
+	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
 	Contexts: []discord.InteractionContextType{
 		discord.InteractionContextTypeGuild,
 	},

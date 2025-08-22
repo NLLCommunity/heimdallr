@@ -24,6 +24,7 @@ var CreateRoleButtonCommand = discord.SlashCommandCreate{
 
 	DMPermission:             utils.Ref(false),
 	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionManageRoles),
+	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
 
 	Options: []discord.ApplicationCommandOption{
 		discord.ApplicationCommandOptionRole{

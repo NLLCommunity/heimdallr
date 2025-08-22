@@ -45,6 +45,7 @@ var AdminCommand = discord.SlashCommandCreate{
 	Description:              "admin commands",
 	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionAdministrator),
 	Contexts:                 []discord.InteractionContextType{discord.InteractionContextTypeGuild},
+	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
 	Options: []discord.ApplicationCommandOption{
 		discord.ApplicationCommandOptionSubCommand{
 			Name:        "info",

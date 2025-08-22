@@ -26,6 +26,7 @@ var KickCommand = discord.SlashCommandCreate{
 	Name:                     "kick",
 	Description:              "Kick a user from the server",
 	DMPermission:             utils.Ref(false),
+	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
 	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
 	Options: []discord.ApplicationCommandOption{
 		discord.ApplicationCommandOptionSubCommand{

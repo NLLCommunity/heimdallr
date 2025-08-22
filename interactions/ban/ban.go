@@ -27,6 +27,7 @@ var BanCommand = discord.SlashCommandCreate{
 	Name:                     "ban",
 	Description:              "Ban a user from the server",
 	DMPermission:             utils.Ref(false),
+	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
 	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionBanMembers),
 	Options: []discord.ApplicationCommandOption{
 

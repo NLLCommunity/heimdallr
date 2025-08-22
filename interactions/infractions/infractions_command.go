@@ -27,6 +27,7 @@ var InfractionsCommand = discord.SlashCommandCreate{
 	},
 
 	DMPermission:             utils.Ref(false),
+	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
 	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
 	Options: []discord.ApplicationCommandOption{
 		discord.ApplicationCommandOptionSubCommand{

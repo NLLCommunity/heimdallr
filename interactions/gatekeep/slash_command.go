@@ -14,6 +14,7 @@ var ApproveSlashCommand = discord.SlashCommandCreate{
 	Name:                     "approve",
 	Description:              "Approve a user to join the server",
 	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
+	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
 	Contexts: []discord.InteractionContextType{
 		discord.InteractionContextTypeGuild,
 	},
