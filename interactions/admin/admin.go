@@ -34,6 +34,10 @@ func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
 			r.Modal("/leave-message/modal", AdminLeaveMessageModalHandler)
 
 			r.Command("/anti-spam", AdminAntiSpamHandler)
+
+			r.Command("/ban-footer", AdminBanFooterHandler)
+			r.Component("/ban-footer/button", AdminBanFooterButtonHandler)
+			r.Modal("/ban-footer/modal", AdminBanFooterModalHandler)
 		},
 	)
 
@@ -60,6 +64,7 @@ var AdminCommand = discord.SlashCommandCreate{
 		joinMessageSubcommand,
 		leaveMessageSubcommand,
 		antiSpamSubcommand,
+		banFooterSubcommand,
 	},
 }
 
