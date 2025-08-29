@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/handler"
+	"github.com/disgoorg/snowflake/v2"
+
 	ix "github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/interactions/quote"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
-	"github.com/disgoorg/disgo/discord"
-	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/snowflake/v2"
 )
 
 var ModmailReportMessageCommand = discord.MessageCommandCreate{
@@ -27,8 +28,7 @@ func ModmailReportMessageHandler(e *handler.CommandEvent) error {
 		SetCustomID(customID).
 		AddActionRow(
 			discord.NewParagraphTextInput("reason", "Report reason").
-				WithPlaceholder("The reason for reporting the message.").
-				WithMinLength(12),
+				WithPlaceholder("The reason for reporting the message."),
 		).Build()
 
 	return e.Modal(modal)

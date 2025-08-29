@@ -6,10 +6,11 @@ import (
 	"strconv"
 	"time"
 
-	ix "github.com/NLLCommunity/heimdallr/interactions"
-	"github.com/NLLCommunity/heimdallr/utils"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
+
+	ix "github.com/NLLCommunity/heimdallr/interactions"
+	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 var createSubcommand = discord.ApplicationCommandOptionSubCommand{
@@ -77,7 +78,10 @@ func ModmailAdminCreateButtonHandler(e *handler.CommandEvent) error {
 	role := data.Role("role")
 	channel := data.Channel("channel")
 	maxActive := data.Int("max-active-reports")
-	slowModeStr := data.String("slow-mode-time")
+	slowModeStr, slowModeOK := data.OptString("slow-mode-time")
+	if !slowModeOK {
+		slowModeStr = "0s"
+	}
 	if color == "" {
 		color = "blue"
 	}
@@ -152,7 +156,9 @@ func ModmailReportButtonHandler(e *handler.ComponentEvent) error {
 				WithPlaceholder(
 					"Report information\n\n" +
 						"Markdown is supported\n\n" +
-						"More details, imager, etc. can be submitted afterwards"),
+						"More details, imager, etc. can be submitted afterwards").
+				WithRequired(true).
+				WithMinLength(10),
 		).
 		Build()
 
