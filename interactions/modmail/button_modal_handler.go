@@ -5,11 +5,12 @@ import (
 	"log/slog"
 	"strconv"
 
-	ix "github.com/NLLCommunity/heimdallr/interactions"
-	"github.com/NLLCommunity/heimdallr/utils"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/snowflake/v2"
+
+	ix "github.com/NLLCommunity/heimdallr/interactions"
+	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 func ModmailReportModalHandler(e *handler.ModalEvent) error {
@@ -95,7 +96,7 @@ func ModmailReportModalHandler(e *handler.ModalEvent) error {
 	message, err := e.Client().Rest().CreateMessage(
 		thread.ID(),
 		discord.MessageCreate{
-			Content: fmt.Sprintf("||%s%s",
+			Content: fmt.Sprintf("%s%s",
 				utils.Iif(role != "0", fmt.Sprintf("<@&%s>", role), ""),
 				user.Mention()),
 			Embeds: []discord.Embed{embed},

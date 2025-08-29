@@ -35,6 +35,9 @@ type GuildSettings struct {
 	AntiSpamEnabled         bool
 	AntiSpamCount           int `gorm:"default:5"`
 	AntiSpamCooldownSeconds int `gorm:"default:20"`
+
+	BanFooter           string
+	AlwaysSendBanFooter bool
 }
 
 func GetGuildSettings(guildID snowflake.ID) (*GuildSettings, error) {

@@ -99,6 +99,10 @@ var BanCommand = discord.SlashCommandCreate{
 				},
 			},
 		},
+		discord.ApplicationCommandOptionBool{
+			Name:        "dont-auto-dm",
+			Description: "Override server-default always send ban footer. message/duration will still trigger it",
+		},
 	},
 }
 
@@ -118,6 +122,7 @@ func BanHandler(e *handler.CommandEvent) error {
 	reason := data.String("reason")
 	message := data.String("message")
 	deleteMessages := time.Duration(data.Int("delete-messages")) * time.Second
+	dontAutoDm := data.Bool("dont-auto-dm")
 
 	if reason == "" {
 		reason = message
@@ -134,7 +139,7 @@ func BanHandler(e *handler.CommandEvent) error {
 	}
 
 	failedToMessage := false
-	if banData.Message != "" || banData.Duration != "" {
+	if banData.Message != "" || banData.Duration != "" || (shouldAlwaysSendBanFooter(guild.ID) && !dontAutoDm) {
 		mc := createBanDMMessage(banData)
 		_, err := interactions.SendDirectMessage(e.Client(), *banData.User, mc)
 		if err != nil {
@@ -254,12 +259,19 @@ func createBanDMMessage(data BanHandlerData) discord.MessageCreate {
 		data.Message,
 	)
 
+	footer := ""
+	settings, err := model.GetGuildSettings(data.Guild.ID)
+	if err == nil {
+		footer = settings.BanFooter
+	}
+
 	return discord.NewMessageCreateBuilder().
 		SetContentf(
-			"You have been banned from %s.\n%s%s\n\n(You cannot respond to this message)",
+			"You have been banned from %s.\n%s%s\n\n%s\n\n(You cannot respond to this message)",
 			data.Guild.Name,
 			utils.Iif(data.Duration != "", expiryText, ""),
 			utils.Iif(data.Message != "", messageText, ""),
+			footer,
 		).Build()
 }
 
@@ -269,6 +281,15 @@ func durationToRelTimestamp(duration string) string {
 		return duration
 	}
 	return fmt.Sprintf("<t:%d:R>", time.Now().Add(dur).Unix())
+}
+
+func shouldAlwaysSendBanFooter(guild snowflake.ID) bool {
+	settings, err := model.GetGuildSettings(guild)
+	if err != nil {
+		return false
+	}
+
+	return settings.AlwaysSendBanFooter
 }
 
 var durationChoices = []discord.ApplicationCommandOptionChoiceString{
