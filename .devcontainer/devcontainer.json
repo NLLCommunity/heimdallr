@@ -1,6 +1,6 @@
 {
   "name": "Heimdallr",
-  "image": "mcr.microsoft.com/devcontainers/go:1.24",
+  "image": "mcr.microsoft.com/devcontainers/go:1.25",
   "remoteUser": "vscode",
   "mounts": [
     "source=${localEnv:HOME}${localEnv:USERPROFILE}/.ssh,target=/home/vscode/.ssh,type=bind,readonly"
