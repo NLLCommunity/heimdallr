@@ -13,7 +13,7 @@ require (
 	github.com/spf13/viper v1.20.1
 	github.com/sqids/sqids-go v0.4.1
 	github.com/stretchr/testify v1.11.1
-	gorm.io/gorm v1.30.3
+	gorm.io/gorm v1.30.4
 )
 
 require golang.org/x/sync v0.15.0 // indirect
