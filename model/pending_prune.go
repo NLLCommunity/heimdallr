@@ -21,7 +21,8 @@ type MemberPendingPrune struct {
 
 func AddMembersToBePruned(pruneID uuid.UUID, members []discord.Member) error {
 	ctx := context.Background()
-	err := DB.Transaction(
+	session := DB.Session(&gorm.Session{SkipDefaultTransaction: true})
+	err := session.Transaction(
 		func(tx *gorm.DB) error {
 			for _, member := range members {
 				err := gorm.G[MemberPendingPrune](tx).Create(
@@ -49,7 +50,10 @@ func AddMembersToBePruned(pruneID uuid.UUID, members []discord.Member) error {
 
 func GetMembersToPrune(pruneID uuid.UUID, guildID snowflake.ID) ([]MemberPendingPrune, error) {
 	ctx := context.Background()
-	pendingPrunes, err := gorm.G[MemberPendingPrune](DB).Where(
+	session := DB.Session(
+		&gorm.Session{SkipDefaultTransaction: true},
+	)
+	pendingPrunes, err := gorm.G[MemberPendingPrune](session).Where(
 		"guild_id = ? AND prune_id = ? AND pruned <> 1", guildID, pruneID,
 	).Find(ctx)
 	if err != nil {
@@ -61,7 +65,8 @@ func GetMembersToPrune(pruneID uuid.UUID, guildID snowflake.ID) ([]MemberPending
 
 func GetPrunedMembers(pruneID uuid.UUID, guildID snowflake.ID) ([]MemberPendingPrune, error) {
 	ctx := context.Background()
-	prunedMembers, err := gorm.G[MemberPendingPrune](DB).Where(
+	session := DB.Session(&gorm.Session{SkipDefaultTransaction: true})
+	prunedMembers, err := gorm.G[MemberPendingPrune](session).Where(
 		"guild_id = ? AND prune_id AND pruned = 1", guildID, pruneID,
 	).Find(ctx)
 
@@ -70,19 +75,22 @@ func GetPrunedMembers(pruneID uuid.UUID, guildID snowflake.ID) ([]MemberPendingP
 
 func RemovePrunedMembers(guildID snowflake.ID) error {
 	ctx := context.Background()
-	_, err := gorm.G[MemberPendingPrune](DB).Where("guild_id = ? AND pruned = 1", guildID).Delete(ctx)
+	session := DB.Session(&gorm.Session{SkipDefaultTransaction: true})
+	_, err := gorm.G[MemberPendingPrune](session).Where("guild_id = ? AND pruned = 1", guildID).Delete(ctx)
 	return err
 }
 
 func RemoveMembersByPruneID(pruneID uuid.UUID, guildID snowflake.ID) error {
 	ctx := context.Background()
-	_, err := gorm.G[MemberPendingPrune](DB).Where("guild_id = ? AND prune_id = ?", guildID, pruneID).Delete(ctx)
+	session := DB.Session(&gorm.Session{SkipDefaultTransaction: true})
+	_, err := gorm.G[MemberPendingPrune](session).Where("guild_id = ? AND prune_id = ?", guildID, pruneID).Delete(ctx)
 	return err
 }
 
 func SetMemberPruned(guildID snowflake.ID, userID snowflake.ID, pruned bool) error {
 	ctx := context.Background()
-	_, err := gorm.G[MemberPendingPrune](DB).
+	session := DB.Session(&gorm.Session{SkipDefaultTransaction: true})
+	_, err := gorm.G[MemberPendingPrune](session).
 		Where("guild_id = ? AND user_id = ?", guildID, userID).
 		Select("pruned").
 		Updates(ctx, MemberPendingPrune{Pruned: pruned})
@@ -91,8 +99,8 @@ func SetMemberPruned(guildID snowflake.ID, userID snowflake.ID, pruned bool) err
 
 func IsMemberPruned(guildID, userID snowflake.ID) (bool, error) {
 	ctx := context.Background()
-
-	member, err := gorm.G[MemberPendingPrune](DB).
+	session := DB.Session(&gorm.Session{SkipDefaultTransaction: true})
+	member, err := gorm.G[MemberPendingPrune](session).
 		Where("guild_id = ? AND user_id = ?", guildID, userID).
 		First(ctx)
 

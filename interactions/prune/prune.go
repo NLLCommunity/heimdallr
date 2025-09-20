@@ -195,7 +195,6 @@ func kickMembers(client bot.Client, guildID snowflake.ID, pruneID uuid.UUID) (me
 
 	for _, member := range members {
 		err := model.SetMemberPruned(guildID, member.UserID, true)
-		//time.Sleep(250 * time.Millisecond)
 		if err != nil {
 			messages += fmt.Sprintf("Failed to kick %s", getUsernameOrID(client, guildID, member.UserID))
 			slog.Warn(

@@ -21,7 +21,7 @@ func init() {
 }
 
 func InitDB(path string) (*gorm.DB, error) {
-	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{SkipDefaultTransaction: true})
+	db, err := gorm.Open(sqlite.Open(path))
 	if err != nil {
 		return nil, err
 	}
