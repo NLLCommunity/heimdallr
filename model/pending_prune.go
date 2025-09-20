@@ -106,3 +106,9 @@ func IsMemberPruned(guildID, userID snowflake.ID) (bool, error) {
 
 	return member.Pruned, err
 }
+
+func DeletePrunesBeforeTime(t time.Time) error {
+	ctx := context.Background()
+	_, err := gorm.G[MemberPendingPrune](DB).Where("timestamp < ?", t).Delete(ctx)
+	return err
+}

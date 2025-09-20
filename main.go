@@ -157,11 +157,13 @@ func main() {
 	}
 
 	removeTempBansTask := scheduled_tasks.RemoveTempBansScheduledTask(client)
+	removeStalePrunesTask := scheduled_tasks.RemoveStalePendingPrunes()
 
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	<-s
 	removeTempBansTask.Stop()
+	removeStalePrunesTask.Stop()
 }
 
 func getLogLevel(level string) slog.Level {
