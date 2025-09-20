@@ -67,7 +67,7 @@ func GetPrunedMembers(pruneID uuid.UUID, guildID snowflake.ID) ([]MemberPendingP
 	ctx := context.Background()
 	session := DB.Session(&gorm.Session{SkipDefaultTransaction: true})
 	prunedMembers, err := gorm.G[MemberPendingPrune](session).Where(
-		"guild_id = ? AND prune_id AND pruned = 1", guildID, pruneID,
+		"guild_id = ? AND prune_id = ? AND pruned = 1", guildID, pruneID,
 	).Find(ctx)
 
 	return prunedMembers, err
