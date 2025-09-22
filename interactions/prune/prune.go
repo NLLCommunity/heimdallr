@@ -85,7 +85,7 @@ func PruneConfirmHandler(e *handler.ComponentEvent) error {
 		return e.CreateMessage(ix.EphemeralMessageContent("An error occurred.").Build())
 	}
 
-	_ = e.DeferCreateMessage(true)
+	_ = e.UpdateMessage(discord.NewMessageUpdateBuilder().SetContainerComponents().Build())
 
 	messages := kickMembers(e.Client(), guildID, pruneID)
 
@@ -113,6 +113,10 @@ func removeKickedMembersAndNotify(e *handler.ComponentEvent, guildID snowflake.I
 		err = fmt.Errorf("failed to retrieve guild settings: %w", err)
 		return
 	}
+
+	// Prepare the messages that will be shown to moderators and in the join/leave
+	// channel if it is enabled.
+
 	modChannelText := ""
 	joinleaveText := ""
 
@@ -131,25 +135,27 @@ func removeKickedMembersAndNotify(e *handler.ComponentEvent, guildID snowflake.I
 		}
 	}
 
+	// Prepend a title and append any info messages if they exist.
 	modChannelText = fmt.Sprintf(
 		"## The following users have been pruned:\n%s\n\n%s",
 		modChannelText,
 		utils.Iif(messages == "", "", "### Messages:\n"+messages),
 	)
 
+	// Split messages up into parts, in case there is a long list of pruned members.
 	modChannelTextSplit := utils.SplitStringToLengthByLine(modChannelText, 2000)
 	joinleaveTextSplit := utils.SplitStringToLengthByLine(joinleaveText, 2000)
 
 	if settings.ModeratorChannel != 0 {
+		// Handle moderator notification of pruned members if a moderator channel is defined.
 		_, err := e.CreateFollowupMessage(
 			discord.NewMessageCreateBuilder().
 				SetContent("Users have been pruned").SetContainerComponents().Build(),
 		)
 		if err != nil {
 			slog.Warn(
-				"failed to create prune message",
+				"failed to create prune confirmation message",
 				"guild_id", guildID,
-				"channel_id", settings.ModeratorChannel,
 				"err", err,
 			)
 		}
@@ -165,6 +171,8 @@ func removeKickedMembersAndNotify(e *handler.ComponentEvent, guildID snowflake.I
 			}
 		}
 	} else {
+		// if no moderator channel is defined, create an ephemeral message with the
+		// information instead
 		for _, text := range modChannelTextSplit {
 			_, err = e.CreateFollowupMessage(
 				discord.NewMessageCreateBuilder().
@@ -176,6 +184,7 @@ func removeKickedMembersAndNotify(e *handler.ComponentEvent, guildID snowflake.I
 		}
 	}
 
+	// Post leave messages if they are enabled.
 	if settings.JoinLeaveChannel != 0 && settings.LeaveMessageEnabled {
 		for _, text := range joinleaveTextSplit {
 			_, err := e.Client().Rest().CreateMessage(
@@ -188,6 +197,8 @@ func removeKickedMembersAndNotify(e *handler.ComponentEvent, guildID snowflake.I
 			}
 		}
 	}
+
+	// Cleanup
 
 	err = model.RemovePrunedMembers(guildID)
 	if err != nil {
