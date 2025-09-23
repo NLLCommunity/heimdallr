@@ -149,8 +149,7 @@ func removeKickedMembersAndNotify(e *handler.ComponentEvent, guildID snowflake.I
 	if settings.ModeratorChannel != 0 {
 		// Handle moderator notification of pruned members if a moderator channel is defined.
 		_, err := e.CreateFollowupMessage(
-			discord.NewMessageCreateBuilder().
-				SetContent("Users have been pruned").SetContainerComponents().Build(),
+			ix.EphemeralMessageContent("Users have been pruned").Build(),
 		)
 		if err != nil {
 			slog.Warn(
@@ -175,8 +174,7 @@ func removeKickedMembersAndNotify(e *handler.ComponentEvent, guildID snowflake.I
 		// information instead
 		for _, text := range modChannelTextSplit {
 			_, err = e.CreateFollowupMessage(
-				discord.NewMessageCreateBuilder().
-					SetContent(text).Build(),
+				ix.EphemeralMessageContent(text).Build(),
 			)
 			if err != nil {
 				slog.Warn("failed to create mod prune message", "guild_id", guildID, "err", err)
