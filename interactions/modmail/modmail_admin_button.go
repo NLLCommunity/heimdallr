@@ -88,25 +88,34 @@ func ModmailAdminCreateButtonHandler(e *handler.CommandEvent) error {
 
 	slowMode, err := time.ParseDuration(slowModeStr)
 	if err != nil {
-		slog.Info("Failed to parse slow mode duration",
-			"slow_mode", slowModeStr, "err", err)
+		slog.Info(
+			"Failed to parse slow mode duration",
+			"slow_mode", slowModeStr, "err", err,
+		)
 	}
 
 	if slowMode.Hours() > 6 {
 		return e.CreateMessage(
-			ix.EphemeralMessageContentf("Slow mode duration is too long '%s'. Max is six hours.",
-				slowModeStr).Build())
+			ix.EphemeralMessageContentf(
+				"Slow mode duration is too long '%s'. Max is six hours.",
+				slowModeStr,
+			).Build(),
+		)
 	}
 
 	return e.CreateMessage(
 		discord.NewMessageCreateBuilder().
-			AddActionRow(discord.NewButton(
-				stringToButtonStyle[color],
-				label,
-				fmt.Sprintf("/modmail/report-button/%s/%s/%d/%.0f",
-					role.ID, channel.ID, maxActive, slowMode.Seconds()),
-				"", 0,
-			)).Build(),
+			AddActionRow(
+				discord.NewButton(
+					stringToButtonStyle[color],
+					label,
+					fmt.Sprintf(
+						"/modmail/report-button/%s/%s/%d/%.0f",
+						role.ID, channel.ID, maxActive, slowMode.Seconds(),
+					),
+					"", 0,
+				),
+			).Build(),
 	)
 }
 
@@ -123,19 +132,22 @@ func ModmailReportButtonHandler(e *handler.ComponentEvent) error {
 		slog.Error("Failed to parse max active")
 		return e.CreateMessage(
 			ix.EphemeralMessageContent("Failed to create report modal").
-				Build())
+				Build(),
+		)
 	}
 
 	below, err := isBelowMaxActive(e, maxActive)
 	if err != nil {
 		return e.CreateMessage(
 			ix.EphemeralMessageContent("Something went wrong when preparing for the report.").
-				Build())
+				Build(),
+		)
 	}
 	if !below {
 		return e.CreateMessage(
 			ix.EphemeralMessageContent("You already have the maximum number of reports open").
-				Build())
+				Build(),
+		)
 	}
 
 	customID := fmt.Sprintf("/modmail/report-modal/%s/%s/%s/%s", role, channel, maxActiveStr, slowModeStr)
@@ -145,18 +157,20 @@ func ModmailReportButtonHandler(e *handler.ComponentEvent) error {
 	modal := discord.NewModalCreateBuilder().
 		SetCustomID(customID).
 		SetTitle("Report").
-		AddActionRow(
-			discord.NewShortTextInput("title", "Subject").
+		AddLabel(
+			"Subject", discord.NewShortTextInput("title").
 				WithPlaceholder("Subject or topic of the report").
 				WithRequired(true).
 				WithMinLength(5).
-				WithMaxLength(100)).
-		AddActionRow(
-			discord.NewParagraphTextInput("description", "Description").
+				WithMaxLength(100),
+		).
+		AddLabel(
+			"Description", discord.NewParagraphTextInput("description").
 				WithPlaceholder(
-					"Report information\n\n" +
-						"Markdown is supported\n\n" +
-						"More details, imager, etc. can be submitted afterwards").
+					"Report information\n\n"+
+						"Markdown is supported\n\n"+
+						"More details, imager, etc. can be submitted afterwards",
+				).
 				WithRequired(true).
 				WithMinLength(10),
 		).

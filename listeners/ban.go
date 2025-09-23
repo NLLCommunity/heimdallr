@@ -22,9 +22,9 @@ func OnMemberBan(e *events.GuildBan) {
 		return
 	}
 
-	ban, err := e.Client().Rest().GetBan(e.GuildID, e.User.ID)
+	ban, err := e.Client().Rest.GetBan(e.GuildID, e.User.ID)
 	if err != nil || ban == nil {
-		_, _ = e.Client().Rest().CreateMessage(
+		_, _ = e.Client().Rest.CreateMessage(
 			guildSettings.ModeratorChannel, discord.NewMessageCreateBuilder().
 				SetContentf("User %s (`%d`) was banned", e.User.Username, e.User.ID).
 				Build(),
@@ -46,7 +46,7 @@ func OnMemberBan(e *events.GuildBan) {
 		AddField("User ID", fmt.Sprintf("`%s`", e.User.ID), true)
 
 	if banData.BanningUserID != 0 {
-		if banningUser, err := e.Client().Rest().GetUser(banData.BanningUserID); err == nil {
+		if banningUser, err := e.Client().Rest.GetUser(banData.BanningUserID); err == nil {
 			embed.AddField("Banning User", banningUser.Username, true)
 		}
 	}
@@ -61,7 +61,7 @@ func OnMemberBan(e *events.GuildBan) {
 		}
 	}
 
-	_, _ = e.Client().Rest().CreateMessage(
+	_, _ = e.Client().Rest.CreateMessage(
 		guildSettings.ModeratorChannel, discord.NewMessageCreateBuilder().
 			AddEmbeds(embed.Build()).
 			SetAllowedMentions(&discord.AllowedMentions{}).

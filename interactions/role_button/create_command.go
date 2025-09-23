@@ -6,7 +6,7 @@ import (
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/omit"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/utils"
@@ -22,8 +22,8 @@ var CreateRoleButtonCommand = discord.SlashCommandCreate{
 		discord.LocaleNorwegian: "Lag ein knapp som gjev brukaren ei rolle når han vert trykt på.",
 	},
 
-	DMPermission:             utils.Ref(false),
-	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionManageRoles),
+	Contexts:                 []discord.InteractionContextType{discord.InteractionContextTypeGuild},
+	DefaultMemberPermissions: omit.NewPtr(discord.PermissionManageRoles),
 	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
 
 	Options: []discord.ApplicationCommandOption{
@@ -95,16 +95,20 @@ func CreateRoleButtonHandler(e *handler.CommandEvent) error {
 
 	// Check if the user has permission to assign roles
 	if !permissions.Has(discord.PermissionManageRoles) {
-		return e.CreateMessage(interactions.EphemeralMessageContent(
-			"You need the Manage Roles permission to create a role button.",
-		).Build())
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"You need the Manage Roles permission to create a role button.",
+			).Build(),
+		)
 	}
 
 	// Check if the specific role in question is one the user can assign
 	if !permissions.Has(role.Permissions) {
-		return e.CreateMessage(interactions.EphemeralMessageContent(
-			"You cannot assign a role with permissions you do not have.",
-		).Build())
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"You cannot assign a role with permissions you do not have.",
+			).Build(),
+		)
 	}
 
 	// Create the button

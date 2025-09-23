@@ -10,7 +10,7 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/google/uuid"
 
@@ -44,7 +44,7 @@ var PruneCommand = discord.SlashCommandCreate{
 		discord.ApplicationIntegrationTypeGuildInstall,
 	},
 
-	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionManageGuild),
+	DefaultMemberPermissions: omit.NewPtr(discord.PermissionManageGuild),
 
 	Options: []discord.ApplicationCommandOption{
 		discord.ApplicationCommandOptionInt{
@@ -85,7 +85,7 @@ func PruneConfirmHandler(e *handler.ComponentEvent) error {
 		return e.CreateMessage(ix.EphemeralMessageContent("An error occurred.").Build())
 	}
 
-	_ = e.UpdateMessage(discord.NewMessageUpdateBuilder().SetContainerComponents().Build())
+	_ = e.UpdateMessage(discord.NewMessageUpdateBuilder().SetComponents().Build())
 
 	messages := kickMembers(e.Client(), guildID, pruneID)
 
@@ -160,7 +160,7 @@ func removeKickedMembersAndNotify(e *handler.ComponentEvent, guildID snowflake.I
 		}
 
 		for _, text := range modChannelTextSplit {
-			_, err = e.Client().Rest().CreateMessage(
+			_, err = e.Client().Rest.CreateMessage(
 				settings.ModeratorChannel,
 				discord.NewMessageCreateBuilder().
 					SetContent(text).Build(),
@@ -185,7 +185,7 @@ func removeKickedMembersAndNotify(e *handler.ComponentEvent, guildID snowflake.I
 	// Post leave messages if they are enabled.
 	if settings.JoinLeaveChannel != 0 && settings.LeaveMessageEnabled {
 		for _, text := range joinleaveTextSplit {
-			_, err := e.Client().Rest().CreateMessage(
+			_, err := e.Client().Rest.CreateMessage(
 				settings.JoinLeaveChannel,
 				discord.NewMessageCreateBuilder().
 					SetContent(text).Build(),
@@ -211,7 +211,7 @@ func removeKickedMembersAndNotify(e *handler.ComponentEvent, guildID snowflake.I
 	return
 }
 
-func kickMembers(client bot.Client, guildID snowflake.ID, pruneID uuid.UUID) (messages string) {
+func kickMembers(client *bot.Client, guildID snowflake.ID, pruneID uuid.UUID) (messages string) {
 	guildSettings, err := model.GetGuildSettings(guildID)
 	if err != nil {
 		slog.Error("failed to get guild settings")
@@ -239,13 +239,13 @@ func kickMembers(client bot.Client, guildID snowflake.ID, pruneID uuid.UUID) (me
 			continue
 		}
 
-		discordMember, err := client.Rest().GetMember(guildID, member.UserID)
+		discordMember, err := client.Rest.GetMember(guildID, member.UserID)
 		if err == nil && !slices.Contains(discordMember.RoleIDs, guildSettings.GatekeepPendingRole) {
 			_ = model.SetMemberPruned(guildID, member.UserID, false)
 			continue // member no longer has the pending role, skip to next.
 		}
 
-		err = client.Rest().RemoveMember(guildID, member.UserID)
+		err = client.Rest.RemoveMember(guildID, member.UserID)
 		if err != nil {
 			_ = model.SetMemberPruned(guildID, member.UserID, false)
 			slog.Warn(
@@ -291,7 +291,7 @@ func PruneCancelHandler(e *handler.ComponentEvent) error {
 
 	return e.UpdateMessage(
 		discord.NewMessageUpdateBuilder().
-			SetContent(e.Message.Content + "\n\n**Cancelled!**").SetContainerComponents().Build(),
+			SetContent(e.Message.Content + "\n\n**Cancelled!**").SetComponents().Build(),
 	)
 }
 
@@ -370,7 +370,7 @@ func getPrunableMembers(
 ) (members []discord.Member, err error) {
 	maxTimeDiff := time.Duration(days) * time.Hour * 24
 
-	for member := range utils.GetMembersIter(e.Client().Rest(), *e.GuildID()) {
+	for member := range utils.GetMembersIter(e.Client().Rest, *e.GuildID()) {
 		if member.Error != nil {
 			return nil, member.Error
 		}
@@ -384,7 +384,7 @@ func getPrunableMembers(
 			continue
 		}
 
-		if time.Since(member.JoinedAt) < maxTimeDiff {
+		if time.Since(utils.RefDefault(member.JoinedAt, time.Now())) < maxTimeDiff {
 			continue
 		}
 
@@ -394,20 +394,20 @@ func getPrunableMembers(
 	return
 }
 
-func getUsernameOrID(c bot.Client, guildID, userID snowflake.ID) string {
-	member, ok := c.Caches().Member(guildID, userID)
+func getUsernameOrID(c *bot.Client, guildID, userID snowflake.ID) string {
+	member, ok := c.Caches.Member(guildID, userID)
 	if ok {
 		return member.User.Username
 	}
-	user, err := c.Rest().GetUser(userID)
+	user, err := c.Rest.GetUser(userID)
 	if err != nil {
 		return "ID:" + userID.String()
 	}
 
 	return user.Username
 }
-func renderLeaveMessage(client bot.Client, guildID, userID snowflake.ID) (string, error) {
-	guild, err := client.Rest().GetGuild(guildID, false)
+func renderLeaveMessage(client *bot.Client, guildID, userID snowflake.ID) (string, error) {
+	guild, err := client.Rest.GetGuild(guildID, false)
 	if err != nil || guild == nil {
 		return "", fmt.Errorf("failed to get guild: %w", err)
 	}
@@ -420,12 +420,12 @@ func renderLeaveMessage(client bot.Client, guildID, userID snowflake.ID) (string
 		return "", nil
 	}
 
-	user, err := client.Rest().GetUser(userID)
+	user, err := client.Rest.GetUser(userID)
 	if err != nil || user == nil {
 		return "", fmt.Errorf("failed to get user: %w", err)
 	}
 
-	member, err := client.Rest().GetMember(guildID, userID)
+	member, err := client.Rest.GetMember(guildID, userID)
 	if err != nil || member == nil {
 		member = new(discord.Member)
 	}
