@@ -21,7 +21,7 @@ func init() {
 }
 
 func InitDB(path string) (*gorm.DB, error) {
-	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(path))
 	if err != nil {
 		return nil, err
 	}
@@ -31,6 +31,7 @@ func InitDB(path string) (*gorm.DB, error) {
 		&GuildSettings{},
 		&ModmailSettings{},
 		&TempBan{},
+		&MemberPendingPrune{},
 	)
 	if err != nil {
 		slog.Error("failed to migrate database", "error", err)

@@ -157,3 +157,28 @@ func GetMembersIter(r rest.Rest, guildID snowflake.ID) iter.Seq[IterResult[disco
 		}
 	}
 }
+
+// SplitStringToLengthByLine splits a string into multiple parts, so that each
+// part is at or below the length limit. However, the split should only occur on
+// newlines, so that most inline and single-line formatting and such are not
+// affected by it.
+//
+// Usage notes:
+// Use a length of 2000 for a standard Discord message. If you plan to add any
+// formatting before it, reduce this number.
+func SplitStringToLengthByLine(input string, length int) (output []string) {
+	inputLines := strings.Split(input, "\n")
+
+	buf := ""
+	for _, line := range inputLines {
+		if len(buf)+len(line) > length {
+			output = append(output, buf)
+			buf = ""
+		}
+
+		buf += line + "\n"
+	}
+
+	output = append(output, buf)
+	return
+}
