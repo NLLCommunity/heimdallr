@@ -12,7 +12,7 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
@@ -39,8 +39,8 @@ var QuoteCommand = discord.SlashCommandCreate{
 		discord.LocaleNorwegian: "Lag et sitat av ei melding.",
 	},
 
-	DMPermission:             utils.Ref(false),
-	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionSendMessages),
+	Contexts:                 []discord.InteractionContextType{discord.InteractionContextTypeGuild},
+	DefaultMemberPermissions: omit.NewPtr(discord.PermissionSendMessages),
 
 	Options: []discord.ApplicationCommandOption{
 		discord.ApplicationCommandOptionString{
@@ -85,40 +85,51 @@ func QuoteHandler(e *handler.CommandEvent) error {
 
 	parts, err := parseMessageLink(url)
 	if err != nil {
-		_ = e.CreateMessage(interactions.EphemeralMessageContent("Invalid message link.").
-			Build())
+		_ = e.CreateMessage(
+			interactions.EphemeralMessageContent("Invalid message link.").
+				Build(),
+		)
 		return err
 	}
 
 	if parts.GuildId != guildID {
-		return e.CreateMessage(interactions.EphemeralMessageContent(
-			"Message link is not in this server.").Build())
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"Message link is not in this server.",
+			).Build(),
+		)
 	}
 
-	message, err := e.Client().Rest().GetMessage(parts.ChannelId, parts.MessageId)
+	message, err := e.Client().Rest.GetMessage(parts.ChannelId, parts.MessageId)
 	if err != nil {
-		_ = e.CreateMessage(interactions.EphemeralMessageContent(
-			"Failed to fetch message.").Build())
+		_ = e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"Failed to fetch message.",
+			).Build(),
+		)
 		return err
 	}
 
 	if canRead, _ := userCanReadChannelMessages(e.User().ID, message.ChannelID, e.Client()); !canRead {
-		return e.CreateMessage(interactions.EphemeralMessageContent(
-			"You don't have permission to read messages in that channel.").Build())
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"You don't have permission to read messages in that channel.",
+			).Build(),
+		)
 	}
 
 	embed := CreateMessageQuoteEmbed(e.Client(), message, showReplyTo)
 
 	resp := discord.NewMessageCreateBuilder().SetEmbeds(embed)
-	resp.AddContainerComponents(discord.NewActionRow(discord.NewLinkButton("Jump to message", url)))
+	resp.AddComponents(discord.NewActionRow(discord.NewLinkButton("Jump to message", url)))
 	resp.SetAllowedMentions(&discord.AllowedMentions{})
 
 	return e.CreateMessage(resp.Build())
 }
 
-func CreateMessageQuoteEmbed(client bot.Client, message *discord.Message, showReferenced bool) discord.Embed {
+func CreateMessageQuoteEmbed(client *bot.Client, message *discord.Message, showReferenced bool) discord.Embed {
 	channelName := "unknown channel"
-	channel, err := client.Rest().GetChannel(message.ChannelID)
+	channel, err := client.Rest.GetChannel(message.ChannelID)
 	if err == nil {
 		prefix := getChannelTypePrefix(channel)
 		channelName = prefix + channel.Name()
@@ -184,8 +195,8 @@ func getChannelTypePrefix(channel discord.Channel) string {
 	}
 }
 
-func userCanReadChannelMessages(userID, channelID snowflake.ID, client bot.Client) (bool, error) {
-	channel, err := client.Rest().GetChannel(channelID)
+func userCanReadChannelMessages(userID, channelID snowflake.ID, client *bot.Client) (bool, error) {
+	channel, err := client.Rest.GetChannel(channelID)
 	if err != nil {
 		return false, fmt.Errorf("failed to get channel: %w", err)
 	}
@@ -201,12 +212,12 @@ func userCanReadChannelMessages(userID, channelID snowflake.ID, client bot.Clien
 		return false, nil
 	}
 
-	guild, err := client.Rest().GetGuild(guildID, false)
+	guild, err := client.Rest.GetGuild(guildID, false)
 	if err != nil {
 		return false, fmt.Errorf("failed to get guild: %w", err)
 	}
 
-	member, err := client.Rest().GetMember(guildID, userID)
+	member, err := client.Rest.GetMember(guildID, userID)
 	if err != nil {
 		return false, fmt.Errorf("failed to get member: %w", err)
 	}

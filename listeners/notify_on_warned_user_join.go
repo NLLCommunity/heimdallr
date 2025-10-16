@@ -42,12 +42,12 @@ func OnWarnedUserJoin(e *events.GuildMemberJoin) {
 	modChannel := guildSettings.ModeratorChannel
 	isOwnerChannel := false
 	if modChannel == 0 {
-		guild, err := e.Client().Rest().GetGuild(e.GuildID, false)
+		guild, err := e.Client().Rest.GetGuild(e.GuildID, false)
 		if err != nil {
 			return
 		}
 
-		c, err := e.Client().Rest().CreateDMChannel(guild.OwnerID)
+		c, err := e.Client().Rest.CreateDMChannel(guild.OwnerID)
 		if err != nil {
 			return
 		}
@@ -60,12 +60,14 @@ func OnWarnedUserJoin(e *events.GuildMemberJoin) {
 		extraMsg = "\n(as the moderator channel has not been set, this message was sent you as the owner of the server)"
 	}
 
-	_, _ = e.Client().Rest().CreateMessage(modChannel,
+	_, _ = e.Client().Rest.CreateMessage(
+		modChannel,
 		discord.NewMessageCreateBuilder().
 			SetContentf(
 				"%s has joined with a total infraction severity score of %.2f, greater than the threshold of 1.0%s",
 				e.Member.Mention(),
 				totalSeverity,
 				extraMsg,
-			).Build())
+			).Build(),
+	)
 }

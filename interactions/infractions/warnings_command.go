@@ -23,7 +23,7 @@ var UserInfractionsCommand = discord.SlashCommandCreate{
 		discord.LocaleNorwegian: "Se advarslene dine.",
 	},
 
-	DMPermission:     utils.Ref(false),
+	Contexts:         []discord.InteractionContextType{discord.InteractionContextTypeGuild},
 	IntegrationTypes: []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
 }
 

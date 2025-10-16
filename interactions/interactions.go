@@ -49,10 +49,10 @@ func NewDMError(dmChannelCreated, messageSent bool, inner error) *DMError {
 	}
 }
 
-func SendDirectMessage(client bot.Client, user discord.User, messageCreate discord.MessageCreate) (
+func SendDirectMessage(client *bot.Client, user discord.User, messageCreate discord.MessageCreate) (
 	*discord.Message, error,
 ) {
-	dmChannel, err := client.Rest().CreateDMChannel(user.ID)
+	dmChannel, err := client.Rest.CreateDMChannel(user.ID)
 	if err != nil {
 		return nil, NewDMError(false, false, err)
 	}
@@ -61,7 +61,7 @@ func SendDirectMessage(client bot.Client, user discord.User, messageCreate disco
 		return nil, NewDMError(false, false, nil)
 	}
 
-	msg, err := client.Rest().CreateMessage(
+	msg, err := client.Rest.CreateMessage(
 		dmChannel.ID(),
 		messageCreate,
 	)
