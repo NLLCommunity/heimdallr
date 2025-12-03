@@ -10,7 +10,7 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags "-s -w" -o heimdallr .
 
-FROM alpine:3.22
+FROM alpine:3.23
 
 WORKDIR /usr/src/app
 
