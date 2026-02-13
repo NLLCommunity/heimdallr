@@ -7,7 +7,7 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 
 	ix "github.com/NLLCommunity/heimdallr/interactions"
@@ -29,7 +29,7 @@ func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
 var ModmailAdminCommand = discord.SlashCommandCreate{
 	Name:                     "modmail-admin",
 	Description:              "Commands for receiving and sending Modmail.",
-	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
+	DefaultMemberPermissions: omit.NewPtr(discord.PermissionKickMembers),
 	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
 	Contexts: []discord.InteractionContextType{
 		discord.InteractionContextTypeGuild,
@@ -162,7 +162,7 @@ func isBelowMaxActive(e interactionEvent, maxActive int) (bool, error) {
 
 	guildID := *e.GuildID()
 
-	activeThreads, err := e.Client().Rest().GetActiveGuildThreads(guildID)
+	activeThreads, err := e.Client().Rest.GetActiveGuildThreads(guildID)
 	if err != nil {
 		slog.Error("Failed to retrieve active threads", "err", err)
 		return false, fmt.Errorf("unable to retrieve active guild threads: %w", err)
@@ -174,7 +174,7 @@ func isBelowMaxActive(e interactionEvent, maxActive int) (bool, error) {
 		if *thread.ParentID() != e.Channel().ID() {
 			continue
 		}
-		members, err := e.Client().Rest().GetThreadMembers(thread.ID())
+		members, err := e.Client().Rest.GetThreadMembers(thread.ID())
 		if err != nil {
 			slog.Error("Failed to get thread members", "err", err)
 			return false, fmt.Errorf("couldn't get thread members: %w", err)
@@ -199,7 +199,7 @@ func isBelowMaxActive(e interactionEvent, maxActive int) (bool, error) {
 
 type interactionEvent interface {
 	Channel() discord.InteractionChannel
-	Client() bot.Client
+	Client() *bot.Client
 	GuildID() *snowflake.ID
 	User() discord.User
 }
