@@ -68,17 +68,16 @@ func SendDirectMessage(client *bot.Client, user discord.User, messageCreate disc
 	if err != nil {
 		return msg, NewDMError(true, false, err)
 	}
-
 	return msg, nil
 }
 
-func EphemeralMessageContent(content string) *discord.MessageCreateBuilder {
-	return discord.NewMessageCreateBuilder().
-		SetContent(content).
-		SetEphemeral(true).
-		SetAllowedMentions(&discord.AllowedMentions{})
+func EphemeralMessageContent(content string) discord.MessageCreate {
+	return discord.NewMessageCreate().
+		WithContent(content).
+		WithEphemeral(true).
+		WithAllowedMentions(&discord.AllowedMentions{})
 }
 
-func EphemeralMessageContentf(content string, fmtArgs ...any) *discord.MessageCreateBuilder {
+func EphemeralMessageContentf(content string, fmtArgs ...any) discord.MessageCreate {
 	return EphemeralMessageContent(fmt.Sprintf(content, fmtArgs...))
 }

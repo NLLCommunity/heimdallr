@@ -195,7 +195,7 @@ func severityToDots(severity float64) string {
 func getUserInfractionsAndMakeMessage(
 	modView bool,
 	guild *discord.Guild, user *discord.User,
-) (*discord.MessageCreateBuilder, error) {
+) (discord.MessageCreate, error) {
 	infrData, err := getUserInfractions(guild.ID, user.ID, pageSize, 0)
 	if err != nil {
 		return interactions.EphemeralMessageContent("Failed to retrieve infractions."), err
@@ -225,7 +225,7 @@ func getUserInfractionsAndMakeMessage(
 			severityToDots(infrData.TotalSeverity),
 			utils.FormatFloatUpToPrec(infrData.TotalSeverity, 2),
 		),
-	).SetEmbeds(infrData.Embeds...)
+	).WithEmbeds(infrData.Embeds...)
 
 	if infrData.Components != nil {
 		message.AddActionRow(infrData.Components...)
@@ -237,16 +237,16 @@ func getUserInfractionsAndMakeMessage(
 func getUserInfractionsAndUpdateMessage(
 	modView bool, offset int,
 	guild *discord.Guild, user *discord.User,
-) (mcb *discord.MessageCreateBuilder, mub *discord.MessageUpdateBuilder, err error) {
+) (mcb *discord.MessageCreate, mub *discord.MessageUpdate, err error) {
 
 	infrData, err := getUserInfractions(guild.ID, user.ID, pageSize, offset)
 	if err != nil {
-		mcb = interactions.EphemeralMessageContent("Failed to retrieve infractions.")
+		mcb = new(interactions.EphemeralMessageContent("Failed to retrieve infractions."))
 		return
 	}
 
 	if infrData.TotalCount == 0 {
-		mcb = interactions.EphemeralMessageContent("You have no infractions.")
+		mcb = new(interactions.EphemeralMessageContent("You have no infractions."))
 		return
 	}
 
@@ -260,10 +260,10 @@ func getUserInfractionsAndUpdateMessage(
 		infrData.TotalCount,
 	)
 
-	mub = discord.NewMessageUpdateBuilder().
-		SetEmbeds(infrData.Embeds...).
+	mub = new(discord.NewMessageUpdate().
+		WithEmbeds(infrData.Embeds...).
 		AddActionRow(infrData.Components...).
-		SetContentf(
+		WithContentf(
 			"%s (Viewing %d-%d)\nTotal strikes: %s",
 			utils.Iif(modView, modText, userText),
 			infrData.Offset+1,
@@ -273,6 +273,6 @@ func getUserInfractionsAndUpdateMessage(
 				severityToDots(infrData.TotalSeverity),
 				utils.FormatFloatUpToPrec(infrData.TotalSeverity, 2),
 			),
-		)
+		))
 	return
 }

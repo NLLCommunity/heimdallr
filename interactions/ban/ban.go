@@ -156,11 +156,11 @@ func BanHandler(e *handler.CommandEvent) error {
 		rest.WithReason(banData.String()),
 	)
 	if err != nil {
-		_ = e.CreateMessage(interactions.EphemeralMessageContent("Failed to ban User").Build())
+		_ = e.CreateMessage(interactions.EphemeralMessageContent("Failed to ban User"))
 	} else if failedToMessage {
-		_ = e.CreateMessage(interactions.EphemeralMessageContent("User was banned but message failed to send.").Build())
+		_ = e.CreateMessage(interactions.EphemeralMessageContent("User was banned but message failed to send."))
 	} else {
-		_ = e.CreateMessage(interactions.EphemeralMessageContent("User was banned.").Build())
+		_ = e.CreateMessage(interactions.EphemeralMessageContent("User was banned."))
 	}
 
 	dur, err := utils.ParseLongDuration(duration)
@@ -265,14 +265,14 @@ func createBanDMMessage(data BanHandlerData) discord.MessageCreate {
 		footer = settings.BanFooter
 	}
 
-	return discord.NewMessageCreateBuilder().
-		SetContentf(
+	return discord.NewMessageCreate().
+		WithContentf(
 			"You have been banned from %s.\n%s%s\n\n%s\n\n(You cannot respond to this message)",
 			data.Guild.Name,
 			utils.Iif(data.Duration != "", expiryText, ""),
 			utils.Iif(data.Message != "", messageText, ""),
 			footer,
-		).Build()
+		)
 }
 
 func durationToRelTimestamp(duration string) string {

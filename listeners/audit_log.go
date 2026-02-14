@@ -63,14 +63,13 @@ func OnAuditLog(e *events.GuildAuditLogEntryCreate) {
 	}
 
 	_, err = e.Client().Rest.CreateMessage(
-		guildSettings.ModeratorChannel, discord.NewMessageCreateBuilder().
-			SetContent(msg).
-			SetAllowedMentions(
+		guildSettings.ModeratorChannel, discord.NewMessageCreate().
+			WithContent(msg).
+			WithAllowedMentions(
 				&discord.AllowedMentions{
 					RepliedUser: false,
 				},
-			).
-			Build(),
+			),
 	)
 
 	if err != nil {

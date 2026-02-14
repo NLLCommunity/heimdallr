@@ -60,14 +60,14 @@ func KickWithMessageHandler(e *handler.CommandEvent) error {
 	user := data.User("user")
 	message := data.String("message")
 
-	mc := discord.NewMessageCreateBuilder().
-		SetContentf(
+	mc := discord.NewMessageCreate().
+		WithContentf(
 			"You have been kicked from %s.\n"+
 				"Additionally, this message was added:\n\n%s\n\n"+
 				"(You cannot respond to this message.)",
 			guild.Name,
 			message,
-		).Build()
+		)
 
 	failedToMessage := false
 	_, err := interactions.SendDirectMessage(e.Client(), user, mc)
@@ -83,7 +83,7 @@ func KickWithMessageHandler(e *handler.CommandEvent) error {
 		return e.CreateMessage(
 			interactions.EphemeralMessageContentf(
 				"Failed to kick user %s.", user.Mention(),
-			).Build(),
+			),
 		)
 	}
 
@@ -91,13 +91,13 @@ func KickWithMessageHandler(e *handler.CommandEvent) error {
 		return e.CreateMessage(
 			interactions.EphemeralMessageContentf(
 				"User was kicked but message failed to send.",
-			).Build(),
+			),
 		)
 	}
 
 	return e.CreateMessage(
 		interactions.EphemeralMessageContentf(
 			"User %s was kicked.", user.Mention(),
-		).Build(),
+		),
 	)
 }

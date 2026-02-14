@@ -25,8 +25,7 @@ func ModmailReportModalHandler(e *handler.ModalEvent) error {
 	if err != nil {
 		slog.Warn("Failed to parse 'max active'.", "max_active", maxActiveStr, "err", err)
 		_, err := e.CreateFollowupMessage(
-			ix.EphemeralMessageContent("Failed to submit report").
-				Build(),
+			ix.EphemeralMessageContent("Failed to submit report"),
 		)
 		return err
 	}
@@ -35,8 +34,7 @@ func ModmailReportModalHandler(e *handler.ModalEvent) error {
 	if err != nil {
 		slog.Error("Failed to parse 'slow mode'.", "slow_mode", slowModeStr, "err", err)
 		_, err := e.CreateFollowupMessage(
-			ix.EphemeralMessageContent("Failed to submit report").
-				Build(),
+			ix.EphemeralMessageContent("Failed to submit report"),
 		)
 		return err
 	}
@@ -48,16 +46,14 @@ func ModmailReportModalHandler(e *handler.ModalEvent) error {
 			"max-active", maxActiveStr, "err", err,
 		)
 		_, err := e.CreateFollowupMessage(
-			ix.EphemeralMessageContent("Failed to submit report.").
-				Build(),
+			ix.EphemeralMessageContent("Failed to submit report."),
 		)
 		return err
 	}
 
 	if !canSubmit {
 		_, err := e.CreateFollowupMessage(
-			ix.EphemeralMessageContent("You have reached the maximum number of active reports.").
-				Build(),
+			ix.EphemeralMessageContent("You have reached the maximum number of active reports."),
 		)
 		return err
 	}
@@ -76,8 +72,7 @@ func ModmailReportModalHandler(e *handler.ModalEvent) error {
 	if err != nil {
 		slog.Error("Failed to create thread", "err", err)
 		_, err := e.CreateFollowupMessage(
-			ix.EphemeralMessageContent("Failed to submit report.").
-				Build(),
+			ix.EphemeralMessageContent("Failed to submit report."),
 		)
 		return err
 	}
@@ -123,12 +118,12 @@ func ModmailReportModalHandler(e *handler.ModalEvent) error {
 		if err == nil {
 			_, err = e.Client().Rest.CreateMessage(
 				channelSnowflake,
-				discord.NewMessageCreateBuilder().
-					SetContentf("### New Modmail thread in <#%d>", e.Channel().ID()).
+				discord.NewMessageCreate().
+					WithContentf("### New Modmail thread in <#%d>", e.Channel().ID()).
 					AddEmbeds(embed).
 					AddActionRow(
 						discord.NewLinkButton("Go to thread", message.JumpURL()),
-					).Build(),
+					),
 			)
 
 			if err != nil {
@@ -142,8 +137,7 @@ func ModmailReportModalHandler(e *handler.ModalEvent) error {
 
 	_, err = e.CreateFollowupMessage(
 		ix.EphemeralMessageContent("Report created!").
-			AddActionRow(discord.NewLinkButton("View", message.JumpURL())).
-			Build(),
+			AddActionRow(discord.NewLinkButton("View", message.JumpURL())),
 	)
 
 	return err

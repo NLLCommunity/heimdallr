@@ -86,8 +86,7 @@ func QuoteHandler(e *handler.CommandEvent) error {
 	parts, err := parseMessageLink(url)
 	if err != nil {
 		_ = e.CreateMessage(
-			interactions.EphemeralMessageContent("Invalid message link.").
-				Build(),
+			interactions.EphemeralMessageContent("Invalid message link."),
 		)
 		return err
 	}
@@ -96,7 +95,7 @@ func QuoteHandler(e *handler.CommandEvent) error {
 		return e.CreateMessage(
 			interactions.EphemeralMessageContent(
 				"Message link is not in this server.",
-			).Build(),
+			),
 		)
 	}
 
@@ -105,7 +104,7 @@ func QuoteHandler(e *handler.CommandEvent) error {
 		_ = e.CreateMessage(
 			interactions.EphemeralMessageContent(
 				"Failed to fetch message.",
-			).Build(),
+			),
 		)
 		return err
 	}
@@ -114,17 +113,17 @@ func QuoteHandler(e *handler.CommandEvent) error {
 		return e.CreateMessage(
 			interactions.EphemeralMessageContent(
 				"You don't have permission to read messages in that channel.",
-			).Build(),
+			),
 		)
 	}
 
 	embed := CreateMessageQuoteEmbed(e.Client(), message, showReplyTo)
 
-	resp := discord.NewMessageCreateBuilder().SetEmbeds(embed)
+	resp := discord.NewMessageCreate().WithEmbeds(embed)
 	resp.AddComponents(discord.NewActionRow(discord.NewLinkButton("Jump to message", url)))
-	resp.SetAllowedMentions(&discord.AllowedMentions{})
+	resp.WithAllowedMentions(&discord.AllowedMentions{})
 
-	return e.CreateMessage(resp.Build())
+	return e.CreateMessage(resp)
 }
 
 func CreateMessageQuoteEmbed(client *bot.Client, message *discord.Message, showReferenced bool) discord.Embed {

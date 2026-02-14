@@ -138,9 +138,8 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 	)
 
 	_, err = e.Client().Rest.CreateMessage(
-		guildSettings.ModeratorChannel, discord.NewMessageCreateBuilder().
-			SetContent(adminMessage).
-			Build(),
+		guildSettings.ModeratorChannel, discord.NewMessageCreate().
+			WithContent(adminMessage),
 	)
 
 	if err != nil {

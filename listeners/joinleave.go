@@ -48,7 +48,7 @@ func OnUserJoin(e *events.GuildMemberJoin) {
 	}
 
 	_, err = e.Client().Rest.CreateMessage(
-		joinLeaveChannel, discord.NewMessageCreateBuilder().SetContent(contents).Build(),
+		joinLeaveChannel, discord.NewMessageCreate().WithContent(contents),
 	)
 	if err != nil {
 		slog.Error(
@@ -102,7 +102,7 @@ func OnUserLeave(e *events.GuildMemberLeave) {
 	}
 
 	_, err = e.Client().Rest.CreateMessage(
-		joinLeaveChannel, discord.NewMessageCreateBuilder().SetContent(contents).Build(),
+		joinLeaveChannel, discord.NewMessageCreate().WithContent(contents),
 	)
 	if err != nil {
 		slog.Error(

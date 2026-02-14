@@ -57,7 +57,7 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		return e.CreateMessage(
 			interactions.EphemeralMessageContentf(
 				"%s is already being approved.", member.Mention(),
-			).Build(),
+			),
 		)
 	}
 	activeApprovalProcesses[member.User.ID] = true
@@ -82,11 +82,11 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 			"guild_id", guild.ID,
 			"err", err,
 		)
-		return e.CreateMessage(interactions.EphemeralMessageContent("Failed to get guild information.").Build())
+		return e.CreateMessage(interactions.EphemeralMessageContent("Failed to get guild information."))
 	}
 
 	if !guildSettings.GatekeepEnabled {
-		return e.CreateMessage(interactions.EphemeralMessageContent("Gatekeep is not enabled in this server.").Build())
+		return e.CreateMessage(interactions.EphemeralMessageContent("Gatekeep is not enabled in this server."))
 	}
 
 	hasApprovedRole := false
@@ -104,7 +104,7 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		return e.CreateMessage(
 			interactions.EphemeralMessageContentf(
 				"User %s is already approved.", member.Mention(),
-			).Build(),
+			),
 		)
 	}
 
@@ -151,8 +151,7 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		return e.CreateMessage(
 			interactions.EphemeralMessageContent(
 				"No approved message set; not sending message. Roles have been set.",
-			).
-				Build(),
+			),
 		)
 	}
 
@@ -171,30 +170,29 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 	}
 	_, err = e.Client().Rest.CreateMessage(
 		channel,
-		discord.NewMessageCreateBuilder().
-			SetContent(
+		discord.NewMessageCreate().
+			WithContent(
 				contents+
 					fmt.Sprintf("\n\n-# Approved by %s", e.User().Mention()),
 			).
-			SetAllowedMentions(
+			WithAllowedMentions(
 				&discord.AllowedMentions{
 					Users: []snowflake.ID{member.User.ID},
 				},
-			).
-			Build(),
+			),
 	)
 	if err != nil {
 		return e.CreateMessage(
 			interactions.EphemeralMessageContent(
 				"Failed to send message to approved user.",
-			).Build(),
+			),
 		)
 	}
 
 	_, err = e.CreateFollowupMessage(
 		interactions.EphemeralMessageContent(
 			"User has been approved!",
-		).Build(),
+		),
 	)
 	return err
 }

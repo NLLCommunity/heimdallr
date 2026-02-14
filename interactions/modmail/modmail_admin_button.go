@@ -99,12 +99,12 @@ func ModmailAdminCreateButtonHandler(e *handler.CommandEvent) error {
 			ix.EphemeralMessageContentf(
 				"Slow mode duration is too long '%s'. Max is six hours.",
 				slowModeStr,
-			).Build(),
+			),
 		)
 	}
 
 	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
+		discord.NewMessageCreate().
 			AddActionRow(
 				discord.NewButton(
 					stringToButtonStyle[color],
@@ -115,7 +115,7 @@ func ModmailAdminCreateButtonHandler(e *handler.CommandEvent) error {
 					),
 					"", 0,
 				),
-			).Build(),
+			),
 	)
 }
 
@@ -131,22 +131,19 @@ func ModmailReportButtonHandler(e *handler.ComponentEvent) error {
 	if err != nil {
 		slog.Error("Failed to parse max active")
 		return e.CreateMessage(
-			ix.EphemeralMessageContent("Failed to create report modal").
-				Build(),
+			ix.EphemeralMessageContent("Failed to create report modal"),
 		)
 	}
 
 	below, err := isBelowMaxActive(e, maxActive)
 	if err != nil {
 		return e.CreateMessage(
-			ix.EphemeralMessageContent("Something went wrong when preparing for the report.").
-				Build(),
+			ix.EphemeralMessageContent("Something went wrong when preparing for the report."),
 		)
 	}
 	if !below {
 		return e.CreateMessage(
-			ix.EphemeralMessageContent("You already have the maximum number of reports open").
-				Build(),
+			ix.EphemeralMessageContent("You already have the maximum number of reports open"),
 		)
 	}
 
@@ -154,9 +151,7 @@ func ModmailReportButtonHandler(e *handler.ComponentEvent) error {
 
 	slog.Info("Sending modal", "custom_id", customID)
 
-	modal := discord.NewModalCreateBuilder().
-		SetCustomID(customID).
-		SetTitle("Report").
+	modal := discord.NewModalCreate(customID, "Report", nil).
 		AddLabel(
 			"Subject", discord.NewShortTextInput("title").
 				WithPlaceholder("Subject or topic of the report").
@@ -173,8 +168,7 @@ func ModmailReportButtonHandler(e *handler.ComponentEvent) error {
 				).
 				WithRequired(true).
 				WithMinLength(10),
-		).
-		Build()
+		)
 
 	err = e.Modal(modal)
 	if err != nil {

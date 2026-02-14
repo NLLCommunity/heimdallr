@@ -25,9 +25,8 @@ func OnMemberBan(e *events.GuildBan) {
 	ban, err := e.Client().Rest.GetBan(e.GuildID, e.User.ID)
 	if err != nil || ban == nil {
 		_, _ = e.Client().Rest.CreateMessage(
-			guildSettings.ModeratorChannel, discord.NewMessageCreateBuilder().
-				SetContentf("User %s (`%d`) was banned", e.User.Username, e.User.ID).
-				Build(),
+			guildSettings.ModeratorChannel, discord.NewMessageCreate().
+				WithContentf("User %s (`%d`) was banned", e.User.Username, e.User.ID),
 		)
 	}
 
@@ -62,9 +61,8 @@ func OnMemberBan(e *events.GuildBan) {
 	}
 
 	_, _ = e.Client().Rest.CreateMessage(
-		guildSettings.ModeratorChannel, discord.NewMessageCreateBuilder().
+		guildSettings.ModeratorChannel, discord.NewMessageCreate().
 			AddEmbeds(embed.Build()).
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			Build(),
+			WithAllowedMentions(&discord.AllowedMentions{}),
 	)
 }

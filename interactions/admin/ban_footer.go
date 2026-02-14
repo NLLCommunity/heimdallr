@@ -48,9 +48,9 @@ func AdminBanFooterHandler(e *handler.CommandEvent) error {
 		settings.AlwaysSendBanFooter = alwaysSend
 		err = model.SetGuildSettings(settings)
 		if err != nil {
-			return e.CreateMessage(ix.EphemeralMessageContent("Failed to save settings.").Build())
+			return e.CreateMessage(ix.EphemeralMessageContent("Failed to save settings."))
 		}
-		return e.CreateMessage(ix.EphemeralMessageContent("Settings saved.").Build())
+		return e.CreateMessage(ix.EphemeralMessageContent("Settings saved."))
 	}
 
 	if hasReset && resetOption == "reset" {
@@ -60,7 +60,7 @@ func AdminBanFooterHandler(e *handler.CommandEvent) error {
 		if err != nil {
 			return err
 		}
-		return e.CreateMessage(ix.EphemeralMessageContent("Ban footer has been reset.").Build())
+		return e.CreateMessage(ix.EphemeralMessageContent("Ban footer has been reset."))
 	}
 
 	embed := discord.NewEmbedBuilder().
@@ -69,11 +69,13 @@ func AdminBanFooterHandler(e *handler.CommandEvent) error {
 		Build()
 
 	return e.CreateMessage(
-		ix.EphemeralMessageContentf("**Always send ban DM:** %s",
-			utils.Iif(settings.AlwaysSendBanFooter, "yes", "no")).
-			SetEmbeds(embed).
-			AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/ban-footer/button")).
-			Build())
+		ix.EphemeralMessageContentf(
+			"**Always send ban DM:** %s",
+			utils.Iif(settings.AlwaysSendBanFooter, "yes", "no"),
+		).
+			WithEmbeds(embed).
+			AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/ban-footer/button")),
+	)
 }
 
 func AdminBanFooterButtonHandler(e *handler.ComponentEvent) error {
@@ -116,8 +118,8 @@ func AdminBanFooterModalHandler(e *handler.ModalEvent) error {
 
 	err = model.SetGuildSettings(settings)
 	if err != nil {
-		return e.CreateMessage(ix.EphemeralMessageContent("Failed to update ban footer").Build())
+		return e.CreateMessage(ix.EphemeralMessageContent("Failed to update ban footer"))
 	}
 
-	return e.CreateMessage(ix.EphemeralMessageContent("Ban footer updated.").Build())
+	return e.CreateMessage(ix.EphemeralMessageContent("Ban footer updated."))
 }

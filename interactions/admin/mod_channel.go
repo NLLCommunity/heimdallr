@@ -47,7 +47,7 @@ func AdminModChannelHandler(e *handler.CommandEvent) error {
 	}
 
 	if !hasChannel && !hasReset {
-		return e.CreateMessage(interactions.EphemeralMessageContent(modChannelInfo(settings)).Build())
+		return e.CreateMessage(interactions.EphemeralMessageContent(modChannelInfo(settings)))
 	}
 
 	message := ""
@@ -66,8 +66,7 @@ func AdminModChannelHandler(e *handler.CommandEvent) error {
 	}
 
 	return e.CreateMessage(
-		interactions.EphemeralMessageContent(message).
-			Build(),
+		interactions.EphemeralMessageContent(message),
 	)
 }
 

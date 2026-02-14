@@ -94,8 +94,7 @@ func AdminInfoHandler(e *handler.CommandEvent) error {
 
 	return e.CreateMessage(
 		interactions.EphemeralMessageContent(message).
-			AddActionRow(discord.NewPrimaryButton("Display for everyone", "/admin/show-all-button")).
-			Build(),
+			AddActionRow(discord.NewPrimaryButton("Display for everyone", "/admin/show-all-button")),
 	)
 }
 
@@ -104,15 +103,11 @@ func AdminShowAllButtonHandler(e *handler.ComponentEvent) error {
 
 	return e.CreateMessage(
 		interactions.EphemeralMessageContent(e.Message.Content).
-			SetEmbeds(e.Message.Embeds...).
-			Build(),
+			WithEmbeds(e.Message.Embeds...),
 	)
 }
 
 func messageModal(customID, title, contents string) discord.ModalCreate {
-	return discord.NewModalCreateBuilder().
-		SetCustomID(customID).
-		SetTitle(title).
-		AddLabel(title, discord.NewParagraphTextInput("message").WithValue(contents)).
-		Build()
+	return discord.NewModalCreate(customID, title, nil).
+		AddLabel(title, discord.NewParagraphTextInput("message").WithValue(contents))
 }

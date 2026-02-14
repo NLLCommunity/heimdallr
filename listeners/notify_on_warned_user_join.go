@@ -62,12 +62,12 @@ func OnWarnedUserJoin(e *events.GuildMemberJoin) {
 
 	_, _ = e.Client().Rest.CreateMessage(
 		modChannel,
-		discord.NewMessageCreateBuilder().
-			SetContentf(
+		discord.NewMessageCreate().
+			WithContentf(
 				"%s has joined with a total infraction severity score of %.2f, greater than the threshold of 1.0%s",
 				e.Member.Mention(),
 				totalSeverity,
 				extraMsg,
-			).Build(),
+			),
 	)
 }

@@ -98,7 +98,7 @@ func CreateRoleButtonHandler(e *handler.CommandEvent) error {
 		return e.CreateMessage(
 			interactions.EphemeralMessageContent(
 				"You need the Manage Roles permission to create a role button.",
-			).Build(),
+			),
 		)
 	}
 
@@ -107,17 +107,16 @@ func CreateRoleButtonHandler(e *handler.CommandEvent) error {
 		return e.CreateMessage(
 			interactions.EphemeralMessageContent(
 				"You cannot assign a role with permissions you do not have.",
-			).Build(),
+			),
 		)
 	}
 
 	// Create the button
 
 	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
-			SetContent(instructions).
+		discord.NewMessageCreate().
+			WithContent(instructions).
 			AddActionRow(discord.NewPrimaryButton(text, fmt.Sprintf("/role/assign/%s", role.ID.String()))).
-			SetAllowedMentions(&discord.AllowedMentions{}).
-			Build(),
+			WithAllowedMentions(&discord.AllowedMentions{}),
 	)
 }

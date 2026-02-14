@@ -101,7 +101,7 @@ func AdminInfractionsHandler(e *handler.CommandEvent) error {
 	}
 
 	if !utils.Any(hasHalfLife, hasNotifyThreshold, hasNotifyOnWarnedUserJoin, hasReset) {
-		return e.CreateMessage(interactions.EphemeralMessageContent(infractionInfo(settings)).Build())
+		return e.CreateMessage(interactions.EphemeralMessageContent(infractionInfo(settings)))
 	}
 
 	err = model.SetGuildSettings(settings)
@@ -109,7 +109,7 @@ func AdminInfractionsHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(interactions.EphemeralMessageContent(message).Build())
+	return e.CreateMessage(interactions.EphemeralMessageContent(message))
 }
 
 func infractionInfo(settings *model.GuildSettings) string {

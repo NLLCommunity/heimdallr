@@ -42,7 +42,7 @@ func UserInfractionsHandler(e *handler.CommandEvent) error {
 		slog.Error("Error occurred getting infractions", "err", err)
 	}
 
-	return e.CreateMessage(message.Build())
+	return e.CreateMessage(message)
 }
 
 func UserInfractionButtonHandler(e *handler.ComponentEvent) error {
@@ -64,7 +64,9 @@ func UserInfractionButtonHandler(e *handler.ComponentEvent) error {
 		slog.Error("Error occurred getting infractions", "err", err)
 	}
 	if mcb != nil {
-		return e.CreateMessage(mcb.Build())
+		return e.CreateMessage(*mcb)
+	} else if mub != nil {
+		return e.UpdateMessage(*mub)
 	}
-	return e.UpdateMessage(mub.Build())
+	return nil
 }

@@ -117,7 +117,7 @@ func WarnHandler(e *handler.CommandEvent) error {
 		_ = e.CreateMessage(
 			interactions.EphemeralMessageContent(
 				"Failed to create infraction.",
-			).Build(),
+			),
 		)
 		return fmt.Errorf("failed to create infraction: %w", err)
 	}
@@ -139,17 +139,16 @@ func WarnHandler(e *handler.CommandEvent) error {
 			failedToSend = true
 		}
 		_, err = e.Client().Rest.CreateMessage(
-			channel.ID(), discord.NewMessageCreateBuilder().
-				SetEmbeds(embed.Build()).
-				Build(),
+			channel.ID(), discord.NewMessageCreate().
+				WithEmbeds(embed.Build()),
 		)
 		if err != nil {
 			failedToSend = true
 		}
 	}
 
-	message := discord.NewMessageCreateBuilder().
-		SetContentf(
+	message := discord.NewMessageCreate().
+		WithContentf(
 			"## %s %s.",
 			utils.Iif(
 				inf.Silent, "Silent warning created for",
@@ -157,8 +156,7 @@ func WarnHandler(e *handler.CommandEvent) error {
 			),
 			user.Mention(),
 		).
-		SetEmbeds(embed.Build()).
-		Build()
+		WithEmbeds(embed.Build())
 
 	guildSettings, err := model.GetGuildSettings(guild.ID)
 	if err == nil && guildSettings.ModeratorChannel != 0 {
@@ -177,6 +175,6 @@ func WarnHandler(e *handler.CommandEvent) error {
 	return e.CreateMessage(
 		interactions.EphemeralMessageContentf(
 			"Warning created for %s.", user.Mention(),
-		).Build(),
+		),
 	)
 }

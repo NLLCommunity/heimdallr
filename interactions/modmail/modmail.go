@@ -82,7 +82,7 @@ func ModmailSettingsHandler(e *handler.CommandEvent) error {
 	settings, err := model.GetModmailSettings(*e.GuildID())
 	if err != nil {
 		slog.Warn("Failed to load Modmail settings", "guild", *e.GuildID())
-		return e.CreateMessage(ix.EphemeralMessageContent("Failed to load settings.").Build())
+		return e.CreateMessage(ix.EphemeralMessageContent("Failed to load settings."))
 	}
 
 	if !reportChannelOK && !pingRoleOK && !notificationChannelOK && !resetOptionOK {
@@ -103,8 +103,7 @@ func ModmailSettingsHandler(e *handler.CommandEvent) error {
 				reportThreadsChannel,
 				reportNotificationChannel,
 				reportPingRole,
-			).
-				Build(),
+			),
 		)
 	}
 
@@ -144,10 +143,10 @@ func ModmailSettingsHandler(e *handler.CommandEvent) error {
 
 	err = model.SetModmailSettings(settings)
 	if err != nil {
-		return e.CreateMessage(ix.EphemeralMessageContent("Failed to save settings.").Build())
+		return e.CreateMessage(ix.EphemeralMessageContent("Failed to save settings."))
 	}
 
-	return e.CreateMessage(ix.EphemeralMessageContent(message).Build())
+	return e.CreateMessage(ix.EphemeralMessageContent(message))
 }
 
 func isBelowMaxActive(e interactionEvent, maxActive int) (bool, error) {

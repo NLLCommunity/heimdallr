@@ -104,7 +104,7 @@ func InfractionsListHandler(e *handler.CommandEvent) error {
 		return e.CreateMessage(
 			interactions.EphemeralMessageContent(
 				"You must specify either a user or a user ID.",
-			).Build(),
+			),
 		)
 	}
 
@@ -112,7 +112,7 @@ func InfractionsListHandler(e *handler.CommandEvent) error {
 		return e.CreateMessage(
 			interactions.EphemeralMessageContent(
 				"You can only specify either a user or a user ID.",
-			).Build(),
+			),
 		)
 	}
 
@@ -122,7 +122,7 @@ func InfractionsListHandler(e *handler.CommandEvent) error {
 			_ = e.CreateMessage(
 				interactions.EphemeralMessageContent(
 					"Failed to parse user id.",
-				).Build(),
+				),
 			)
 			return fmt.Errorf("failed to parse user id: %w", err)
 		}
@@ -148,7 +148,7 @@ func InfractionsListHandler(e *handler.CommandEvent) error {
 		slog.Error("Error occurred getting infractions", "err", err)
 	}
 
-	return e.CreateMessage(message.Build())
+	return e.CreateMessage(message)
 }
 
 func InfractionsRemoveHandler(e *handler.CommandEvent) error {
@@ -167,14 +167,14 @@ func InfractionsRemoveHandler(e *handler.CommandEvent) error {
 		return e.CreateMessage(
 			interactions.EphemeralMessageContent(
 				"Failed to delete infraction.",
-			).Build(),
+			),
 		)
 	}
 
 	return e.CreateMessage(
 		interactions.EphemeralMessageContent(
 			"Infraction deleted.",
-		).Build(),
+		),
 	)
 }
 
@@ -208,7 +208,7 @@ func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
 		return e.CreateMessage(
 			interactions.EphemeralMessageContent(
 				"You can only paginate responses from your own commands.",
-			).Build(),
+			),
 		)
 	}
 
@@ -217,7 +217,9 @@ func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
 		slog.Error("Error occurred getting infractions", "err", err)
 	}
 	if mcb != nil {
-		return e.CreateMessage(mcb.Build())
+		return e.CreateMessage(*mcb)
+	} else if mub != nil {
+		return e.UpdateMessage(*mub)
 	}
-	return e.UpdateMessage(mub.Build())
+	return nil
 }
