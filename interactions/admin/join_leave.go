@@ -49,11 +49,13 @@ var joinLeaveSubcommand = discord.ApplicationCommandOptionSubCommand{
 	Name:        "join-leave",
 	Description: "View or set join and leave message settings",
 	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionBool{
-			Name:        "new-modal",
-			Description: "Whether to use the new modal interface for join/leave settings",
-			Required:    false,
-		},
+		/*
+			discord.ApplicationCommandOptionBool{
+				Name:        "new-modal",
+				Description: "Whether to use the new modal interface for join/leave settings",
+				Required:    false,
+			},
+		*/
 		discord.ApplicationCommandOptionBool{
 			Name:        "join-enabled",
 			Description: "Whether to enable join messages",
