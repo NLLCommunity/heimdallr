@@ -48,7 +48,7 @@ type userInfractions struct {
 }
 
 func getUserInfractions(guildID, userID snowflake.ID, limit, offset int) (userInfractions, error) {
-	infractions, count, err := model.GetUserInfractions(guildID, userID, pageSize, offset)
+	infractions, count, err := model.GetUserInfractions(guildID, userID, limit, offset)
 	if err != nil {
 		return userInfractions{}, fmt.Errorf("failed to get user infractions: %w", err)
 	}
@@ -128,10 +128,15 @@ func getUserInfractions(guildID, userID snowflake.ID, limit, offset int) (userIn
 func createInfractionEmbeds(infractions []model.Infraction, guildSettings *model.GuildSettings) []discord.Embed {
 	var embeds []discord.Embed
 
+	halfLifeDays := 0.0
+	if guildSettings != nil {
+		halfLifeDays = guildSettings.InfractionHalfLifeDays
+	}
+
 	for _, inf := range infractions {
 		weightWithHalfLife := utils.CalcHalfLife(
 			time.Since(inf.CreatedAt),
-			utils.Iif(guildSettings == nil, 0.0, guildSettings.InfractionHalfLifeDays),
+			halfLifeDays,
 			inf.Weight,
 		)
 

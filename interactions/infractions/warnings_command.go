@@ -30,14 +30,13 @@ var UserInfractionsCommand = discord.SlashCommandCreate{
 func UserInfractionsHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("infractions", e)
 
-	user := e.User()
 	guild, ok := e.Guild()
 	if !ok {
 		slog.Warn("No guild id found in event.", "guild", guild)
 		return interactions.ErrEventNoGuildID
 	}
 
-	message, err := getUserInfractionsAndMakeMessage(false, &guild, &user)
+	message, err := getUserInfractionsAndMakeMessage(false, &guild, new(e.User()))
 	if err != nil {
 		slog.Error("Error occurred getting infractions", "err", err)
 	}
@@ -53,13 +52,12 @@ func UserInfractionButtonHandler(e *handler.ComponentEvent) error {
 		return fmt.Errorf("failed to parse offset: %w", err)
 	}
 
-	user := e.User()
 	guild, ok := e.Guild()
 	if !ok {
 		return interactions.ErrEventNoGuildID
 	}
 
-	mcb, mub, err := getUserInfractionsAndUpdateMessage(false, offset, &guild, &user)
+	mcb, mub, err := getUserInfractionsAndUpdateMessage(false, offset, &guild, new(e.User()))
 	if err != nil {
 		slog.Error("Error occurred getting infractions", "err", err)
 	}

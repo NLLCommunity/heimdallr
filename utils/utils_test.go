@@ -88,8 +88,7 @@ func TestWrapRef(t *testing.T) {
 
 func TestRefDefault(t *testing.T) {
 	t.Run("non-nil pointer", func(t *testing.T) {
-		s := "test"
-		result := RefDefault(&s, "default")
+		result := RefDefault(new("test"), "default")
 		assert.Equal(t, "test", result)
 	})
 

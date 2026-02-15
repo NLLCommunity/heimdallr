@@ -135,7 +135,7 @@ func WarnHandler(e *handler.CommandEvent) error {
 	failedToSend := false
 	if !inf.Silent {
 		channel, err := e.Client().Rest.CreateDMChannel(user.ID)
-		if err != nil {
+		if err != nil || channel == nil {
 			failedToSend = true
 		}
 		_, err = e.Client().Rest.CreateMessage(

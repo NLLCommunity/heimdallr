@@ -34,8 +34,7 @@ func init() {
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {
-		var configFileNotFoundError viper.ConfigFileNotFoundError
-		if errors.As(err, &configFileNotFoundError) {
+		if _, ok := errors.AsType[viper.ConfigFileNotFoundError](err); ok {
 			slog.Warn("Config file not found; ignore if set using env vars.")
 		} else {
 			slog.Error("Error reading config file.", "error", err)

@@ -104,6 +104,10 @@ func IsMemberPruned(guildID, userID snowflake.ID) (bool, error) {
 		Where("guild_id = ? AND user_id = ?", guildID, userID).
 		First(ctx)
 
+	if err != nil {
+		return false, err
+	}
+
 	return member.Pruned, err
 }
 

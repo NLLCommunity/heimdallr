@@ -31,7 +31,7 @@ func OnWarnedUserJoin(e *events.GuildMemberJoin) {
 	totalSeverity := 0.0
 	for _, infraction := range infractions {
 		diff := time.Since(infraction.CreatedAt)
-		severity := utils.CalcHalfLife(diff, guildSettings.InfractionHalfLifeDays, float64(infraction.Weight))
+		severity := utils.CalcHalfLife(diff, guildSettings.InfractionHalfLifeDays, infraction.Weight)
 		totalSeverity += severity
 	}
 
