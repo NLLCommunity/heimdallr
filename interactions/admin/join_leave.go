@@ -50,6 +50,11 @@ var joinLeaveSubcommand = discord.ApplicationCommandOptionSubCommand{
 	Description: "View or set join and leave message settings",
 	Options: []discord.ApplicationCommandOption{
 		discord.ApplicationCommandOptionBool{
+			Name:        "new-modal",
+			Description: "Whether to use the new modal interface for join/leave settings",
+			Required:    false,
+		},
+		discord.ApplicationCommandOptionBool{
 			Name:        "join-enabled",
 			Description: "Whether to enable join messages",
 			Required:    false,
@@ -92,12 +97,15 @@ func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	modal := createJoinLeaveSettingsModal(settings)
-	return e.Modal(modal)
-
 	message := ""
 
 	data := e.SlashCommandInteractionData()
+
+	if data.Bool("new-modal") {
+		modal := createJoinLeaveSettingsModal(settings)
+		return e.Modal(modal)
+	}
+
 	resetOption, hasReset := data.OptString("reset")
 	if hasReset {
 		switch resetOption {
