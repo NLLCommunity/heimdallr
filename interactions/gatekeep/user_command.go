@@ -5,14 +5,14 @@ import (
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/omit"
 
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 var ApproveUserCommand = discord.UserCommandCreate{
 	Name:                     "Approve",
-	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
+	DefaultMemberPermissions: omit.NewPtr(discord.PermissionKickMembers),
 	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
 	Contexts: []discord.InteractionContextType{
 		discord.InteractionContextTypeGuild,

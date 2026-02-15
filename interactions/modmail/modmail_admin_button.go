@@ -88,25 +88,34 @@ func ModmailAdminCreateButtonHandler(e *handler.CommandEvent) error {
 
 	slowMode, err := time.ParseDuration(slowModeStr)
 	if err != nil {
-		slog.Info("Failed to parse slow mode duration",
-			"slow_mode", slowModeStr, "err", err)
+		slog.Info(
+			"Failed to parse slow mode duration",
+			"slow_mode", slowModeStr, "err", err,
+		)
 	}
 
 	if slowMode.Hours() > 6 {
 		return e.CreateMessage(
-			ix.EphemeralMessageContentf("Slow mode duration is too long '%s'. Max is six hours.",
-				slowModeStr).Build())
+			ix.EphemeralMessageContentf(
+				"Slow mode duration is too long '%s'. Max is six hours.",
+				slowModeStr,
+			),
+		)
 	}
 
 	return e.CreateMessage(
-		discord.NewMessageCreateBuilder().
-			AddActionRow(discord.NewButton(
-				stringToButtonStyle[color],
-				label,
-				fmt.Sprintf("/modmail/report-button/%s/%s/%d/%.0f",
-					role.ID, channel.ID, maxActive, slowMode.Seconds()),
-				"", 0,
-			)).Build(),
+		discord.NewMessageCreate().
+			AddActionRow(
+				discord.NewButton(
+					stringToButtonStyle[color],
+					label,
+					fmt.Sprintf(
+						"/modmail/report-button/%s/%s/%d/%.0f",
+						role.ID, channel.ID, maxActive, slowMode.Seconds(),
+					),
+					"", 0,
+				),
+			),
 	)
 }
 
@@ -122,45 +131,44 @@ func ModmailReportButtonHandler(e *handler.ComponentEvent) error {
 	if err != nil {
 		slog.Error("Failed to parse max active")
 		return e.CreateMessage(
-			ix.EphemeralMessageContent("Failed to create report modal").
-				Build())
+			ix.EphemeralMessageContent("Failed to create report modal"),
+		)
 	}
 
 	below, err := isBelowMaxActive(e, maxActive)
 	if err != nil {
 		return e.CreateMessage(
-			ix.EphemeralMessageContent("Something went wrong when preparing for the report.").
-				Build())
+			ix.EphemeralMessageContent("Something went wrong when preparing for the report."),
+		)
 	}
 	if !below {
 		return e.CreateMessage(
-			ix.EphemeralMessageContent("You already have the maximum number of reports open").
-				Build())
+			ix.EphemeralMessageContent("You already have the maximum number of reports open"),
+		)
 	}
 
 	customID := fmt.Sprintf("/modmail/report-modal/%s/%s/%s/%s", role, channel, maxActiveStr, slowModeStr)
 
 	slog.Info("Sending modal", "custom_id", customID)
 
-	modal := discord.NewModalCreateBuilder().
-		SetCustomID(customID).
-		SetTitle("Report").
-		AddActionRow(
-			discord.NewShortTextInput("title", "Subject").
+	modal := discord.NewModalCreate(customID, "Report", nil).
+		AddLabel(
+			"Subject", discord.NewShortTextInput("title").
 				WithPlaceholder("Subject or topic of the report").
 				WithRequired(true).
 				WithMinLength(5).
-				WithMaxLength(100)).
-		AddActionRow(
-			discord.NewParagraphTextInput("description", "Description").
+				WithMaxLength(100),
+		).
+		AddLabel(
+			"Description", discord.NewParagraphTextInput("description").
 				WithPlaceholder(
-					"Report information\n\n" +
-						"Markdown is supported\n\n" +
-						"More details, imager, etc. can be submitted afterwards").
+					"Report information\n\n"+
+						"Markdown is supported\n\n"+
+						"More details, imager, etc. can be submitted afterwards",
+				).
 				WithRequired(true).
 				WithMinLength(10),
-		).
-		Build()
+		)
 
 	err = e.Modal(modal)
 	if err != nil {

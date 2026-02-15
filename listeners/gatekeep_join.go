@@ -18,11 +18,13 @@ func OnGatekeepUserJoin(e *events.GuildMemberJoin) {
 		return
 	}
 
-	err = e.Client().Rest().AddMemberRole(e.GuildID, e.Member.User.ID, settings.GatekeepPendingRole)
+	err = e.Client().Rest.AddMemberRole(e.GuildID, e.Member.User.ID, settings.GatekeepPendingRole)
 	if err != nil {
-		slog.Warn("failed to add pending role to user",
+		slog.Warn(
+			"failed to add pending role to user",
 			"guild_id", e.GuildID,
 			"user_id", e.Member.User.ID,
-			"role_id", settings.GatekeepPendingRole)
+			"role_id", settings.GatekeepPendingRole,
+		)
 	}
 }

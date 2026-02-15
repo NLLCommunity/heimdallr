@@ -25,8 +25,8 @@ func ModmailReportModalHandler(e *handler.ModalEvent) error {
 	if err != nil {
 		slog.Warn("Failed to parse 'max active'.", "max_active", maxActiveStr, "err", err)
 		_, err := e.CreateFollowupMessage(
-			ix.EphemeralMessageContent("Failed to submit report").
-				Build())
+			ix.EphemeralMessageContent("Failed to submit report"),
+		)
 		return err
 	}
 
@@ -34,50 +34,55 @@ func ModmailReportModalHandler(e *handler.ModalEvent) error {
 	if err != nil {
 		slog.Error("Failed to parse 'slow mode'.", "slow_mode", slowModeStr, "err", err)
 		_, err := e.CreateFollowupMessage(
-			ix.EphemeralMessageContent("Failed to submit report").
-				Build())
+			ix.EphemeralMessageContent("Failed to submit report"),
+		)
 		return err
 	}
 
 	canSubmit, err := isBelowMaxActive(e, maxActive)
 	if err != nil {
-		slog.Error("Failed to check if user can submit report",
-			"max-active", maxActiveStr, "err", err)
+		slog.Error(
+			"Failed to check if user can submit report",
+			"max-active", maxActiveStr, "err", err,
+		)
 		_, err := e.CreateFollowupMessage(
-			ix.EphemeralMessageContent("Failed to submit report.").
-				Build())
+			ix.EphemeralMessageContent("Failed to submit report."),
+		)
 		return err
 	}
 
 	if !canSubmit {
 		_, err := e.CreateFollowupMessage(
-			ix.EphemeralMessageContent("You have reached the maximum number of active reports.").
-				Build())
+			ix.EphemeralMessageContent("You have reached the maximum number of active reports."),
+		)
 		return err
 	}
 
 	title := e.Data.Text("title")
 	description := e.Data.Text("description")
 
-	thread, err := e.Client().Rest().CreateThread(
+	thread, err := e.Client().Rest.CreateThread(
 		e.Channel().ID(),
 		discord.GuildPrivateThreadCreate{
 			Name:                title,
 			AutoArchiveDuration: 10080,
 			Invitable:           utils.Ref(false),
-		})
+		},
+	)
 	if err != nil {
 		slog.Error("Failed to create thread", "err", err)
 		_, err := e.CreateFollowupMessage(
-			ix.EphemeralMessageContent("Failed to submit report.").
-				Build())
+			ix.EphemeralMessageContent("Failed to submit report."),
+		)
 		return err
 	}
 
 	if slowMode > 0 {
-		_, err := e.Client().Rest().UpdateChannel(thread.ID(), discord.GuildThreadUpdate{
-			RateLimitPerUser: utils.Ref(slowMode),
-		})
+		_, err := e.Client().Rest.UpdateChannel(
+			thread.ID(), discord.GuildThreadUpdate{
+				RateLimitPerUser: utils.Ref(slowMode),
+			},
+		)
 		if err != nil {
 			slog.Error("Failed to update thread rate limit", "err", err, "channel", thread.ID())
 		}
@@ -93,14 +98,17 @@ func ModmailReportModalHandler(e *handler.ModalEvent) error {
 		SetAuthor(user.Username, "", avatarURL).
 		Build()
 
-	message, err := e.Client().Rest().CreateMessage(
+	message, err := e.Client().Rest.CreateMessage(
 		thread.ID(),
 		discord.MessageCreate{
-			Content: fmt.Sprintf("%s%s",
+			Content: fmt.Sprintf(
+				"%s%s",
 				utils.Iif(role != "0", fmt.Sprintf("<@&%s>", role), ""),
-				user.Mention()),
+				user.Mention(),
+			),
 			Embeds: []discord.Embed{embed},
-		})
+		},
+	)
 	if err != nil {
 		return err
 	}
@@ -108,25 +116,29 @@ func ModmailReportModalHandler(e *handler.ModalEvent) error {
 	if channel != "" && channel != "0" {
 		channelSnowflake, err := snowflake.Parse(channel)
 		if err == nil {
-			_, err = e.Client().Rest().CreateMessage(channelSnowflake,
-				discord.NewMessageCreateBuilder().
-					SetContentf("### New Modmail thread in <#%d>", e.Channel().ID()).
+			_, err = e.Client().Rest.CreateMessage(
+				channelSnowflake,
+				discord.NewMessageCreate().
+					WithContentf("### New Modmail thread in <#%d>", e.Channel().ID()).
 					AddEmbeds(embed).
 					AddActionRow(
 						discord.NewLinkButton("Go to thread", message.JumpURL()),
-					).Build())
+					),
+			)
 
 			if err != nil {
-				slog.Error("Failed to send message to Modmail notification channel",
-					"err", err, "channel", channel)
+				slog.Error(
+					"Failed to send message to Modmail notification channel",
+					"err", err, "channel", channel,
+				)
 			}
 		}
 	}
 
 	_, err = e.CreateFollowupMessage(
 		ix.EphemeralMessageContent("Report created!").
-			AddActionRow(discord.NewLinkButton("View", message.JumpURL())).
-			Build())
+			AddActionRow(discord.NewLinkButton("View", message.JumpURL())),
+	)
 
 	return err
 }

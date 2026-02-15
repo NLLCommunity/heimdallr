@@ -10,7 +10,7 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/disgo/rest"
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
@@ -26,9 +26,9 @@ func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
 var BanCommand = discord.SlashCommandCreate{
 	Name:                     "ban",
 	Description:              "Ban a user from the server",
-	DMPermission:             utils.Ref(false),
+	Contexts:                 []discord.InteractionContextType{discord.InteractionContextTypeGuild},
 	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
-	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionBanMembers),
+	DefaultMemberPermissions: omit.NewPtr(discord.PermissionBanMembers),
 	Options: []discord.ApplicationCommandOption{
 
 		discord.ApplicationCommandOptionUser{
@@ -151,16 +151,16 @@ func BanHandler(e *handler.CommandEvent) error {
 		}
 	}
 
-	err := e.Client().Rest().AddBan(
+	err := e.Client().Rest.AddBan(
 		guild.ID, banData.User.ID, deleteMessages,
 		rest.WithReason(banData.String()),
 	)
 	if err != nil {
-		_ = e.CreateMessage(interactions.EphemeralMessageContent("Failed to ban User").Build())
+		_ = e.CreateMessage(interactions.EphemeralMessageContent("Failed to ban User"))
 	} else if failedToMessage {
-		_ = e.CreateMessage(interactions.EphemeralMessageContent("User was banned but message failed to send.").Build())
+		_ = e.CreateMessage(interactions.EphemeralMessageContent("User was banned but message failed to send."))
 	} else {
-		_ = e.CreateMessage(interactions.EphemeralMessageContent("User was banned.").Build())
+		_ = e.CreateMessage(interactions.EphemeralMessageContent("User was banned."))
 	}
 
 	dur, err := utils.ParseLongDuration(duration)
@@ -265,14 +265,14 @@ func createBanDMMessage(data BanHandlerData) discord.MessageCreate {
 		footer = settings.BanFooter
 	}
 
-	return discord.NewMessageCreateBuilder().
-		SetContentf(
+	return discord.NewMessageCreate().
+		WithContentf(
 			"You have been banned from %s.\n%s%s\n\n%s\n\n(You cannot respond to this message)",
 			data.Guild.Name,
 			utils.Iif(data.Duration != "", expiryText, ""),
 			utils.Iif(data.Message != "", messageText, ""),
 			footer,
-		).Build()
+		)
 }
 
 func durationToRelTimestamp(duration string) string {

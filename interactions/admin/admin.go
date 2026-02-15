@@ -5,7 +5,7 @@ import (
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/omit"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
@@ -47,7 +47,7 @@ func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
 var AdminCommand = discord.SlashCommandCreate{
 	Name:                     "admin",
 	Description:              "admin commands",
-	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionAdministrator),
+	DefaultMemberPermissions: omit.NewPtr(discord.PermissionAdministrator),
 	Contexts:                 []discord.InteractionContextType{discord.InteractionContextTypeGuild},
 	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
 	Options: []discord.ApplicationCommandOption{
@@ -94,8 +94,7 @@ func AdminInfoHandler(e *handler.CommandEvent) error {
 
 	return e.CreateMessage(
 		interactions.EphemeralMessageContent(message).
-			AddActionRow(discord.NewPrimaryButton("Display for everyone", "/admin/show-all-button")).
-			Build(),
+			AddActionRow(discord.NewPrimaryButton("Display for everyone", "/admin/show-all-button")),
 	)
 }
 
@@ -104,15 +103,11 @@ func AdminShowAllButtonHandler(e *handler.ComponentEvent) error {
 
 	return e.CreateMessage(
 		interactions.EphemeralMessageContent(e.Message.Content).
-			SetEmbeds(e.Message.Embeds...).
-			Build(),
+			WithEmbeds(e.Message.Embeds...),
 	)
 }
 
 func messageModal(customID, title, contents string) discord.ModalCreate {
-	return discord.NewModalCreateBuilder().
-		SetCustomID(customID).
-		SetTitle(title).
-		AddActionRow(discord.NewParagraphTextInput("message", title).WithValue(contents)).
-		Build()
+	return discord.NewModalCreate(customID, title, nil).
+		AddLabel(title, discord.NewParagraphTextInput("message").WithValue(contents))
 }

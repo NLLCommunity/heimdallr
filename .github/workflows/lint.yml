@@ -21,5 +21,6 @@ jobs:
       - name: GolangCi-Lint
         uses: golangci/golangci-lint-action@v9.2.0
         with:
-          version: v2.1.5
+          version: v2.9.0
           args: --timeout=5m
+          install-mode: 'binary'

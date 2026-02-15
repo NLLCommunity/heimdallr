@@ -13,7 +13,7 @@ import (
 
 func OnUserJoin(e *events.GuildMemberJoin) {
 	guildID := e.GuildID
-	guild, err := e.Client().Rest().GetGuild(guildID, false)
+	guild, err := e.Client().Rest.GetGuild(guildID, false)
 	if err != nil {
 		return
 	}
@@ -47,8 +47,8 @@ func OnUserJoin(e *events.GuildMemberJoin) {
 		return
 	}
 
-	_, err = e.Client().Rest().CreateMessage(
-		joinLeaveChannel, discord.NewMessageCreateBuilder().SetContent(contents).Build(),
+	_, err = e.Client().Rest.CreateMessage(
+		joinLeaveChannel, discord.NewMessageCreate().WithContent(contents),
 	)
 	if err != nil {
 		slog.Error(
@@ -62,7 +62,7 @@ func OnUserJoin(e *events.GuildMemberJoin) {
 
 func OnUserLeave(e *events.GuildMemberLeave) {
 	guildID := e.GuildID
-	guild, err := e.Client().Rest().GetGuild(guildID, false)
+	guild, err := e.Client().Rest.GetGuild(guildID, false)
 	if err != nil {
 		return
 	}
@@ -101,8 +101,8 @@ func OnUserLeave(e *events.GuildMemberLeave) {
 		return
 	}
 
-	_, err = e.Client().Rest().CreateMessage(
-		joinLeaveChannel, discord.NewMessageCreateBuilder().SetContent(contents).Build(),
+	_, err = e.Client().Rest.CreateMessage(
+		joinLeaveChannel, discord.NewMessageCreate().WithContent(contents),
 	)
 	if err != nil {
 		slog.Error(

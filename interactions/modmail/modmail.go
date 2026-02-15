@@ -7,7 +7,7 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 
 	ix "github.com/NLLCommunity/heimdallr/interactions"
@@ -29,7 +29,7 @@ func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
 var ModmailAdminCommand = discord.SlashCommandCreate{
 	Name:                     "modmail-admin",
 	Description:              "Commands for receiving and sending Modmail.",
-	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
+	DefaultMemberPermissions: omit.NewPtr(discord.PermissionKickMembers),
 	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
 	Contexts: []discord.InteractionContextType{
 		discord.InteractionContextTypeGuild,
@@ -82,7 +82,7 @@ func ModmailSettingsHandler(e *handler.CommandEvent) error {
 	settings, err := model.GetModmailSettings(*e.GuildID())
 	if err != nil {
 		slog.Warn("Failed to load Modmail settings", "guild", *e.GuildID())
-		return e.CreateMessage(ix.EphemeralMessageContent("Failed to load settings.").Build())
+		return e.CreateMessage(ix.EphemeralMessageContent("Failed to load settings."))
 	}
 
 	if !reportChannelOK && !pingRoleOK && !notificationChannelOK && !resetOptionOK {
@@ -103,8 +103,7 @@ func ModmailSettingsHandler(e *handler.CommandEvent) error {
 				reportThreadsChannel,
 				reportNotificationChannel,
 				reportPingRole,
-			).
-				Build(),
+			),
 		)
 	}
 
@@ -144,10 +143,10 @@ func ModmailSettingsHandler(e *handler.CommandEvent) error {
 
 	err = model.SetModmailSettings(settings)
 	if err != nil {
-		return e.CreateMessage(ix.EphemeralMessageContent("Failed to save settings.").Build())
+		return e.CreateMessage(ix.EphemeralMessageContent("Failed to save settings."))
 	}
 
-	return e.CreateMessage(ix.EphemeralMessageContent(message).Build())
+	return e.CreateMessage(ix.EphemeralMessageContent(message))
 }
 
 func isBelowMaxActive(e interactionEvent, maxActive int) (bool, error) {
@@ -162,7 +161,7 @@ func isBelowMaxActive(e interactionEvent, maxActive int) (bool, error) {
 
 	guildID := *e.GuildID()
 
-	activeThreads, err := e.Client().Rest().GetActiveGuildThreads(guildID)
+	activeThreads, err := e.Client().Rest.GetActiveGuildThreads(guildID)
 	if err != nil {
 		slog.Error("Failed to retrieve active threads", "err", err)
 		return false, fmt.Errorf("unable to retrieve active guild threads: %w", err)
@@ -174,7 +173,7 @@ func isBelowMaxActive(e interactionEvent, maxActive int) (bool, error) {
 		if *thread.ParentID() != e.Channel().ID() {
 			continue
 		}
-		members, err := e.Client().Rest().GetThreadMembers(thread.ID())
+		members, err := e.Client().Rest.GetThreadMembers(thread.ID())
 		if err != nil {
 			slog.Error("Failed to get thread members", "err", err)
 			return false, fmt.Errorf("couldn't get thread members: %w", err)
@@ -199,7 +198,7 @@ func isBelowMaxActive(e interactionEvent, maxActive int) (bool, error) {
 
 type interactionEvent interface {
 	Channel() discord.InteractionChannel
-	Client() bot.Client
+	Client() *bot.Client
 	GuildID() *snowflake.ID
 	User() discord.User
 }

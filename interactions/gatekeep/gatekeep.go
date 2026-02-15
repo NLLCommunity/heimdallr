@@ -37,7 +37,7 @@ func getGuild(e *handler.CommandEvent) (guild discord.Guild, success bool, inGui
 		return
 	}
 
-	restGuild, err := e.Client().Rest().GetGuild(*e.GuildID(), false)
+	restGuild, err := e.Client().Rest.GetGuild(*e.GuildID(), false)
 	if err != nil {
 		slog.Warn("Failed to get guild", "guild_id", *e.GuildID(), "err", err)
 		return
@@ -57,7 +57,7 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		return e.CreateMessage(
 			interactions.EphemeralMessageContentf(
 				"%s is already being approved.", member.Mention(),
-			).Build(),
+			),
 		)
 	}
 	activeApprovalProcesses[member.User.ID] = true
@@ -82,11 +82,11 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 			"guild_id", guild.ID,
 			"err", err,
 		)
-		return e.CreateMessage(interactions.EphemeralMessageContent("Failed to get guild information.").Build())
+		return e.CreateMessage(interactions.EphemeralMessageContent("Failed to get guild information."))
 	}
 
 	if !guildSettings.GatekeepEnabled {
-		return e.CreateMessage(interactions.EphemeralMessageContent("Gatekeep is not enabled in this server.").Build())
+		return e.CreateMessage(interactions.EphemeralMessageContent("Gatekeep is not enabled in this server."))
 	}
 
 	hasApprovedRole := false
@@ -104,12 +104,12 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		return e.CreateMessage(
 			interactions.EphemeralMessageContentf(
 				"User %s is already approved.", member.Mention(),
-			).Build(),
+			),
 		)
 	}
 
 	if guildSettings.GatekeepApprovedRole != 0 {
-		err = e.Client().Rest().AddMemberRole(
+		err = e.Client().Rest.AddMemberRole(
 			guild.ID, member.User.ID,
 			guildSettings.GatekeepApprovedRole,
 			rest.WithReason(fmt.Sprintf("Gatekeep approved by: %s (%s)", e.User().Username, e.User().ID)),
@@ -125,7 +125,7 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		}
 	}
 	if guildSettings.GatekeepPendingRole != 0 {
-		err = e.Client().Rest().RemoveMemberRole(
+		err = e.Client().Rest.RemoveMemberRole(
 			guild.ID, member.User.ID,
 			guildSettings.GatekeepPendingRole,
 			rest.WithReason(fmt.Sprintf("Gatekeep approved by: %s (%s)", e.User().Username, e.User().ID)),
@@ -148,9 +148,11 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 
 	if guildSettings.GatekeepApprovedMessage == "" {
 		slog.Info("No approved message set; not sending message.")
-		return e.CreateMessage(interactions.EphemeralMessageContent(
-			"No approved message set; not sending message. Roles have been set.").
-			Build())
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"No approved message set; not sending message. Roles have been set.",
+			),
+		)
 	}
 
 	channel := guildSettings.JoinLeaveChannel
@@ -166,26 +168,31 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		slog.Warn("Failed to render approved message template.")
 		return err
 	}
-	_, err = e.Client().Rest().CreateMessage(
+	_, err = e.Client().Rest.CreateMessage(
 		channel,
-		discord.NewMessageCreateBuilder().
-			SetContent(
+		discord.NewMessageCreate().
+			WithContent(
 				contents+
 					fmt.Sprintf("\n\n-# Approved by %s", e.User().Mention()),
 			).
-			SetAllowedMentions(
+			WithAllowedMentions(
 				&discord.AllowedMentions{
 					Users: []snowflake.ID{member.User.ID},
 				},
-			).
-			Build(),
+			),
 	)
 	if err != nil {
-		return e.CreateMessage(interactions.EphemeralMessageContent(
-			"Failed to send message to approved user.").Build())
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"Failed to send message to approved user.",
+			),
+		)
 	}
 
-	_, err = e.CreateFollowupMessage(interactions.EphemeralMessageContent(
-		"User has been approved!").Build())
+	_, err = e.CreateFollowupMessage(
+		interactions.EphemeralMessageContent(
+			"User has been approved!",
+		),
+	)
 	return err
 }

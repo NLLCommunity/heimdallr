@@ -15,8 +15,9 @@ import (
 )
 
 var ModmailReportMessageCommand = discord.MessageCommandCreate{
-	Name:     "Report Message",
-	Contexts: []discord.InteractionContextType{discord.InteractionContextTypeGuild},
+	Name:             "Report Message",
+	Contexts:         []discord.InteractionContextType{discord.InteractionContextTypeGuild},
+	IntegrationTypes: []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
 }
 
 func ModmailReportMessageHandler(e *handler.CommandEvent) error {
@@ -24,12 +25,11 @@ func ModmailReportMessageHandler(e *handler.CommandEvent) error {
 
 	customID := fmt.Sprintf("/modmail/report-message/%s/%s", message.ChannelID, message.ID)
 
-	modal := discord.NewModalCreateBuilder().
-		SetCustomID(customID).
-		AddActionRow(
-			discord.NewParagraphTextInput("reason", "Report reason").
+	modal := discord.NewModalCreate(customID, "Report message", nil).
+		AddLabel(
+			"Report reason", discord.NewParagraphTextInput("reason").
 				WithPlaceholder("The reason for reporting the message."),
-		).Build()
+		)
 
 	return e.Modal(modal)
 }
@@ -46,8 +46,8 @@ func ModmailReportMessageModalHandler(e *handler.ModalEvent) error {
 	if err != nil {
 		slog.Warn("Failed to get Modmail settings for guild.", "guild", *e.GuildID())
 		_, err := e.CreateFollowupMessage(
-			ix.EphemeralMessageContent("Something went wrong when getting guild settings.").
-				Build())
+			ix.EphemeralMessageContent("Something went wrong when getting guild settings."),
+		)
 		return err
 	}
 
@@ -55,15 +55,15 @@ func ModmailReportMessageModalHandler(e *handler.ModalEvent) error {
 	if err != nil {
 		slog.Warn("Failed to get Guild settings for guild.", "guild", *e.GuildID())
 		_, err := e.CreateFollowupMessage(
-			ix.EphemeralMessageContent("Something went wrong when getting guild settings.").
-				Build())
+			ix.EphemeralMessageContent("Something went wrong when getting guild settings."),
+		)
 		return err
 	}
 
 	if settings.ReportThreadsChannel == 0 {
 		_, err := e.CreateFollowupMessage(
-			ix.EphemeralMessageContent("This guild has not set up message reports.").
-				Build())
+			ix.EphemeralMessageContent("This guild has not set up message reports."),
+		)
 		return err
 	}
 
@@ -71,8 +71,8 @@ func ModmailReportMessageModalHandler(e *handler.ModalEvent) error {
 	if err != nil {
 		slog.Error("Failed to parse channel ID during message report.", "channel_id", channelIDStr)
 		_, err := e.CreateFollowupMessage(
-			ix.EphemeralMessageContent("Failed to pocess report.").
-				Build())
+			ix.EphemeralMessageContent("Failed to pocess report."),
+		)
 		return err
 	}
 
@@ -80,17 +80,17 @@ func ModmailReportMessageModalHandler(e *handler.ModalEvent) error {
 	if err != nil {
 		slog.Error("Failed to parse message ID during message report.", "message_id", messageIDStr)
 		_, err := e.CreateFollowupMessage(
-			ix.EphemeralMessageContent("Failed to pocess report.").
-				Build())
+			ix.EphemeralMessageContent("Failed to pocess report."),
+		)
 		return err
 	}
 
-	message, err := e.Client().Rest().GetMessage(channelID, messageID)
+	message, err := e.Client().Rest.GetMessage(channelID, messageID)
 	if err != nil {
 		slog.Error("Failed to get message for report", "channel", channelID, "message", messageID)
 		_, err := e.CreateFollowupMessage(
-			ix.EphemeralMessageContent("Failed to retrieve reported message.").
-				Build())
+			ix.EphemeralMessageContent("Failed to retrieve reported message."),
+		)
 		return err
 	}
 
@@ -109,14 +109,16 @@ func ModmailReportMessageModalHandler(e *handler.ModalEvent) error {
 	err = createReportThreadAndMessage(&data)
 	if err != nil {
 		slog.Error("Failed to create report message")
-		_, err := e.CreateFollowupMessage(ix.EphemeralMessageContent("Failed to create report.").
-			Build())
+		_, err := e.CreateFollowupMessage(
+			ix.EphemeralMessageContent("Failed to create report."),
+		)
 		return err
 	}
 
-	_, _ = e.CreateFollowupMessage(ix.EphemeralMessageContent("Report created!").
-		AddActionRow(discord.NewLinkButton("Go to thread", data.reportMessage.JumpURL())).
-		Build())
+	_, _ = e.CreateFollowupMessage(
+		ix.EphemeralMessageContent("Report created!").
+			AddActionRow(discord.NewLinkButton("Go to thread", data.reportMessage.JumpURL())),
+	)
 
 	err = notifyReportMessage(&data)
 	if err != nil {
@@ -140,18 +142,19 @@ type reportData struct {
 func createReportThreadAndMessage(data *reportData) error {
 	user := data.event.User()
 	title := fmt.Sprintf("%s's message report", user.EffectiveName())
-	thread, err := data.event.Client().Rest().CreateThread(
+	thread, err := data.event.Client().Rest.CreateThread(
 		data.modmailSettings.ReportThreadsChannel,
 		discord.GuildPrivateThreadCreate{
 			Name:                title,
 			AutoArchiveDuration: 10080,
 			Invitable:           utils.Ref(false),
-		})
+		},
+	)
 	if err != nil {
 		slog.Error("Failed to create thread", "err", err)
 		_, err := data.event.CreateFollowupMessage(
-			ix.EphemeralMessageContent("Failed to submit report.").
-				Build())
+			ix.EphemeralMessageContent("Failed to submit report."),
+		)
 		return err
 	}
 
@@ -166,16 +169,17 @@ func createReportThreadAndMessage(data *reportData) error {
 		messageText += fmt.Sprintf(" <@&%s>", data.modmailSettings.ReportPingRole)
 	}
 
-	reportMessage, err := data.event.Client().Rest().CreateMessage(thread.ID(),
-		discord.NewMessageCreateBuilder().
-			SetContent(messageText).
+	reportMessage, err := data.event.Client().Rest.CreateMessage(
+		thread.ID(),
+		discord.NewMessageCreate().
+			WithContent(messageText).
 			AddEmbeds(reasonEmbed, data.messageEmbed).
-			AddActionRow(discord.NewLinkButton("Jump to message", data.message.JumpURL())).
-			Build())
+			AddActionRow(discord.NewLinkButton("Jump to message", data.message.JumpURL())),
+	)
 
 	if err != nil {
 		slog.Warn("Failed to create report message")
-		_, _ = data.event.CreateFollowupMessage(ix.EphemeralMessageContent("Failed to create report.").Build())
+		_, _ = data.event.CreateFollowupMessage(ix.EphemeralMessageContent("Failed to create report."))
 		return err
 	}
 
@@ -187,7 +191,7 @@ func createReportThreadAndMessage(data *reportData) error {
 func notifyReportMessage(data *reportData) error {
 	var channelID snowflake.ID
 
-	guild, gErr := data.event.Client().Rest().GetGuild(*data.event.GuildID(), false)
+	guild, gErr := data.event.Client().Rest.GetGuild(*data.event.GuildID(), false)
 
 	if data.modmailSettings.ReportNotificationChannel != 0 {
 		channelID = data.modmailSettings.ReportNotificationChannel
@@ -201,16 +205,16 @@ func notifyReportMessage(data *reportData) error {
 		return nil // no channel to notify
 	}
 
-	message := discord.NewMessageCreateBuilder().
-		SetContentf("New message report from %s", data.event.User().Mention()).
-		SetEmbeds(data.reportMessage.Embeds...).
+	message := discord.NewMessageCreate().
+		WithContentf("New message report from %s", data.event.User().Mention()).
+		WithEmbeds(data.reportMessage.Embeds...).
 		AddActionRow(
 			discord.NewLinkButton("Go to report", data.reportMessage.JumpURL()),
-			discord.NewLinkButton("Go to message", data.message.JumpURL())).
-		SetAllowedMentions(&discord.AllowedMentions{}).
-		Build()
+			discord.NewLinkButton("Go to message", data.message.JumpURL()),
+		).
+		WithAllowedMentions(&discord.AllowedMentions{})
 
-	_, err := data.event.Client().Rest().CreateMessage(channelID, message)
+	_, err := data.event.Client().Rest.CreateMessage(channelID, message)
 	if err != nil {
 		slog.Warn("Failed to notify message report.")
 		return err

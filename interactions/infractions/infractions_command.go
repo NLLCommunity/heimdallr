@@ -7,7 +7,7 @@ import (
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
@@ -26,9 +26,9 @@ var InfractionsCommand = discord.SlashCommandCreate{
 		discord.LocaleNorwegian: "Se en brukers advarsler.",
 	},
 
-	DMPermission:             utils.Ref(false),
+	Contexts:                 []discord.InteractionContextType{discord.InteractionContextTypeGuild},
 	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
-	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
+	DefaultMemberPermissions: omit.NewPtr(discord.PermissionKickMembers),
 	Options: []discord.ApplicationCommandOption{
 		discord.ApplicationCommandOptionSubCommand{
 			Name: "list",
@@ -101,24 +101,33 @@ func InfractionsListHandler(e *handler.CommandEvent) error {
 	userIDString, hasUserID := data.OptString("user-id")
 
 	if !hasUser && !hasUserID {
-		return e.CreateMessage(interactions.EphemeralMessageContent(
-			"You must specify either a user or a user ID.").Build())
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"You must specify either a user or a user ID.",
+			),
+		)
 	}
 
 	if hasUser && hasUserID {
-		return e.CreateMessage(interactions.EphemeralMessageContent(
-			"You can only specify either a user or a user ID.").Build())
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"You can only specify either a user or a user ID.",
+			),
+		)
 	}
 
 	if !hasUser {
 		userID, err := snowflake.Parse(userIDString)
 		if err != nil {
-			_ = e.CreateMessage(interactions.EphemeralMessageContent(
-				"Failed to parse user id.").Build())
+			_ = e.CreateMessage(
+				interactions.EphemeralMessageContent(
+					"Failed to parse user id.",
+				),
+			)
 			return fmt.Errorf("failed to parse user id: %w", err)
 		}
 
-		userRef, err := e.Client().Rest().GetUser(userID)
+		userRef, err := e.Client().Rest.GetUser(userID)
 		if err != nil || userRef == nil {
 			user = discord.User{
 				ID:       userID,
@@ -139,7 +148,7 @@ func InfractionsListHandler(e *handler.CommandEvent) error {
 		slog.Error("Error occurred getting infractions", "err", err)
 	}
 
-	return e.CreateMessage(message.Build())
+	return e.CreateMessage(message)
 }
 
 func InfractionsRemoveHandler(e *handler.CommandEvent) error {
@@ -155,12 +164,18 @@ func InfractionsRemoveHandler(e *handler.CommandEvent) error {
 
 	err := model.DeleteInfractionBySqid(infID)
 	if err != nil {
-		return e.CreateMessage(interactions.EphemeralMessageContent(
-			"Failed to delete infraction.").Build())
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"Failed to delete infraction.",
+			),
+		)
 	}
 
-	return e.CreateMessage(interactions.EphemeralMessageContent(
-		"Infraction deleted.").Build())
+	return e.CreateMessage(
+		interactions.EphemeralMessageContent(
+			"Infraction deleted.",
+		),
+	)
 }
 
 func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
@@ -184,14 +199,17 @@ func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
 		return fmt.Errorf("failed to parse user id: %w", err)
 	}
 
-	user, err := e.Client().Rest().GetUser(userID)
+	user, err := e.Client().Rest.GetUser(userID)
 	if err != nil {
 		return fmt.Errorf("failed to get user: %w", err)
 	}
 
 	if e.User().ID != parentIx.User.ID {
-		return e.CreateMessage(interactions.EphemeralMessageContent(
-			"You can only paginate responses from your own commands.").Build())
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"You can only paginate responses from your own commands.",
+			),
+		)
 	}
 
 	mcb, mub, err := getUserInfractionsAndUpdateMessage(false, offset, &guild, user)
@@ -199,7 +217,9 @@ func InfractionsListComponentHandler(e *handler.ComponentEvent) error {
 		slog.Error("Error occurred getting infractions", "err", err)
 	}
 	if mcb != nil {
-		return e.CreateMessage(mcb.Build())
+		return e.CreateMessage(*mcb)
+	} else if mub != nil {
+		return e.UpdateMessage(*mub)
 	}
-	return e.UpdateMessage(mub.Build())
+	return nil
 }

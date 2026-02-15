@@ -23,26 +23,25 @@ var UserInfractionsCommand = discord.SlashCommandCreate{
 		discord.LocaleNorwegian: "Se advarslene dine.",
 	},
 
-	DMPermission:     utils.Ref(false),
+	Contexts:         []discord.InteractionContextType{discord.InteractionContextTypeGuild},
 	IntegrationTypes: []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
 }
 
 func UserInfractionsHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("infractions", e)
 
-	user := e.User()
 	guild, ok := e.Guild()
 	if !ok {
 		slog.Warn("No guild id found in event.", "guild", guild)
 		return interactions.ErrEventNoGuildID
 	}
 
-	message, err := getUserInfractionsAndMakeMessage(false, &guild, &user)
+	message, err := getUserInfractionsAndMakeMessage(false, &guild, new(e.User()))
 	if err != nil {
 		slog.Error("Error occurred getting infractions", "err", err)
 	}
 
-	return e.CreateMessage(message.Build())
+	return e.CreateMessage(message)
 }
 
 func UserInfractionButtonHandler(e *handler.ComponentEvent) error {
@@ -53,18 +52,19 @@ func UserInfractionButtonHandler(e *handler.ComponentEvent) error {
 		return fmt.Errorf("failed to parse offset: %w", err)
 	}
 
-	user := e.User()
 	guild, ok := e.Guild()
 	if !ok {
 		return interactions.ErrEventNoGuildID
 	}
 
-	mcb, mub, err := getUserInfractionsAndUpdateMessage(false, offset, &guild, &user)
+	mcb, mub, err := getUserInfractionsAndUpdateMessage(false, offset, &guild, new(e.User()))
 	if err != nil {
 		slog.Error("Error occurred getting infractions", "err", err)
 	}
 	if mcb != nil {
-		return e.CreateMessage(mcb.Build())
+		return e.CreateMessage(*mcb)
+	} else if mub != nil {
+		return e.UpdateMessage(*mub)
 	}
-	return e.UpdateMessage(mub.Build())
+	return nil
 }

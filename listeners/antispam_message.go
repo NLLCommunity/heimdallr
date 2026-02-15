@@ -10,7 +10,7 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/disgo/rest"
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/jellydator/ttlcache/v3"
 
@@ -33,7 +33,8 @@ var whitespaceReplacer = strings.NewReplacer(
 )
 
 var userMessages = ttlcache.New[string, userMessagesInfo](
-	ttlcache.WithTTL[string, userMessagesInfo](60 * time.Second))
+	ttlcache.WithTTL[string, userMessagesInfo](60 * time.Second),
+)
 
 type userMessagesInfo struct {
 	Score    int
@@ -97,9 +98,11 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 	cutoffTime := time.Now().Add(-cooldown)
 
 	expiry := time.Now().Add(24 * time.Hour)
-	_, err := e.Client().Rest().UpdateMember(e.GuildID, userID, discord.MemberUpdate{
-		CommunicationDisabledUntil: json.NewNullablePtr(expiry),
-	}, rest.WithReason("User timed out due to anti-spam settings."))
+	_, err := e.Client().Rest.UpdateMember(
+		e.GuildID, userID, discord.MemberUpdate{
+			CommunicationDisabledUntil: omit.NewPtr(expiry),
+		}, rest.WithReason("User timed out due to anti-spam settings."),
+	)
 
 	if err != nil {
 		slog.Error("Failed to timeout user.", "err", err, "guild", e.GuildID, "user", userID)
@@ -116,9 +119,12 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 	}
 
 	for _, m := range removableMessageIDs {
-		err := e.Client().Rest().DeleteMessage(m.ChannelID, m.MessageID)
+		err := e.Client().Rest.DeleteMessage(m.ChannelID, m.MessageID)
 		if err != nil {
-			slog.Error("Failed to delete message.", "err", err, "guild", e.GuildID, "channel", m.ChannelID, "message", m.MessageID)
+			slog.Error(
+				"Failed to delete message.", "err", err, "guild", e.GuildID, "channel", m.ChannelID, "message",
+				m.MessageID,
+			)
 		}
 	}
 
@@ -128,18 +134,22 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 
 	adminMessage := fmt.Sprintf(
 		"User %s has been timed out for spamming. Deleted %d messages.\n\nTriggering message:\n>>> %s",
-		e.Message.Author.Mention(), len(removableMessageIDs), e.Message.Content)
+		e.Message.Author.Mention(), len(removableMessageIDs), e.Message.Content,
+	)
 
-	_, err = e.Client().Rest().CreateMessage(guildSettings.ModeratorChannel, discord.NewMessageCreateBuilder().
-		SetContent(adminMessage).
-		Build())
+	_, err = e.Client().Rest.CreateMessage(
+		guildSettings.ModeratorChannel, discord.NewMessageCreate().
+			WithContent(adminMessage),
+	)
 
 	if err != nil {
-		slog.Error("Failed to send timeout message to moderator channel.",
+		slog.Error(
+			"Failed to send timeout message to moderator channel.",
 			"err", err,
 			"guild", e.GuildID,
 			"channel", guildSettings.ModeratorChannel,
-			"user", e.Message.Author.ID)
+			"user", e.Message.Author.ID,
+		)
 	}
 }
 
@@ -166,11 +176,13 @@ func compareToPreviousMessages(m discord.Message, info userMessagesInfo) bool {
 }
 
 func createMessageInfoForUser(uHash string, m discord.Message, ttl time.Duration) {
-	userMessages.Set(uHash,
+	userMessages.Set(
+		uHash,
 		userMessagesInfo{
 			Messages: []*messageDetails{createMessageDetails(m)},
 		},
-		ttl)
+		ttl,
+	)
 }
 
 func createMessageDetails(m discord.Message) *messageDetails {

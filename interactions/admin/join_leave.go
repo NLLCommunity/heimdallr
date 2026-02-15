@@ -11,10 +11,51 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
+func createJoinLeaveSettingsModal(guildSettings *model.GuildSettings) discord.ModalCreate {
+	return discord.NewModalCreate("/admin/join-leave/modal", "Join/Leave Settings", nil).
+		AddLabel(
+			"Enable join message", discord.NewStringSelectMenu(
+				"join-enabled", "Yes/No",
+				discord.NewStringSelectMenuOption("Yes", "true").WithDefault(guildSettings.JoinMessageEnabled),
+				discord.NewStringSelectMenuOption("No", "false").WithDefault(!guildSettings.JoinMessageEnabled),
+			).
+				WithRequired(true),
+		).
+		AddLabel(
+			"Enable leave message", discord.NewStringSelectMenu(
+				"leave-enabled", "Yes/No",
+				discord.NewStringSelectMenuOption("Yes", "true").WithDefault(guildSettings.LeaveMessageEnabled),
+				discord.NewStringSelectMenuOption("No", "false").WithDefault(!guildSettings.LeaveMessageEnabled),
+			).
+				WithRequired(true),
+		).
+		AddLabel(
+			"Join/leave message channel", discord.NewChannelSelectMenu("channel", "#welcome").
+				WithChannelTypes(discord.ChannelTypeGuildText).SetDefaultValues(guildSettings.JoinLeaveChannel),
+		).
+		AddLabel(
+			"Join message", discord.NewParagraphTextInput("join-message").
+				WithPlaceholder("").
+				WithValue(guildSettings.JoinMessage),
+		).
+		AddLabel(
+			"Leave message", discord.NewParagraphTextInput("leave-message").
+				WithPlaceholder("").
+				WithValue(guildSettings.LeaveMessage),
+		)
+}
+
 var joinLeaveSubcommand = discord.ApplicationCommandOptionSubCommand{
 	Name:        "join-leave",
 	Description: "View or set join and leave message settings",
 	Options: []discord.ApplicationCommandOption{
+		/*
+			discord.ApplicationCommandOptionBool{
+				Name:        "new-modal",
+				Description: "Whether to use the new modal interface for join/leave settings",
+				Required:    false,
+			},
+		*/
 		discord.ApplicationCommandOptionBool{
 			Name:        "join-enabled",
 			Description: "Whether to enable join messages",
@@ -61,6 +102,12 @@ func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
 	message := ""
 
 	data := e.SlashCommandInteractionData()
+
+	if data.Bool("new-modal") {
+		modal := createJoinLeaveSettingsModal(settings)
+		return e.Modal(modal)
+	}
+
 	resetOption, hasReset := data.OptString("reset")
 	if hasReset {
 		switch resetOption {
@@ -100,7 +147,7 @@ func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
 	}
 
 	if !utils.Any(hasJoinEnabled, hasLeaveEnabled, hasChannel, hasReset) {
-		return e.CreateMessage(interactions.EphemeralMessageContent(joinLeaveInfo(settings)).Build())
+		return e.CreateMessage(interactions.EphemeralMessageContent(joinLeaveInfo(settings)))
 	}
 
 	err = model.SetGuildSettings(settings)
@@ -108,7 +155,7 @@ func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	return e.CreateMessage(interactions.EphemeralMessageContent(message).Build())
+	return e.CreateMessage(interactions.EphemeralMessageContent(message))
 }
 
 func joinLeaveInfo(settings *model.GuildSettings) string {

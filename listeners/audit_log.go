@@ -17,11 +17,11 @@ func OnAuditLog(e *events.GuildAuditLogEntryCreate) {
 	msg := ""
 	switch entry.ActionType {
 	case discord.AuditLogEventMemberKick:
-		targetUser, err := e.Client().Rest().GetUser(*entry.TargetID)
+		targetUser, err := e.Client().Rest.GetUser(*entry.TargetID)
 		if err != nil {
 			return
 		}
-		user, err := e.Client().Rest().GetUser(entry.UserID)
+		user, err := e.Client().Rest.GetUser(entry.UserID)
 		if err != nil {
 			slog.Warn("Failed to get user for audit log entry.", "err", err, "user_id", entry.UserID)
 			return
@@ -62,15 +62,14 @@ func OnAuditLog(e *events.GuildAuditLogEntryCreate) {
 		return
 	}
 
-	_, err = e.Client().Rest().CreateMessage(
-		guildSettings.ModeratorChannel, discord.NewMessageCreateBuilder().
-			SetContent(msg).
-			SetAllowedMentions(
+	_, err = e.Client().Rest.CreateMessage(
+		guildSettings.ModeratorChannel, discord.NewMessageCreate().
+			WithContent(msg).
+			WithAllowedMentions(
 				&discord.AllowedMentions{
 					RepliedUser: false,
 				},
-			).
-			Build(),
+			),
 	)
 
 	if err != nil {

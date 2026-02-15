@@ -35,26 +35,38 @@ func RoleAssignButtonHandler(e *handler.ComponentEvent) error {
 	}
 
 	customID := e.ButtonInteractionData().CustomID()
-	comp := e.Message.ComponentByID(customID)
+	var component discord.InteractiveComponent
+
+	for comp := range e.Message.AllComponents() {
+		if iComp, ok := comp.(discord.InteractiveComponent); ok {
+			if iComp.GetCustomID() == customID {
+				component = iComp
+				break
+			}
+		}
+	}
+
 	componentLabel := "role button"
-	if comp != nil {
-		switch x := comp.(type) {
+	if component != nil {
+		switch x := component.(type) {
 		case discord.ButtonComponent:
 			componentLabel = fmt.Sprintf("role button \"%s\"", x.Label)
 		}
 	}
 
-	err = e.Client().Rest().AddMemberRole(
+	err = e.Client().Rest.AddMemberRole(
 		*e.GuildID(), e.User().ID, roleID,
 		rest.WithReason(fmt.Sprintf("User pressed %s in channel \"%s\"", componentLabel, e.Channel().Name())),
 	)
 
 	if err != nil {
-		_ = e.CreateMessage(interactions.EphemeralMessageContent(
-			"Failed to assign role. This is likely due to the bot not having the required permissions.",
-		).Build())
+		_ = e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"Failed to assign role. This is likely due to the bot not having the required permissions.",
+			),
+		)
 		return err
 	}
 
-	return e.CreateMessage(interactions.EphemeralMessageContent("Role assigned!").Build())
+	return e.CreateMessage(interactions.EphemeralMessageContent("Role assigned!"))
 }

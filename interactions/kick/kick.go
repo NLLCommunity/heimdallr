@@ -6,7 +6,7 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/disgo/rest"
-	"github.com/disgoorg/json"
+	"github.com/disgoorg/omit"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/utils"
@@ -25,9 +25,9 @@ func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
 var KickCommand = discord.SlashCommandCreate{
 	Name:                     "kick",
 	Description:              "Kick a user from the server",
-	DMPermission:             utils.Ref(false),
+	Contexts:                 []discord.InteractionContextType{discord.InteractionContextTypeGuild},
 	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
-	DefaultMemberPermissions: json.NewNullablePtr(discord.PermissionKickMembers),
+	DefaultMemberPermissions: omit.NewPtr(discord.PermissionKickMembers),
 	Options: []discord.ApplicationCommandOption{
 		discord.ApplicationCommandOptionSubCommand{
 			Name:        "with-message",
@@ -60,14 +60,14 @@ func KickWithMessageHandler(e *handler.CommandEvent) error {
 	user := data.User("user")
 	message := data.String("message")
 
-	mc := discord.NewMessageCreateBuilder().
-		SetContentf(
+	mc := discord.NewMessageCreate().
+		WithContentf(
 			"You have been kicked from %s.\n"+
 				"Additionally, this message was added:\n\n%s\n\n"+
 				"(You cannot respond to this message.)",
 			guild.Name,
 			message,
-		).Build()
+		)
 
 	failedToMessage := false
 	_, err := interactions.SendDirectMessage(e.Client(), user, mc)
@@ -75,20 +75,29 @@ func KickWithMessageHandler(e *handler.CommandEvent) error {
 		failedToMessage = true
 	}
 
-	err = e.Client().Rest().RemoveMember(
+	err = e.Client().Rest.RemoveMember(
 		guild.ID, user.ID,
 		rest.WithReason(fmt.Sprintf("Kicked by: %s (%s), with message: %s", e.User().Username, e.User().ID, message)),
 	)
 	if err != nil {
-		return e.CreateMessage(interactions.EphemeralMessageContentf(
-			"Failed to kick user %s.", user.Mention()).Build())
+		return e.CreateMessage(
+			interactions.EphemeralMessageContentf(
+				"Failed to kick user %s.", user.Mention(),
+			),
+		)
 	}
 
 	if failedToMessage {
-		return e.CreateMessage(interactions.EphemeralMessageContentf(
-			"User was kicked but message failed to send.").Build())
+		return e.CreateMessage(
+			interactions.EphemeralMessageContentf(
+				"User was kicked but message failed to send.",
+			),
+		)
 	}
 
-	return e.CreateMessage(interactions.EphemeralMessageContentf(
-		"User %s was kicked.", user.Mention()).Build())
+	return e.CreateMessage(
+		interactions.EphemeralMessageContentf(
+			"User %s was kicked.", user.Mention(),
+		),
+	)
 }
