@@ -1,4 +1,4 @@
-FROM golang:1.25 AS builder
+FROM golang:1.26 AS builder
 
 WORKDIR /usr/src/app
 
@@ -10,7 +10,7 @@ COPY . .
 
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags "-s -w" -o heimdallr .
 
-FROM alpine:3.22
+FROM alpine:3.23
 
 WORKDIR /usr/src/app
 
@@ -20,7 +20,7 @@ VOLUME /var/lib/heimdallr
 
 RUN apk add --no-cache ca-certificates fuse3 sqlite tini
 
-COPY --from=litestream/litestream:0.3 /usr/local/bin/litestream /bin/litestream
+COPY --from=litestream/litestream:0.5 /usr/local/bin/litestream /bin/litestream
 COPY --from=builder /usr/src/app/heimdallr /usr/src/app/bin/heimdallr
 COPY --from=builder /usr/src/app/litestream.yml /usr/src/app/start.sh ./
 
