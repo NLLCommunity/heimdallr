@@ -255,11 +255,15 @@ func getUserInfractionsAndUpdateMessage(
 		return
 	}
 
+	// For some reason golangci-lint cannot find the variables being used...
+	//nolint:staticcheck
 	modText := fmt.Sprintf(
 		"%s has %d infractions.",
 		user.Mention(),
 		infrData.TotalCount,
 	)
+
+	//nolint:staticcheck
 	userText := fmt.Sprintf(
 		"You have %d infractions.",
 		infrData.TotalCount,
