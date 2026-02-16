@@ -1,0 +1,24 @@
+# https://taskfile.dev
+
+version: "3"
+
+env:
+  GOPRIVATE: github.com/myrkvi/grem
+
+tasks:
+  default:
+    desc: Build and run heimdallr
+    cmds:
+      - task: build
+      - task: run
+  run:
+    desc: Run heimdallr
+    preconditions:
+      - sh: test -f ./heimdallr
+        msg: "heimdallr binary not found, please run 'task build' first"
+    cmds:
+      - ./heimdallr
+  build:
+    desc: Build heimdallr binary
+    cmds:
+      - go build -o heimdallr .

@@ -24,6 +24,7 @@ import (
 	_ "github.com/NLLCommunity/heimdallr/config"
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/interactions/admin"
+	"github.com/NLLCommunity/heimdallr/interactions/admin_dashboard"
 	"github.com/NLLCommunity/heimdallr/interactions/ban"
 	"github.com/NLLCommunity/heimdallr/interactions/gatekeep"
 	"github.com/NLLCommunity/heimdallr/interactions/infractions"
@@ -35,6 +36,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/interactions/role_button"
 	"github.com/NLLCommunity/heimdallr/listeners"
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/rpcserver"
 	"github.com/NLLCommunity/heimdallr/scheduled_tasks"
 )
 
@@ -83,6 +85,7 @@ func main() {
 
 	commandInteractions := []interactions.ApplicationCommandRegisterFunc{
 		admin.Register,
+		admin_dashboard.Register,
 		ban.Register,
 		gatekeep.Register,
 		infractions.Register,
@@ -158,6 +161,12 @@ func main() {
 
 	removeTempBansTask := scheduled_tasks.RemoveTempBansScheduledTask(client)
 	removeStalePrunesTask := scheduled_tasks.RemoveStalePendingPrunes()
+
+	go func() {
+		if err := rpcserver.StartServer(viper.GetString("rpc.address"), client); err != nil {
+			slog.Error("Failed to start RPC server", "error", err)
+		}
+	}()
 
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)

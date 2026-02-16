@@ -7,3 +7,6 @@ token = "INSERT_YOUR_TOKEN_HERE" # Discord bot token
 [dev_mode]
 enabled = true # Enable or disable developer mode
 guild_id = 0   # Guild ID to use for developer mode
+
+[dashboard]
+base_url = "http://localhost:5173" # Web dashboard URL
