@@ -1,0 +1,31 @@
+package partials
+
+import "github.com/NLLCommunity/heimdallr/web/templates/components"
+
+type ModChannelData struct {
+	GuildID          string
+	ModeratorChannel string
+	Channels         []components.ChannelInfo
+	SaveSuccess      bool
+	SaveError        string
+}
+
+templ SettingsModChannel(data ModChannelData) {
+	<section id="mod-channel">
+		<h3>Moderator Channel</h3>
+		<form
+			hx-post={ "/guild/" + data.GuildID + "/settings/mod-channel" }
+			hx-target="#mod-channel"
+			hx-swap="outerHTML"
+		>
+			if data.SaveSuccess {
+				@components.AlertSuccess("Settings saved.")
+			}
+			if data.SaveError != "" {
+				@components.AlertError(data.SaveError)
+			}
+			@components.ChannelSelect("moderator_channel", "Channel", data.Channels, data.ModeratorChannel)
+			@components.SaveButton()
+		</form>
+	</section>
+}

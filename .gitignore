@@ -30,10 +30,12 @@ go.work.sum
 /dist/
 /out/
 
+.worktrees/
 
 # Heimdallr-specific files
+/heimdallr
 # Heimdallr binary
-heimdallr
+/heimdallrbot
 # Heimdallr configuration file
 config.toml
 # Database file

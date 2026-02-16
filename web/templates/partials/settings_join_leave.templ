@@ -1,0 +1,52 @@
+package partials
+
+import (
+	"github.com/NLLCommunity/heimdallr/web/templates/components"
+	"github.com/NLLCommunity/heimdallr/utils"
+)
+
+type JoinLeaveData struct {
+	GuildID             string
+	JoinMessageEnabled  bool
+	JoinMessage         string
+	JoinMessageV2       bool
+	JoinMessageV2Json   string
+	LeaveMessageEnabled bool
+	LeaveMessage        string
+	LeaveMessageV2      bool
+	LeaveMessageV2Json  string
+	Channel             string
+	Channels            []components.ChannelInfo
+	Placeholders        []utils.MessageTemplatePlaceholder
+	SaveSuccess         bool
+	SaveError           string
+}
+
+templ SettingsJoinLeave(data JoinLeaveData) {
+	<section id="join-leave">
+		<h3>Join/Leave Messages</h3>
+		<form
+			hx-post={ "/guild/" + data.GuildID + "/settings/join-leave" }
+			hx-target="#join-leave"
+			hx-swap="outerHTML"
+		>
+			if data.SaveSuccess {
+				@components.AlertSuccess("Settings saved.")
+			}
+			if data.SaveError != "" {
+				@components.AlertError(data.SaveError)
+			}
+			@components.ChannelSelect("channel", "Message channel", data.Channels, data.Channel)
+			@PlaceholderHelp(data.Placeholders)
+			<hr/>
+			<h4>Join Message</h4>
+			@components.ToggleField("join_message_enabled", "Enable join message", "", data.JoinMessageEnabled)
+			@V2MessageToggle("join_message", data.JoinMessage, data.JoinMessageV2, data.JoinMessageV2Json)
+			<hr/>
+			<h4>Leave Message</h4>
+			@components.ToggleField("leave_message_enabled", "Enable leave message", "", data.LeaveMessageEnabled)
+			@V2MessageToggle("leave_message", data.LeaveMessage, data.LeaveMessageV2, data.LeaveMessageV2Json)
+			@components.SaveButton()
+		</form>
+	</section>
+}

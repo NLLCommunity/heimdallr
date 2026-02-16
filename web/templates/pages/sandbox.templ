@@ -1,0 +1,35 @@
+package pages
+
+import (
+	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
+	"github.com/NLLCommunity/heimdallr/web/templates/components"
+)
+
+type SandboxData struct {
+	GuildID  string
+	Channels []components.ChannelInfo
+}
+
+templ Sandbox(nav layouts.NavData, data SandboxData) {
+	@layouts.Base("Message Sandbox", nav) {
+		<h2>Message Sandbox</h2>
+		<p><a href={ templ.SafeURL("/guild/" + data.GuildID) }>← Back to settings</a></p>
+		<div x-data="messageBuilder('[]')">
+			<div class="grid" style="grid-template-columns: 1fr 1fr;">
+				<div>
+					<h3>Editor</h3>
+					@components.MessageEditor()
+				</div>
+				<div>
+					<h3>Send to Channel</h3>
+					<form hx-post={ "/guild/" + data.GuildID + "/sandbox/send" } hx-target="#send-result" hx-swap="innerHTML">
+						@components.ChannelSelect("channel_id", "Channel", data.Channels, "")
+						<input type="hidden" name="components_json" x-bind:value="JSON.stringify(serialize())"/>
+						<button type="submit">Send Message</button>
+					</form>
+					<div id="send-result"></div>
+				</div>
+			</div>
+		</div>
+	}
+}

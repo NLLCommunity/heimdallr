@@ -1,0 +1,13 @@
+package components
+
+templ ToggleField(name string, label string, description string, checked bool) {
+	<fieldset>
+		<label>
+			<input type="checkbox" name={ name } role="switch" checked?={ checked } value="true"/>
+			{ label }
+		</label>
+		if description != "" {
+			<small>{ description }</small>
+		}
+	</fieldset>
+}

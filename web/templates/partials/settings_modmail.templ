@@ -1,0 +1,36 @@
+package partials
+
+import "github.com/NLLCommunity/heimdallr/web/templates/components"
+
+type ModmailData struct {
+	GuildID                   string
+	ReportThreadsChannel      string
+	ReportNotificationChannel string
+	ReportPingRole            string
+	Channels                  []components.ChannelInfo
+	Roles                     []components.RoleInfo
+	SaveSuccess               bool
+	SaveError                 string
+}
+
+templ SettingsModmail(data ModmailData) {
+	<section id="modmail">
+		<h3>Modmail</h3>
+		<form
+			hx-post={ "/guild/" + data.GuildID + "/settings/modmail" }
+			hx-target="#modmail"
+			hx-swap="outerHTML"
+		>
+			if data.SaveSuccess {
+				@components.AlertSuccess("Settings saved.")
+			}
+			if data.SaveError != "" {
+				@components.AlertError(data.SaveError)
+			}
+			@components.ChannelSelect("report_threads_channel", "Report threads channel", data.Channels, data.ReportThreadsChannel)
+			@components.ChannelSelect("report_notification_channel", "Report notification channel", data.Channels, data.ReportNotificationChannel)
+			@components.RoleSelect("report_ping_role", "Report ping role", data.Roles, data.ReportPingRole)
+			@components.SaveButton()
+		</form>
+	</section>
+}

@@ -1,0 +1,50 @@
+/* Hide Alpine.js content until initialized */
+[x-cloak] { display: none !important; }
+
+/* Sidebar + main content layout */
+.dashboard-layout {
+  display: flex;
+  gap: 2rem;
+}
+.dashboard-layout aside {
+  width: 220px;
+  flex-shrink: 0;
+}
+.dashboard-layout main {
+  flex: 1;
+  min-width: 0;
+}
+@media (max-width: 768px) {
+  .dashboard-layout {
+    flex-direction: column;
+  }
+  .dashboard-layout aside {
+    width: 100%;
+  }
+}
+
+/* Danger button variant */
+.btn-danger {
+  --pico-background-color: #dc3545;
+  --pico-border-color: #dc3545;
+  --pico-color: #fff;
+}
+.btn-danger:hover {
+  --pico-background-color: #bb2d3b;
+  --pico-border-color: #bb2d3b;
+}
+
+/* Alert styling */
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: var(--pico-border-radius);
+  margin-bottom: 1rem;
+}
+.alert-success {
+  background: color-mix(in srgb, green 15%, transparent);
+  border: 1px solid green;
+}
+.alert-error {
+  background: color-mix(in srgb, red 15%, transparent);
+  border: 1px solid red;
+}

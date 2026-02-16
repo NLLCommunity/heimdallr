@@ -1,0 +1,27 @@
+package pages
+
+import "github.com/NLLCommunity/heimdallr/web/templates/layouts"
+
+type GuildData struct {
+	ID   string
+	Name string
+	Icon string
+}
+
+templ Guilds(nav layouts.NavData, guilds []GuildData) {
+	@layouts.Base("Select Server", nav) {
+		<h2>Select a Server</h2>
+		if len(guilds) == 0 {
+			<p>No servers found where you have admin permissions.</p>
+		}
+		<div class="grid">
+			for _, g := range guilds {
+				<a href={ templ.SafeURL("/guild/" + g.ID) } style="text-decoration: none;">
+					<article>
+						<h3>{ g.Name }</h3>
+					</article>
+				</a>
+			}
+		</div>
+	}
+}

@@ -1,0 +1,206 @@
+package components
+
+// MessageEditor renders the full Alpine.js component editor UI.
+// It must be placed inside a `<div x-data="messageBuilder(...)">` context.
+templ MessageEditor() {
+	<template x-for="(comp, i) in components" :key="i">
+		<article>
+			<header style="display: flex; justify-content: space-between; align-items: center;">
+				<strong x-text="comp.type.replace('_', ' ')"></strong>
+				<div>
+					<button type="button" @click="moveUp(i)" :disabled="i === 0">&#8593;</button>
+					<button type="button" @click="moveDown(i)" :disabled="i === components.length - 1">&#8595;</button>
+					<button type="button" class="btn-danger" @click="removeComponent(i)">&#10005;</button>
+				</div>
+			</header>
+			<!-- Text Display -->
+			<template x-if="comp.type === 'text_display'">
+				<div>
+					<textarea x-model="comp.content" rows="3" placeholder="Markdown content"></textarea>
+				</div>
+			</template>
+			<!-- Separator -->
+			<template x-if="comp.type === 'separator'">
+				<div>
+					<label><input type="checkbox" role="switch" x-model="comp.divider"/> Show divider</label>
+					<select x-model="comp.spacing">
+						<option value="small">Small</option>
+						<option value="large">Large</option>
+					</select>
+				</div>
+			</template>
+			<!-- Section (1-3 text fields + optional accessory) -->
+			<template x-if="comp.type === 'section'">
+				<div>
+					<small>Text fields (1-3):</small>
+					<template x-for="(text, ti) in comp.texts" :key="ti">
+						<div style="display: flex; gap: 0.5rem; align-items: start; margin-bottom: 0.5rem;">
+							<textarea x-model="comp.texts[ti]" rows="2" placeholder="Text field" style="flex: 1;"></textarea>
+							<button type="button" class="btn-danger outline" @click="removeSectionText(comp, ti)" :disabled="comp.texts.length <= 1">&#10005;</button>
+						</div>
+					</template>
+					<button type="button" @click="addSectionText(comp)" class="outline" :disabled="comp.texts.length >= 3">+ Text field</button>
+					<hr/>
+					<small>Accessory (optional):</small>
+					<select @change="setAccessoryType(comp, $event.target.value)" :value="comp.accessory ? comp.accessory.kind : ''">
+						<option value="">None</option>
+						<option value="thumbnail">Thumbnail image</option>
+						<option value="button">Link button</option>
+					</select>
+					<template x-if="comp.accessory && comp.accessory.kind === 'thumbnail'">
+						<div>
+							<input x-model="comp.accessory.url" placeholder="Image URL"/>
+						</div>
+					</template>
+					<template x-if="comp.accessory && comp.accessory.kind === 'button'">
+						<div>
+							<input x-model="comp.accessory.label" placeholder="Button label"/>
+							<input x-model="comp.accessory.url" placeholder="URL"/>
+							<input x-model="comp.accessory.emoji" placeholder="Emoji (optional)"/>
+						</div>
+					</template>
+				</div>
+			</template>
+			<!-- Action Row (link buttons only) -->
+			<template x-if="comp.type === 'action_row'">
+				<div>
+					<small>Link buttons:</small>
+					<template x-for="(btn, bi) in comp.buttons" :key="bi">
+						<fieldset>
+							<input x-model="btn.label" placeholder="Label"/>
+							<input x-model="btn.url" placeholder="URL"/>
+							<input x-model="btn.emoji" placeholder="Emoji (optional)"/>
+							<button type="button" class="btn-danger outline" @click="comp.buttons.splice(bi, 1)">Remove</button>
+						</fieldset>
+					</template>
+					<button type="button" @click="comp.buttons.push({label:'',url:''})" class="outline">+ Link button</button>
+				</div>
+			</template>
+			<!-- Media Gallery -->
+			<template x-if="comp.type === 'media_gallery'">
+				<div>
+					<template x-for="(item, mi) in comp.items" :key="mi">
+						<fieldset>
+							<input x-model="item.url" placeholder="Image URL"/>
+							<input x-model="item.description" placeholder="Description (optional)"/>
+							<button type="button" class="btn-danger outline" @click="comp.items.splice(mi, 1)">Remove</button>
+						</fieldset>
+					</template>
+					<button type="button" @click="comp.items.push({url:''})" class="outline">+ Image</button>
+				</div>
+			</template>
+			<!-- Container -->
+			<template x-if="comp.type === 'container'">
+				<div>
+					<label>Accent color: <input type="color" x-model="comp.accentColor"/></label>
+					<label><input type="checkbox" role="switch" x-model="comp.spoiler"/> Spoiler</label>
+					<hr/>
+					<small>Child components:</small>
+					<template x-for="(child, ci) in comp.children" :key="ci">
+						<article>
+							<header style="display: flex; justify-content: space-between; align-items: center;">
+								<strong x-text="child.type.replace('_', ' ')"></strong>
+								<div>
+									<button type="button" @click="moveChildUp(i, ci)" :disabled="ci === 0">&#8593;</button>
+									<button type="button" @click="moveChildDown(i, ci)" :disabled="ci === comp.children.length - 1">&#8595;</button>
+									<button type="button" class="btn-danger outline" @click="removeChild(i, ci)">&#10005;</button>
+								</div>
+							</header>
+							<!-- Child: Text Display -->
+							<template x-if="child.type === 'text_display'">
+								<div>
+									<textarea x-model="child.content" rows="2" placeholder="Markdown content"></textarea>
+								</div>
+							</template>
+							<!-- Child: Separator -->
+							<template x-if="child.type === 'separator'">
+								<div>
+									<label><input type="checkbox" role="switch" x-model="child.divider"/> Show divider</label>
+									<select x-model="child.spacing">
+										<option value="small">Small</option>
+										<option value="large">Large</option>
+									</select>
+								</div>
+							</template>
+							<!-- Child: Section (1-3 text fields + optional accessory) -->
+							<template x-if="child.type === 'section'">
+								<div>
+									<small>Text fields (1-3):</small>
+									<template x-for="(text, ti) in child.texts" :key="ti">
+										<div style="display: flex; gap: 0.5rem; align-items: start; margin-bottom: 0.5rem;">
+											<textarea x-model="child.texts[ti]" rows="2" placeholder="Text field" style="flex: 1;"></textarea>
+											<button type="button" class="btn-danger outline" @click="removeSectionText(child, ti)" :disabled="child.texts.length <= 1">&#10005;</button>
+										</div>
+									</template>
+									<button type="button" @click="addSectionText(child)" class="outline" :disabled="child.texts.length >= 3">+ Text field</button>
+									<hr/>
+									<small>Accessory (optional):</small>
+									<select @change="setAccessoryType(child, $event.target.value)" :value="child.accessory ? child.accessory.kind : ''">
+										<option value="">None</option>
+										<option value="thumbnail">Thumbnail image</option>
+										<option value="button">Link button</option>
+									</select>
+									<template x-if="child.accessory && child.accessory.kind === 'thumbnail'">
+										<div>
+											<input x-model="child.accessory.url" placeholder="Image URL"/>
+										</div>
+									</template>
+									<template x-if="child.accessory && child.accessory.kind === 'button'">
+										<div>
+											<input x-model="child.accessory.label" placeholder="Button label"/>
+											<input x-model="child.accessory.url" placeholder="URL"/>
+											<input x-model="child.accessory.emoji" placeholder="Emoji (optional)"/>
+										</div>
+									</template>
+								</div>
+							</template>
+							<!-- Child: Action Row (link buttons) -->
+							<template x-if="child.type === 'action_row'">
+								<div>
+									<template x-for="(btn, bi) in child.buttons" :key="bi">
+										<fieldset>
+											<input x-model="btn.label" placeholder="Label"/>
+											<input x-model="btn.url" placeholder="URL"/>
+											<button type="button" class="btn-danger outline" @click="child.buttons.splice(bi, 1)">Remove</button>
+										</fieldset>
+									</template>
+									<button type="button" @click="child.buttons.push({label:'',url:''})" class="outline">+ Link button</button>
+								</div>
+							</template>
+							<!-- Child: Media Gallery -->
+							<template x-if="child.type === 'media_gallery'">
+								<div>
+									<template x-for="(item, mi) in child.items" :key="mi">
+										<fieldset>
+											<input x-model="item.url" placeholder="Image URL"/>
+											<input x-model="item.description" placeholder="Description (optional)"/>
+											<button type="button" class="btn-danger outline" @click="child.items.splice(mi, 1)">Remove</button>
+										</fieldset>
+									</template>
+									<button type="button" @click="child.items.push({url:''})" class="outline">+ Image</button>
+								</div>
+							</template>
+						</article>
+					</template>
+					<select @change="if($event.target.value){addChild(i,$event.target.value);$event.target.value=''}">
+						<option value="">Add child...</option>
+						<option value="text_display">Text Display</option>
+						<option value="section">Section</option>
+						<option value="separator">Separator</option>
+						<option value="media_gallery">Media Gallery</option>
+						<option value="action_row">Action Row</option>
+					</select>
+				</div>
+			</template>
+		</article>
+	</template>
+	<select @change="if($event.target.value){addComponent($event.target.value);$event.target.value=''}">
+		<option value="">Add component...</option>
+		<option value="text_display">Text Display</option>
+		<option value="section">Section</option>
+		<option value="container">Container</option>
+		<option value="separator">Separator</option>
+		<option value="media_gallery">Media Gallery</option>
+		<option value="action_row">Action Row</option>
+	</select>
+}

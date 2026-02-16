@@ -1,0 +1,29 @@
+# https://taskfile.dev
+
+version: "3"
+
+env:
+  GOPRIVATE: github.com/myrkvi/grem
+  GOTOOLCHAIN: auto
+
+tasks:
+  default:
+    desc: Build and run heimdallr
+    cmds:
+      - task: build
+      - task: run
+  run:
+    desc: Run heimdallr
+    preconditions:
+      - sh: test -f ./heimdallrbot{{exeExt}}
+        msg: "heimdallr binary not found, please run 'task build' first"
+    cmds:
+      - ./heimdallrbot{{exeExt}}
+  build:
+    desc: Build heimdallr binary
+    cmds:
+      - templ generate
+      - >
+        go build -a -installsuffix cgo -ldflags "-s -w"
+        -o heimdallrbot{{exeExt}}
+        github.com/NLLCommunity/heimdallr

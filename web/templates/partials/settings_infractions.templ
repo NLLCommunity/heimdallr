@@ -1,0 +1,34 @@
+package partials
+
+import "github.com/NLLCommunity/heimdallr/web/templates/components"
+
+type InfractionsData struct {
+	GuildID                     string
+	HalfLifeDays                float64
+	NotifyOnWarnedUserJoin      bool
+	NotifyWarnSeverityThreshold float64
+	SaveSuccess                 bool
+	SaveError                   string
+}
+
+templ SettingsInfractions(data InfractionsData) {
+	<section id="infractions">
+		<h3>Infractions</h3>
+		<form
+			hx-post={ "/guild/" + data.GuildID + "/settings/infractions" }
+			hx-target="#infractions"
+			hx-swap="outerHTML"
+		>
+			if data.SaveSuccess {
+				@components.AlertSuccess("Settings saved.")
+			}
+			if data.SaveError != "" {
+				@components.AlertError(data.SaveError)
+			}
+			@components.NumberField("half_life_days", "Half-life (days)", data.HalfLifeDays, 0, 365, 0.5)
+			@components.ToggleField("notify_on_warned_user_join", "Notify when warned user joins", "", data.NotifyOnWarnedUserJoin)
+			@components.NumberField("notify_warn_severity_threshold", "Warning severity threshold", data.NotifyWarnSeverityThreshold, 0, 100, 0.1)
+			@components.SaveButton()
+		</form>
+	</section>
+}
