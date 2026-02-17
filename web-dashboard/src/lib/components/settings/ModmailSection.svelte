@@ -1,5 +1,6 @@
 <script lang="ts">
-  import SnowflakeField from "../ui/SnowflakeField.svelte";
+  import ChannelSelect from "../ui/ChannelSelect.svelte";
+  import RoleSelect from "../ui/RoleSelect.svelte";
   import SaveButton from "../ui/SaveButton.svelte";
   import { settingsStore } from "../../stores/settings.svelte";
 
@@ -23,27 +24,27 @@
     {#if section.loading}
       <span class="loading loading-dots loading-md"></span>
     {:else}
-      <SnowflakeField
+      <ChannelSelect
         label="Report threads channel"
         description="Channel where report threads are created"
         value={section.data.reportThreadsChannel}
-        placeholder="Channel ID"
+        guildId={section.data.guildId}
         onchange={(v) => (section.data.reportThreadsChannel = v)}
       />
 
-      <SnowflakeField
+      <ChannelSelect
         label="Report notification channel"
         description="Channel where new report notifications are posted"
         value={section.data.reportNotificationChannel}
-        placeholder="Channel ID"
+        guildId={section.data.guildId}
         onchange={(v) => (section.data.reportNotificationChannel = v)}
       />
 
-      <SnowflakeField
+      <RoleSelect
         label="Report ping role"
         description="Role pinged when a new report is submitted"
         value={section.data.reportPingRole}
-        placeholder="Role ID"
+        guildId={section.data.guildId}
         onchange={(v) => (section.data.reportPingRole = v)}
       />
 

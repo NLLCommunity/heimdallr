@@ -1,24 +1,33 @@
 <script lang="ts">
   import ToggleField from "../ui/ToggleField.svelte";
-  import SnowflakeField from "../ui/SnowflakeField.svelte";
-  import TextareaField from "../ui/TextareaField.svelte";
+  import ChannelSelect from "../ui/ChannelSelect.svelte";
+  import V2MessageToggle from "../ui/V2MessageToggle.svelte";
   import SaveButton from "../ui/SaveButton.svelte";
   import { settingsStore } from "../../stores/settings.svelte";
+  import { guildDataStore } from "../../stores/guild-data.svelte";
 
   const settings = settingsStore();
+  const guildData = guildDataStore();
   const section = $derived(settings.joinLeave);
   const dirty = $derived(
     section.data.joinMessageEnabled !== section.saved.joinMessageEnabled ||
     section.data.joinMessage !== section.saved.joinMessage ||
+    section.data.joinMessageV2 !== section.saved.joinMessageV2 ||
+    section.data.joinMessageV2Json !== section.saved.joinMessageV2Json ||
     section.data.leaveMessageEnabled !== section.saved.leaveMessageEnabled ||
     section.data.leaveMessage !== section.saved.leaveMessage ||
+    section.data.leaveMessageV2 !== section.saved.leaveMessageV2 ||
+    section.data.leaveMessageV2Json !== section.saved.leaveMessageV2Json ||
     section.data.channel !== section.saved.channel
   );
 
-  const messagePlaceholders = `{user} — The user's mention
-{username} — The user's name
-{server} — The server name
-{member_count} — Current member count`;
+  $effect(() => { guildData.loadPlaceholders(); });
+
+  const helpText = $derived(
+    guildData.placeholders
+      .map((p) => `${p.placeholder} — ${p.description}`)
+      .join("\n")
+  );
 </script>
 
 <div id="join-leave" class="card bg-base-100 shadow-md">
@@ -32,11 +41,11 @@
     {#if section.loading}
       <span class="loading loading-dots loading-md"></span>
     {:else}
-      <SnowflakeField
+      <ChannelSelect
         label="Channel"
         description="Channel where join/leave messages are sent"
         value={section.data.channel}
-        placeholder="Channel ID"
+        guildId={section.data.guildId}
         onchange={(v) => (section.data.channel = v)}
       />
 
@@ -48,11 +57,15 @@
         onchange={(v) => (section.data.joinMessageEnabled = v)}
       />
 
-      <TextareaField
+      <V2MessageToggle
         label="Join message"
-        value={section.data.joinMessage}
-        helpText={messagePlaceholders}
-        onchange={(v) => (section.data.joinMessage = v)}
+        {helpText}
+        plainText={section.data.joinMessage}
+        v2Enabled={section.data.joinMessageV2}
+        v2Json={section.data.joinMessageV2Json}
+        onPlainTextChange={(v) => (section.data.joinMessage = v)}
+        onV2EnabledChange={(v) => (section.data.joinMessageV2 = v)}
+        onV2JsonChange={(v) => (section.data.joinMessageV2Json = v)}
       />
 
       <div class="divider text-sm">Leave Message</div>
@@ -63,11 +76,15 @@
         onchange={(v) => (section.data.leaveMessageEnabled = v)}
       />
 
-      <TextareaField
+      <V2MessageToggle
         label="Leave message"
-        value={section.data.leaveMessage}
-        helpText={messagePlaceholders}
-        onchange={(v) => (section.data.leaveMessage = v)}
+        {helpText}
+        plainText={section.data.leaveMessage}
+        v2Enabled={section.data.leaveMessageV2}
+        v2Json={section.data.leaveMessageV2Json}
+        onPlainTextChange={(v) => (section.data.leaveMessage = v)}
+        onV2EnabledChange={(v) => (section.data.leaveMessageV2 = v)}
+        onV2JsonChange={(v) => (section.data.leaveMessageV2Json = v)}
       />
 
       <SaveButton

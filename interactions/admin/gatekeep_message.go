@@ -42,13 +42,22 @@ func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
 	}
 
 	if hasReset && resetOption == "reset" {
-		// Reset the message to default
 		settings.GatekeepApprovedMessage = "Welcome to the server, {{user}}!"
+		settings.GatekeepApprovedMessageV2 = false
+		settings.GatekeepApprovedMessageV2Json = ""
 		err = model.SetGuildSettings(settings)
 		if err != nil {
 			return err
 		}
 		return e.CreateMessage(interactions.EphemeralMessageContent("Gatekeep approved message has been reset."))
+	}
+
+	if settings.GatekeepApprovedMessageV2 {
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"The gatekeep approved message is currently using **Components V2** mode, which can only be edited from the web dashboard.\n\nUse the `reset` option to switch back to plain text mode.",
+			),
+		)
 	}
 
 	embed := discord.NewEmbedBuilder().
@@ -79,6 +88,14 @@ func AdminGatekeepMessageButtonHandler(e *handler.ComponentEvent) error {
 	settings, err := model.GetGuildSettings(guild.ID)
 	if err != nil {
 		return err
+	}
+
+	if settings.GatekeepApprovedMessageV2 {
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"This message uses Components V2 and can only be edited from the web dashboard.",
+			),
+		)
 	}
 
 	return e.Modal(
@@ -112,6 +129,8 @@ func AdminGatekeepMessageModalHandler(e *handler.ModalEvent) error {
 	}
 
 	settings.GatekeepApprovedMessage = message
+	settings.GatekeepApprovedMessageV2 = false
+	settings.GatekeepApprovedMessageV2Json = ""
 
 	err = model.SetGuildSettings(settings)
 	if err != nil {

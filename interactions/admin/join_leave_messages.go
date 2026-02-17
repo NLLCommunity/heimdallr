@@ -56,13 +56,22 @@ func AdminJoinMessageHandler(e *handler.CommandEvent) error {
 	}
 
 	if hasReset && resetOption == "reset" {
-		// Reset the message to default
 		settings.JoinMessage = "Welcome to the server, {{user}}!"
+		settings.JoinMessageV2 = false
+		settings.JoinMessageV2Json = ""
 		err = model.SetGuildSettings(settings)
 		if err != nil {
 			return err
 		}
 		return e.CreateMessage(interactions.EphemeralMessageContent("Join message has been reset."))
+	}
+
+	if settings.JoinMessageV2 {
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"The join message is currently using **Components V2** mode, which can only be edited from the web dashboard.\n\nUse the `reset` option to switch back to plain text mode.",
+			),
+		)
 	}
 
 	embed := discord.NewEmbedBuilder().
@@ -93,6 +102,14 @@ func AdminJoinMessageButtonHandler(e *handler.ComponentEvent) error {
 	settings, err := model.GetGuildSettings(guild.ID)
 	if err != nil {
 		return err
+	}
+
+	if settings.JoinMessageV2 {
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"This message uses Components V2 and can only be edited from the web dashboard.",
+			),
+		)
 	}
 
 	return e.Modal(
@@ -128,6 +145,8 @@ func AdminJoinMessageModalHandler(e *handler.ModalEvent) error {
 	}
 
 	settings.JoinMessage = message
+	settings.JoinMessageV2 = false
+	settings.JoinMessageV2Json = ""
 
 	err = model.SetGuildSettings(settings)
 	if err != nil {
@@ -154,13 +173,22 @@ func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
 	}
 
 	if hasReset && resetOption == "reset" {
-		// Reset the message to default
 		settings.LeaveMessage = "{{user}} has left the server."
+		settings.LeaveMessageV2 = false
+		settings.LeaveMessageV2Json = ""
 		err = model.SetGuildSettings(settings)
 		if err != nil {
 			return err
 		}
 		return e.CreateMessage(interactions.EphemeralMessageContent("Leave message has been reset."))
+	}
+
+	if settings.LeaveMessageV2 {
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"The leave message is currently using **Components V2** mode, which can only be edited from the web dashboard.\n\nUse the `reset` option to switch back to plain text mode.",
+			),
+		)
 	}
 
 	embed := discord.NewEmbedBuilder().
@@ -191,6 +219,14 @@ func AdminLeaveMessageButtonHandler(e *handler.ComponentEvent) error {
 	settings, err := model.GetGuildSettings(guild.ID)
 	if err != nil {
 		return err
+	}
+
+	if settings.LeaveMessageV2 {
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"This message uses Components V2 and can only be edited from the web dashboard.",
+			),
+		)
 	}
 
 	return e.Modal(
@@ -226,6 +262,8 @@ func AdminLeaveMessageModalHandler(e *handler.ModalEvent) error {
 	}
 
 	settings.LeaveMessage = message
+	settings.LeaveMessageV2 = false
+	settings.LeaveMessageV2Json = ""
 
 	err = model.SetGuildSettings(settings)
 	if err != nil {

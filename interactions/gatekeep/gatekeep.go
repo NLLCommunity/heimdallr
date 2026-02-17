@@ -3,6 +3,7 @@ package gatekeep
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 
 	"github.com/cbroglie/mustache"
@@ -146,7 +147,10 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		"guild_id", guild.ID,
 	)
 
-	if guildSettings.GatekeepApprovedMessage == "" {
+	hasV2 := guildSettings.GatekeepApprovedMessageV2 && guildSettings.GatekeepApprovedMessageV2Json != ""
+	hasPlain := guildSettings.GatekeepApprovedMessage != ""
+
+	if !hasV2 && !hasPlain {
 		slog.Info("No approved message set; not sending message.")
 		return e.CreateMessage(
 			interactions.EphemeralMessageContent(
@@ -163,24 +167,51 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 	}
 
 	templateData := utils.NewMessageTemplateData(member.Member, guild)
-	contents, err := mustache.RenderRaw(guildSettings.GatekeepApprovedMessage, true, templateData)
-	if err != nil {
-		slog.Warn("Failed to render approved message template.")
-		return err
+
+	if hasV2 {
+		emojiMap := make(map[string]discord.Emoji)
+		for emoji := range e.Client().Caches.Emojis(guild.ID) {
+			emojiMap[strings.ToLower(emoji.Name)] = emoji
+		}
+
+		components, compErr := utils.BuildV2Message(guildSettings.GatekeepApprovedMessageV2Json, templateData, emojiMap)
+		if compErr != nil {
+			slog.Warn("Failed to build V2 approved message.", "err", compErr)
+			return compErr
+		}
+
+		// Append "Approved by" footer as a text display component
+		components = append(components, discord.NewTextDisplay(
+			fmt.Sprintf("-# Approved by %s", e.User().Mention()),
+		))
+
+		_, err = e.Client().Rest.CreateMessage(channel, discord.MessageCreate{
+			Flags:      discord.MessageFlagIsComponentsV2,
+			Components: components,
+			AllowedMentions: &discord.AllowedMentions{
+				Users: []snowflake.ID{member.User.ID},
+			},
+		})
+	} else {
+		contents, renderErr := mustache.RenderRaw(guildSettings.GatekeepApprovedMessage, true, templateData)
+		if renderErr != nil {
+			slog.Warn("Failed to render approved message template.")
+			return renderErr
+		}
+		_, err = e.Client().Rest.CreateMessage(
+			channel,
+			discord.NewMessageCreate().
+				WithContent(
+					contents+
+						fmt.Sprintf("\n\n-# Approved by %s", e.User().Mention()),
+				).
+				WithAllowedMentions(
+					&discord.AllowedMentions{
+						Users: []snowflake.ID{member.User.ID},
+					},
+				),
+		)
 	}
-	_, err = e.Client().Rest.CreateMessage(
-		channel,
-		discord.NewMessageCreate().
-			WithContent(
-				contents+
-					fmt.Sprintf("\n\n-# Approved by %s", e.User().Mention()),
-			).
-			WithAllowedMentions(
-				&discord.AllowedMentions{
-					Users: []snowflake.ID{member.User.ID},
-				},
-			),
-	)
 	if err != nil {
 		return e.CreateMessage(
 			interactions.EphemeralMessageContent(

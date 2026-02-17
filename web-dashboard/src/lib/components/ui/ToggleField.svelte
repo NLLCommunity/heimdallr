@@ -9,19 +9,17 @@
   let { label, description, checked, onchange }: Props = $props();
 </script>
 
-<div class="form-control">
-  <label class="label cursor-pointer justify-start gap-4">
-    <input
-      type="checkbox"
-      class="toggle toggle-primary"
-      {checked}
-      onchange={(e) => onchange(e.currentTarget.checked)}
-    />
-    <div>
-      <span class="label-text font-medium">{label}</span>
-      {#if description}
-        <p class="label-text text-base-content/60 text-sm">{description}</p>
-      {/if}
-    </div>
-  </label>
-</div>
+<label class="flex cursor-pointer items-center justify-between gap-4">
+  <div class="flex flex-col">
+    <span class="text-sm font-semibold">{label}</span>
+    {#if description}
+      <span class="text-base-content/60 text-xs">{description}</span>
+    {/if}
+  </div>
+  <input
+    type="checkbox"
+    class="toggle toggle-primary shrink-0"
+    {checked}
+    onchange={(e) => onchange(e.currentTarget.checked)}
+  />
+</label>

@@ -2,6 +2,7 @@ package listeners
 
 import (
 	"log/slog"
+	"strings"
 
 	"github.com/cbroglie/mustache"
 	"github.com/disgoorg/disgo/discord"
@@ -36,6 +37,28 @@ func OnUserJoin(e *events.GuildMemberJoin) {
 	}
 
 	joinleaveInfo := utils.NewMessageTemplateData(e.Member, guild.Guild)
+
+	if guildSettings.JoinMessageV2 && guildSettings.JoinMessageV2Json != "" {
+		emojiMap := make(map[string]discord.Emoji)
+		for emoji := range e.Client().Caches.Emojis(guildID) {
+			emojiMap[strings.ToLower(emoji.Name)] = emoji
+		}
+
+		components, err := utils.BuildV2Message(guildSettings.JoinMessageV2Json, joinleaveInfo, emojiMap)
+		if err != nil {
+			slog.Error("Failed to build V2 join message.", "err", err, "guild_id", guildID)
+			return
+		}
+
+		_, err = e.Client().Rest.CreateMessage(joinLeaveChannel, discord.MessageCreate{
+			Flags:      discord.MessageFlagIsComponentsV2,
+			Components: components,
+		})
+		if err != nil {
+			slog.Error("Failed to send V2 join message.", "guild_id", guildID, "channel_id", joinLeaveChannel, "err", err)
+		}
+		return
+	}
 
 	contents, err := mustache.RenderRaw(guildSettings.JoinMessage, true, joinleaveInfo)
 	if err != nil {
@@ -90,6 +113,28 @@ func OnUserLeave(e *events.GuildMemberLeave) {
 
 	e.Member.User = e.User
 	joinleaveInfo := utils.NewMessageTemplateData(e.Member, guild.Guild)
+
+	if guildSettings.LeaveMessageV2 && guildSettings.LeaveMessageV2Json != "" {
+		emojiMap := make(map[string]discord.Emoji)
+		for emoji := range e.Client().Caches.Emojis(guildID) {
+			emojiMap[strings.ToLower(emoji.Name)] = emoji
+		}
+
+		components, err := utils.BuildV2Message(guildSettings.LeaveMessageV2Json, joinleaveInfo, emojiMap)
+		if err != nil {
+			slog.Error("Failed to build V2 leave message.", "err", err, "guild_id", guildID)
+			return
+		}
+
+		_, err = e.Client().Rest.CreateMessage(joinLeaveChannel, discord.MessageCreate{
+			Flags:      discord.MessageFlagIsComponentsV2,
+			Components: components,
+		})
+		if err != nil {
+			slog.Error("Failed to send V2 leave message.", "guild_id", guildID, "channel_id", joinLeaveChannel, "err", err)
+		}
+		return
+	}
 
 	contents, err := mustache.RenderRaw(guildSettings.LeaveMessage, true, joinleaveInfo)
 	if err != nil {

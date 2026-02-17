@@ -81,7 +81,7 @@
                 </div>
               {:else}
                 <div class="avatar placeholder">
-                  <div class="bg-neutral text-neutral-content w-16 rounded-full">
+                  <div class="bg-neutral text-neutral-content flex w-16 items-center justify-center rounded-full">
                     <span class="text-xl">{guild.name.charAt(0).toUpperCase()}</span>
                   </div>
                 </div>

@@ -12,20 +12,20 @@
   let { label, description, value, min, max, step = 1, onchange }: Props = $props();
 </script>
 
-<div class="form-control">
-  <label class="label">
-    <span class="label-text font-medium">{label}</span>
+<label class="flex items-center justify-between gap-4">
+  <div class="flex flex-col">
+    <span class="text-sm font-semibold">{label}</span>
     {#if description}
-      <span class="label-text text-base-content/60 text-sm">{description}</span>
+      <span class="text-base-content/60 text-xs">{description}</span>
     {/if}
-    <input
-      type="number"
-      class="input input-bordered w-full max-w-xs"
-      {value}
-      {min}
-      {max}
-      {step}
-      oninput={(e) => onchange(Number(e.currentTarget.value))}
-    />
-  </label>
-</div>
+  </div>
+  <input
+    type="number"
+    class="input input-bordered w-full max-w-xs shrink-0"
+    {value}
+    {min}
+    {max}
+    {step}
+    oninput={(e) => onchange(Number(e.currentTarget.value))}
+  />
+</label>

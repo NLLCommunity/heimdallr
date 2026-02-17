@@ -1,5 +1,5 @@
 <script lang="ts">
-  import SnowflakeField from "../ui/SnowflakeField.svelte";
+  import ChannelSelect from "../ui/ChannelSelect.svelte";
   import SaveButton from "../ui/SaveButton.svelte";
   import { settingsStore } from "../../stores/settings.svelte";
 
@@ -21,10 +21,11 @@
     {#if section.loading}
       <span class="loading loading-dots loading-md"></span>
     {:else}
-      <SnowflakeField
-        label="Channel ID"
-        description="The Discord channel ID for moderator notifications"
+      <ChannelSelect
+        label="Channel"
+        description="The Discord channel for moderator notifications"
         value={section.data.moderatorChannel}
+        guildId={section.data.guildId}
         onchange={(v) => (section.data.moderatorChannel = v)}
       />
       <SaveButton

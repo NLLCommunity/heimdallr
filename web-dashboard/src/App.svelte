@@ -4,11 +4,13 @@
   import Callback from "./lib/routes/Callback.svelte";
   import GuildSelector from "./lib/routes/GuildSelector.svelte";
   import Dashboard from "./lib/routes/Dashboard.svelte";
+  import Sandbox from "./lib/routes/Sandbox.svelte";
 
   const routes = {
     "/": Login,
     "/callback": Callback,
     "/guilds": GuildSelector,
+    "/guild/:id/sandbox": Sandbox,
     "/guild/:id": Dashboard,
   };
 </script>

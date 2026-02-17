@@ -10,18 +10,18 @@
   let { label, description, value, placeholder = "Channel or Role ID", onchange }: Props = $props();
 </script>
 
-<div class="form-control">
-  <label class="label">
-    <span class="label-text font-medium">{label}</span>
+<label class="flex items-center justify-between gap-4">
+  <div class="flex flex-col">
+    <span class="text-sm font-semibold">{label}</span>
     {#if description}
-      <span class="label-text text-base-content/60 text-sm">{description}</span>
+      <span class="text-base-content/60 text-xs">{description}</span>
     {/if}
-    <input
-      type="text"
-      class="input input-bordered w-full max-w-xs font-mono"
-      {placeholder}
-      {value}
-      oninput={(e) => onchange(e.currentTarget.value)}
-    />
-  </label>
-</div>
+  </div>
+  <input
+    type="text"
+    class="input input-bordered w-full max-w-xs shrink-0 font-mono"
+    {placeholder}
+    {value}
+    oninput={(e) => onchange(e.currentTarget.value)}
+  />
+</label>

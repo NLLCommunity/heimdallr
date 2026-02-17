@@ -8,6 +8,10 @@
     { id: "ban-footer", label: "Ban Footer" },
     { id: "modmail", label: "Modmail" },
   ];
+
+  function scrollTo(id: string) {
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });
+  }
 </script>
 
 <aside class="bg-base-200 hidden w-56 shrink-0 p-4 lg:block">
@@ -15,7 +19,7 @@
     <li class="menu-title">Settings</li>
     {#each sections as section}
       <li>
-        <a href="#{section.id}" class="text-sm">{section.label}</a>
+        <button class="text-sm" onclick={() => scrollTo(section.id)}>{section.label}</button>
       </li>
     {/each}
   </ul>

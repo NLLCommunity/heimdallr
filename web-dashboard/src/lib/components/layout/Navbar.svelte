@@ -35,6 +35,7 @@
     <a class="btn btn-ghost text-xl" href="/#/guilds">Heimdallr</a>
     {#if currentGuild}
       <span class="text-base-content/60 ml-2">/ {currentGuild.name}</span>
+      <a class="btn btn-ghost btn-sm ml-2" href="/#/guild/{currentGuildId}/sandbox">Sandbox</a>
     {/if}
   </div>
   <div class="flex-none gap-2">

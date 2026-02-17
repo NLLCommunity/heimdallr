@@ -2,8 +2,10 @@ package rpcserver
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strconv"
+	"strings"
 
 	"connectrpc.com/connect"
 	"github.com/disgoorg/disgo/bot"
@@ -12,6 +14,7 @@ import (
 
 	heimdallrv1 "github.com/NLLCommunity/heimdallr/gen/heimdallr/v1"
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 type guildSettingsService struct {
@@ -187,12 +190,14 @@ func (s *guildSettingsService) GetGatekeepSettings(ctx context.Context, req *hei
 	}
 
 	return &heimdallrv1.GatekeepSettings{
-		GuildId:              guildID.String(),
-		Enabled:              settings.GatekeepEnabled,
-		PendingRole:          idStr(settings.GatekeepPendingRole),
-		ApprovedRole:         idStr(settings.GatekeepApprovedRole),
-		AddPendingRoleOnJoin: settings.GatekeepAddPendingRoleOnJoin,
-		ApprovedMessage:      settings.GatekeepApprovedMessage,
+		GuildId:                guildID.String(),
+		Enabled:                settings.GatekeepEnabled,
+		PendingRole:            idStr(settings.GatekeepPendingRole),
+		ApprovedRole:           idStr(settings.GatekeepApprovedRole),
+		AddPendingRoleOnJoin:   settings.GatekeepAddPendingRoleOnJoin,
+		ApprovedMessage:        settings.GatekeepApprovedMessage,
+		ApprovedMessageV2:      settings.GatekeepApprovedMessageV2,
+		ApprovedMessageV2Json:  settings.GatekeepApprovedMessageV2Json,
 	}, nil
 }
 
@@ -213,18 +218,22 @@ func (s *guildSettingsService) UpdateGatekeepSettings(ctx context.Context, req *
 	settings.GatekeepApprovedRole = parseSnowflake(proto.GetApprovedRole())
 	settings.GatekeepAddPendingRoleOnJoin = proto.GetAddPendingRoleOnJoin()
 	settings.GatekeepApprovedMessage = proto.GetApprovedMessage()
+	settings.GatekeepApprovedMessageV2 = proto.GetApprovedMessageV2()
+	settings.GatekeepApprovedMessageV2Json = proto.GetApprovedMessageV2Json()
 
 	if err := model.SetGuildSettings(settings); err != nil {
 		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to save settings"))
 	}
 
 	return &heimdallrv1.GatekeepSettings{
-		GuildId:              guildID.String(),
-		Enabled:              settings.GatekeepEnabled,
-		PendingRole:          idStr(settings.GatekeepPendingRole),
-		ApprovedRole:         idStr(settings.GatekeepApprovedRole),
-		AddPendingRoleOnJoin: settings.GatekeepAddPendingRoleOnJoin,
-		ApprovedMessage:      settings.GatekeepApprovedMessage,
+		GuildId:                guildID.String(),
+		Enabled:                settings.GatekeepEnabled,
+		PendingRole:            idStr(settings.GatekeepPendingRole),
+		ApprovedRole:           idStr(settings.GatekeepApprovedRole),
+		AddPendingRoleOnJoin:   settings.GatekeepAddPendingRoleOnJoin,
+		ApprovedMessage:        settings.GatekeepApprovedMessage,
+		ApprovedMessageV2:      settings.GatekeepApprovedMessageV2,
+		ApprovedMessageV2Json:  settings.GatekeepApprovedMessageV2Json,
 	}, nil
 }
 
@@ -245,8 +254,12 @@ func (s *guildSettingsService) GetJoinLeaveSettings(ctx context.Context, req *he
 		GuildId:             guildID.String(),
 		JoinMessageEnabled:  settings.JoinMessageEnabled,
 		JoinMessage:         settings.JoinMessage,
+		JoinMessageV2:       settings.JoinMessageV2,
+		JoinMessageV2Json:   settings.JoinMessageV2Json,
 		LeaveMessageEnabled: settings.LeaveMessageEnabled,
 		LeaveMessage:        settings.LeaveMessage,
+		LeaveMessageV2:      settings.LeaveMessageV2,
+		LeaveMessageV2Json:  settings.LeaveMessageV2Json,
 		Channel:             idStr(settings.JoinLeaveChannel),
 	}, nil
 }
@@ -265,8 +278,12 @@ func (s *guildSettingsService) UpdateJoinLeaveSettings(ctx context.Context, req 
 
 	settings.JoinMessageEnabled = proto.GetJoinMessageEnabled()
 	settings.JoinMessage = proto.GetJoinMessage()
+	settings.JoinMessageV2 = proto.GetJoinMessageV2()
+	settings.JoinMessageV2Json = proto.GetJoinMessageV2Json()
 	settings.LeaveMessageEnabled = proto.GetLeaveMessageEnabled()
 	settings.LeaveMessage = proto.GetLeaveMessage()
+	settings.LeaveMessageV2 = proto.GetLeaveMessageV2()
+	settings.LeaveMessageV2Json = proto.GetLeaveMessageV2Json()
 	settings.JoinLeaveChannel = parseSnowflake(proto.GetChannel())
 
 	if err := model.SetGuildSettings(settings); err != nil {
@@ -277,8 +294,12 @@ func (s *guildSettingsService) UpdateJoinLeaveSettings(ctx context.Context, req 
 		GuildId:             guildID.String(),
 		JoinMessageEnabled:  settings.JoinMessageEnabled,
 		JoinMessage:         settings.JoinMessage,
+		JoinMessageV2:       settings.JoinMessageV2,
+		JoinMessageV2Json:   settings.JoinMessageV2Json,
 		LeaveMessageEnabled: settings.LeaveMessageEnabled,
 		LeaveMessage:        settings.LeaveMessage,
+		LeaveMessageV2:      settings.LeaveMessageV2,
+		LeaveMessageV2Json:  settings.LeaveMessageV2Json,
 		Channel:             idStr(settings.JoinLeaveChannel),
 	}, nil
 }
@@ -424,5 +445,119 @@ func (s *guildSettingsService) UpdateModmailSettings(ctx context.Context, req *h
 		ReportThreadsChannel:      idStr(ms.ReportThreadsChannel),
 		ReportNotificationChannel: idStr(ms.ReportNotificationChannel),
 		ReportPingRole:            idStr(ms.ReportPingRole),
+	}, nil
+}
+
+// --- Guild Data (Channels & Roles) ---
+
+func (s *guildSettingsService) ListChannels(ctx context.Context, req *heimdallrv1.ListChannelsRequest) (*heimdallrv1.ListChannelsResponse, error) {
+	guildID, err := checkGuildAdmin(ctx, s.client, req.GetGuildId())
+	if err != nil {
+		return nil, err
+	}
+
+	var channels []*heimdallrv1.Channel
+	for ch := range s.client.Caches.ChannelsForGuild(guildID) {
+		var parentID string
+		if pid := ch.ParentID(); pid != nil {
+			parentID = pid.String()
+		}
+		channels = append(channels, &heimdallrv1.Channel{
+			Id:       ch.ID().String(),
+			Name:     ch.Name(),
+			Type:     int32(ch.Type()),
+			Position: int32(ch.Position()),
+			ParentId: parentID,
+		})
+	}
+
+	return &heimdallrv1.ListChannelsResponse{Channels: channels}, nil
+}
+
+func (s *guildSettingsService) ListRoles(ctx context.Context, req *heimdallrv1.ListRolesRequest) (*heimdallrv1.ListRolesResponse, error) {
+	guildID, err := checkGuildAdmin(ctx, s.client, req.GetGuildId())
+	if err != nil {
+		return nil, err
+	}
+
+	var roles []*heimdallrv1.Role
+	for role := range s.client.Caches.Roles(guildID) {
+		roles = append(roles, &heimdallrv1.Role{
+			Id:       role.ID.String(),
+			Name:     role.Name,
+			Color:    int32(role.Color),
+			Position: int32(role.Position),
+			Managed:  role.Managed,
+		})
+	}
+
+	return &heimdallrv1.ListRolesResponse{Roles: roles}, nil
+}
+
+func (s *guildSettingsService) GetTemplatePlaceholders(_ context.Context, _ *heimdallrv1.GetTemplatePlaceholdersRequest) (*heimdallrv1.GetTemplatePlaceholdersResponse, error) {
+	placeholders := make([]*heimdallrv1.TemplatePlaceholder, len(utils.MessageTemplatePlaceholders))
+	for i, p := range utils.MessageTemplatePlaceholders {
+		placeholders[i] = &heimdallrv1.TemplatePlaceholder{
+			Placeholder: p.Placeholder,
+			Description: p.Description,
+		}
+	}
+	return &heimdallrv1.GetTemplatePlaceholdersResponse{Placeholders: placeholders}, nil
+}
+
+// buildEmojiMap builds a lowercase emoji name → Emoji lookup from the guild cache.
+func (s *guildSettingsService) buildEmojiMap(guildID snowflake.ID) map[string]discord.Emoji {
+	emojiMap := make(map[string]discord.Emoji)
+	for emoji := range s.client.Caches.Emojis(guildID) {
+		emojiMap[strings.ToLower(emoji.Name)] = emoji
+	}
+	return emojiMap
+}
+
+// --- SendComponentsMessage ---
+
+func (s *guildSettingsService) SendComponentsMessage(ctx context.Context, req *heimdallrv1.SendComponentsMessageRequest) (*heimdallrv1.SendComponentsMessageResponse, error) {
+	guildID, err := checkGuildAdmin(ctx, s.client, req.GetGuildId())
+	if err != nil {
+		return nil, err
+	}
+
+	channelID, err := snowflake.Parse(req.GetChannelId())
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid channel ID"))
+	}
+
+	ch, ok := s.client.Caches.GuildMessageChannel(channelID)
+	if !ok || ch.GuildID() != guildID {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("channel not found in this guild"))
+	}
+
+	var parsed any
+	if err := json.Unmarshal([]byte(req.GetComponentsJson()), &parsed); err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid components JSON: "+err.Error()))
+	}
+
+	utils.ResolveEmojis(parsed, s.buildEmojiMap(guildID))
+
+	resolvedJSON, err := json.Marshal(parsed)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to re-encode components"))
+	}
+
+	components, err := utils.ParseComponents(string(resolvedJSON))
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid components JSON: "+err.Error()))
+	}
+
+	msg, err := s.client.Rest.CreateMessage(channelID, discord.MessageCreate{
+		Flags:      discord.MessageFlagIsComponentsV2,
+		Components: components,
+	})
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to send message: "+err.Error()))
+	}
+
+	return &heimdallrv1.SendComponentsMessageResponse{
+		MessageId: msg.ID.String(),
 	}, nil
 }

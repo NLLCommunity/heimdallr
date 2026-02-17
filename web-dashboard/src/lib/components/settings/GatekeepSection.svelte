@@ -1,18 +1,30 @@
 <script lang="ts">
   import ToggleField from "../ui/ToggleField.svelte";
-  import SnowflakeField from "../ui/SnowflakeField.svelte";
-  import TextareaField from "../ui/TextareaField.svelte";
+  import RoleSelect from "../ui/RoleSelect.svelte";
+  import V2MessageToggle from "../ui/V2MessageToggle.svelte";
   import SaveButton from "../ui/SaveButton.svelte";
   import { settingsStore } from "../../stores/settings.svelte";
+  import { guildDataStore } from "../../stores/guild-data.svelte";
 
   const settings = settingsStore();
+  const guildData = guildDataStore();
   const section = $derived(settings.gatekeep);
   const dirty = $derived(
     section.data.enabled !== section.saved.enabled ||
     section.data.pendingRole !== section.saved.pendingRole ||
     section.data.approvedRole !== section.saved.approvedRole ||
     section.data.addPendingRoleOnJoin !== section.saved.addPendingRoleOnJoin ||
-    section.data.approvedMessage !== section.saved.approvedMessage
+    section.data.approvedMessage !== section.saved.approvedMessage ||
+    section.data.approvedMessageV2 !== section.saved.approvedMessageV2 ||
+    section.data.approvedMessageV2Json !== section.saved.approvedMessageV2Json
+  );
+
+  $effect(() => { guildData.loadPlaceholders(); });
+
+  const helpText = $derived(
+    guildData.placeholders
+      .map((p) => `${p.placeholder} — ${p.description}`)
+      .join("\n")
   );
 </script>
 
@@ -34,19 +46,19 @@
         onchange={(v) => (section.data.enabled = v)}
       />
 
-      <SnowflakeField
+      <RoleSelect
         label="Pending Role"
         description="Role assigned to unverified members"
         value={section.data.pendingRole}
-        placeholder="Role ID"
+        guildId={section.data.guildId}
         onchange={(v) => (section.data.pendingRole = v)}
       />
 
-      <SnowflakeField
+      <RoleSelect
         label="Approved Role"
         description="Role assigned to verified members"
         value={section.data.approvedRole}
-        placeholder="Role ID"
+        guildId={section.data.guildId}
         onchange={(v) => (section.data.approvedRole = v)}
       />
 
@@ -57,11 +69,16 @@
         onchange={(v) => (section.data.addPendingRoleOnJoin = v)}
       />
 
-      <TextareaField
+      <V2MessageToggle
         label="Approved message"
         description="Message sent to the user when they are approved"
-        value={section.data.approvedMessage}
-        onchange={(v) => (section.data.approvedMessage = v)}
+        {helpText}
+        plainText={section.data.approvedMessage}
+        v2Enabled={section.data.approvedMessageV2}
+        v2Json={section.data.approvedMessageV2Json}
+        onPlainTextChange={(v) => (section.data.approvedMessage = v)}
+        onV2EnabledChange={(v) => (section.data.approvedMessageV2 = v)}
+        onV2JsonChange={(v) => (section.data.approvedMessageV2Json = v)}
       />
 
       <SaveButton
