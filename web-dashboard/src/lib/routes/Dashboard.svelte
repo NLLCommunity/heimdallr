@@ -6,14 +6,8 @@
   import { userStore } from "../stores/user.svelte";
   import { guildsStore } from "../stores/guilds.svelte";
   import { settingsStore } from "../stores/settings.svelte";
+  import { sections } from "../sections";
   import Layout from "../components/layout/Layout.svelte";
-  import ModChannelSection from "../components/settings/ModChannelSection.svelte";
-  import InfractionsSection from "../components/settings/InfractionsSection.svelte";
-  import GatekeepSection from "../components/settings/GatekeepSection.svelte";
-  import JoinLeaveSection from "../components/settings/JoinLeaveSection.svelte";
-  import AntiSpamSection from "../components/settings/AntiSpamSection.svelte";
-  import BanFooterSection from "../components/settings/BanFooterSection.svelte";
-  import ModmailSection from "../components/settings/ModmailSection.svelte";
 
   interface Props {
     params: { id: string };
@@ -66,13 +60,10 @@
     </div>
   {:else}
     <div class="mx-auto flex max-w-3xl flex-col gap-6">
-      <ModChannelSection />
-      <InfractionsSection />
-      <GatekeepSection />
-      <JoinLeaveSection />
-      <AntiSpamSection />
-      <BanFooterSection />
-      <ModmailSection />
+      {#each sections as sec}
+        {@const Component = sec.component}
+        <Component />
+      {/each}
     </div>
   {/if}
 </Layout>

@@ -1,13 +1,5 @@
 <script lang="ts">
-  const sections = [
-    { id: "mod-channel", label: "Moderator Channel" },
-    { id: "infractions", label: "Infractions" },
-    { id: "gatekeep", label: "Gatekeep" },
-    { id: "join-leave", label: "Join/Leave Messages" },
-    { id: "anti-spam", label: "Anti-Spam" },
-    { id: "ban-footer", label: "Ban Footer" },
-    { id: "modmail", label: "Modmail" },
-  ];
+  import { sections } from "../../sections";
 
   function scrollTo(id: string) {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth" });

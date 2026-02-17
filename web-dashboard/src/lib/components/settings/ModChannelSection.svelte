@@ -2,12 +2,12 @@
   import ChannelSelect from "../ui/ChannelSelect.svelte";
   import SaveButton from "../ui/SaveButton.svelte";
   import { settingsStore } from "../../stores/settings.svelte";
+  import { isDirty } from "../../utils/dirty";
+  import { ModChannelSettingsSchema } from "../../../gen/heimdallr/v1/guild_settings_pb";
 
   const settings = settingsStore();
   const section = $derived(settings.modChannel);
-  const dirty = $derived(
-    section.data.moderatorChannel !== section.saved.moderatorChannel
-  );
+  const dirty = $derived(isDirty(ModChannelSettingsSchema, section.data, section.saved));
 </script>
 
 <div id="mod-channel" class="card bg-base-100 shadow-md">

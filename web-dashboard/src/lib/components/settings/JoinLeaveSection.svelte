@@ -5,21 +5,13 @@
   import SaveButton from "../ui/SaveButton.svelte";
   import { settingsStore } from "../../stores/settings.svelte";
   import { guildDataStore } from "../../stores/guild-data.svelte";
+  import { isDirty } from "../../utils/dirty";
+  import { JoinLeaveSettingsSchema } from "../../../gen/heimdallr/v1/guild_settings_pb";
 
   const settings = settingsStore();
   const guildData = guildDataStore();
   const section = $derived(settings.joinLeave);
-  const dirty = $derived(
-    section.data.joinMessageEnabled !== section.saved.joinMessageEnabled ||
-    section.data.joinMessage !== section.saved.joinMessage ||
-    section.data.joinMessageV2 !== section.saved.joinMessageV2 ||
-    section.data.joinMessageV2Json !== section.saved.joinMessageV2Json ||
-    section.data.leaveMessageEnabled !== section.saved.leaveMessageEnabled ||
-    section.data.leaveMessage !== section.saved.leaveMessage ||
-    section.data.leaveMessageV2 !== section.saved.leaveMessageV2 ||
-    section.data.leaveMessageV2Json !== section.saved.leaveMessageV2Json ||
-    section.data.channel !== section.saved.channel
-  );
+  const dirty = $derived(isDirty(JoinLeaveSettingsSchema, section.data, section.saved));
 
   $effect(() => { guildData.loadPlaceholders(); });
 

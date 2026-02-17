@@ -3,14 +3,12 @@
   import RoleSelect from "../ui/RoleSelect.svelte";
   import SaveButton from "../ui/SaveButton.svelte";
   import { settingsStore } from "../../stores/settings.svelte";
+  import { isDirty } from "../../utils/dirty";
+  import { ModmailSettingsSchema } from "../../../gen/heimdallr/v1/guild_settings_pb";
 
   const settings = settingsStore();
   const section = $derived(settings.modmail);
-  const dirty = $derived(
-    section.data.reportThreadsChannel !== section.saved.reportThreadsChannel ||
-    section.data.reportNotificationChannel !== section.saved.reportNotificationChannel ||
-    section.data.reportPingRole !== section.saved.reportPingRole
-  );
+  const dirty = $derived(isDirty(ModmailSettingsSchema, section.data, section.saved));
 </script>
 
 <div id="modmail" class="card bg-base-100 shadow-md">

@@ -1,4 +1,5 @@
-import { create } from "@bufbuild/protobuf";
+import { create, clone, type Message } from "@bufbuild/protobuf";
+import type { GenMessage } from "@bufbuild/protobuf/codegenv2";
 import { settingsClient } from "../api/client";
 import {
   type ModChannelSettings,
@@ -17,12 +18,58 @@ import {
   ModmailSettingsSchema,
 } from "../../gen/heimdallr/v1/guild_settings_pb";
 
-interface SectionState<T> {
+export interface SectionState<T> {
   data: T;
   saved: T;
   saving: boolean;
   loading: boolean;
   error: string | null;
+}
+
+function makeDefault<T extends Message>(schema: GenMessage<T>): SectionState<T> {
+  return {
+    data: create(schema),
+    saved: create(schema),
+    saving: false,
+    loading: false,
+    error: null,
+  };
+}
+
+async function loadSection<T extends Message>(
+  section: SectionState<T>,
+  schema: GenMessage<T>,
+  request: () => Promise<T>,
+) {
+  section.loading = true;
+  section.error = null;
+  try {
+    const res = await request();
+    section.data = res;
+    section.saved = clone(schema, res);
+  } catch (e: any) {
+    section.error = e.message;
+  } finally {
+    section.loading = false;
+  }
+}
+
+async function saveSection<T extends Message>(
+  section: SectionState<T>,
+  schema: GenMessage<T>,
+  request: () => Promise<T>,
+) {
+  section.saving = true;
+  section.error = null;
+  try {
+    const res = await request();
+    section.data = res;
+    section.saved = clone(schema, res);
+  } catch (e: any) {
+    section.error = e.message;
+  } finally {
+    section.saving = false;
+  }
 }
 
 let modChannel = $state<SectionState<ModChannelSettings>>(makeDefault(ModChannelSettingsSchema));
@@ -32,20 +79,6 @@ let joinLeave = $state<SectionState<JoinLeaveSettings>>(makeDefault(JoinLeaveSet
 let antiSpam = $state<SectionState<AntiSpamSettings>>(makeDefault(AntiSpamSettingsSchema));
 let banFooter = $state<SectionState<BanFooterSettings>>(makeDefault(BanFooterSettingsSchema));
 let modmail = $state<SectionState<ModmailSettings>>(makeDefault(ModmailSettingsSchema));
-
-function makeDefault<T>(schema: Parameters<typeof create>[0]): SectionState<T> {
-  return {
-    data: create(schema) as T,
-    saved: create(schema) as T,
-    saving: false,
-    loading: false,
-    error: null,
-  };
-}
-
-function clone<T>(schema: Parameters<typeof create>[0], obj: T): T {
-  return create(schema, obj as Record<string, unknown>) as T;
-}
 
 export function settingsStore() {
   return {
@@ -70,199 +103,66 @@ export function settingsStore() {
     },
 
     async loadModChannel(guildId: string) {
-      modChannel.loading = true;
-      modChannel.error = null;
-      try {
-        const res = await settingsClient.getModChannel({ guildId });
-        modChannel.data = res;
-        modChannel.saved = clone(ModChannelSettingsSchema, res);
-      } catch (e: any) {
-        modChannel.error = e.message;
-      } finally {
-        modChannel.loading = false;
-      }
+      await loadSection(modChannel, ModChannelSettingsSchema,
+        () => settingsClient.getModChannel({ guildId }));
     },
-
     async saveModChannel() {
-      modChannel.saving = true;
-      modChannel.error = null;
-      try {
-        const res = await settingsClient.updateModChannel({ settings: modChannel.data });
-        modChannel.data = res;
-        modChannel.saved = clone(ModChannelSettingsSchema, res);
-      } catch (e: any) {
-        modChannel.error = e.message;
-      } finally {
-        modChannel.saving = false;
-      }
+      await saveSection(modChannel, ModChannelSettingsSchema,
+        () => settingsClient.updateModChannel({ settings: modChannel.data }));
     },
 
     async loadInfractions(guildId: string) {
-      infractions.loading = true;
-      infractions.error = null;
-      try {
-        const res = await settingsClient.getInfractionSettings({ guildId });
-        infractions.data = res;
-        infractions.saved = clone(InfractionSettingsSchema, res);
-      } catch (e: any) {
-        infractions.error = e.message;
-      } finally {
-        infractions.loading = false;
-      }
+      await loadSection(infractions, InfractionSettingsSchema,
+        () => settingsClient.getInfractionSettings({ guildId }));
     },
-
     async saveInfractions() {
-      infractions.saving = true;
-      infractions.error = null;
-      try {
-        const res = await settingsClient.updateInfractionSettings({ settings: infractions.data });
-        infractions.data = res;
-        infractions.saved = clone(InfractionSettingsSchema, res);
-      } catch (e: any) {
-        infractions.error = e.message;
-      } finally {
-        infractions.saving = false;
-      }
+      await saveSection(infractions, InfractionSettingsSchema,
+        () => settingsClient.updateInfractionSettings({ settings: infractions.data }));
     },
 
     async loadGatekeep(guildId: string) {
-      gatekeep.loading = true;
-      gatekeep.error = null;
-      try {
-        const res = await settingsClient.getGatekeepSettings({ guildId });
-        gatekeep.data = res;
-        gatekeep.saved = clone(GatekeepSettingsSchema, res);
-      } catch (e: any) {
-        gatekeep.error = e.message;
-      } finally {
-        gatekeep.loading = false;
-      }
+      await loadSection(gatekeep, GatekeepSettingsSchema,
+        () => settingsClient.getGatekeepSettings({ guildId }));
     },
-
     async saveGatekeep() {
-      gatekeep.saving = true;
-      gatekeep.error = null;
-      try {
-        const res = await settingsClient.updateGatekeepSettings({ settings: gatekeep.data });
-        gatekeep.data = res;
-        gatekeep.saved = clone(GatekeepSettingsSchema, res);
-      } catch (e: any) {
-        gatekeep.error = e.message;
-      } finally {
-        gatekeep.saving = false;
-      }
+      await saveSection(gatekeep, GatekeepSettingsSchema,
+        () => settingsClient.updateGatekeepSettings({ settings: gatekeep.data }));
     },
 
     async loadJoinLeave(guildId: string) {
-      joinLeave.loading = true;
-      joinLeave.error = null;
-      try {
-        const res = await settingsClient.getJoinLeaveSettings({ guildId });
-        joinLeave.data = res;
-        joinLeave.saved = clone(JoinLeaveSettingsSchema, res);
-      } catch (e: any) {
-        joinLeave.error = e.message;
-      } finally {
-        joinLeave.loading = false;
-      }
+      await loadSection(joinLeave, JoinLeaveSettingsSchema,
+        () => settingsClient.getJoinLeaveSettings({ guildId }));
     },
-
     async saveJoinLeave() {
-      joinLeave.saving = true;
-      joinLeave.error = null;
-      try {
-        const res = await settingsClient.updateJoinLeaveSettings({ settings: joinLeave.data });
-        joinLeave.data = res;
-        joinLeave.saved = clone(JoinLeaveSettingsSchema, res);
-      } catch (e: any) {
-        joinLeave.error = e.message;
-      } finally {
-        joinLeave.saving = false;
-      }
+      await saveSection(joinLeave, JoinLeaveSettingsSchema,
+        () => settingsClient.updateJoinLeaveSettings({ settings: joinLeave.data }));
     },
 
     async loadAntiSpam(guildId: string) {
-      antiSpam.loading = true;
-      antiSpam.error = null;
-      try {
-        const res = await settingsClient.getAntiSpamSettings({ guildId });
-        antiSpam.data = res;
-        antiSpam.saved = clone(AntiSpamSettingsSchema, res);
-      } catch (e: any) {
-        antiSpam.error = e.message;
-      } finally {
-        antiSpam.loading = false;
-      }
+      await loadSection(antiSpam, AntiSpamSettingsSchema,
+        () => settingsClient.getAntiSpamSettings({ guildId }));
     },
-
     async saveAntiSpam() {
-      antiSpam.saving = true;
-      antiSpam.error = null;
-      try {
-        const res = await settingsClient.updateAntiSpamSettings({ settings: antiSpam.data });
-        antiSpam.data = res;
-        antiSpam.saved = clone(AntiSpamSettingsSchema, res);
-      } catch (e: any) {
-        antiSpam.error = e.message;
-      } finally {
-        antiSpam.saving = false;
-      }
+      await saveSection(antiSpam, AntiSpamSettingsSchema,
+        () => settingsClient.updateAntiSpamSettings({ settings: antiSpam.data }));
     },
 
     async loadBanFooter(guildId: string) {
-      banFooter.loading = true;
-      banFooter.error = null;
-      try {
-        const res = await settingsClient.getBanFooterSettings({ guildId });
-        banFooter.data = res;
-        banFooter.saved = clone(BanFooterSettingsSchema, res);
-      } catch (e: any) {
-        banFooter.error = e.message;
-      } finally {
-        banFooter.loading = false;
-      }
+      await loadSection(banFooter, BanFooterSettingsSchema,
+        () => settingsClient.getBanFooterSettings({ guildId }));
     },
-
     async saveBanFooter() {
-      banFooter.saving = true;
-      banFooter.error = null;
-      try {
-        const res = await settingsClient.updateBanFooterSettings({ settings: banFooter.data });
-        banFooter.data = res;
-        banFooter.saved = clone(BanFooterSettingsSchema, res);
-      } catch (e: any) {
-        banFooter.error = e.message;
-      } finally {
-        banFooter.saving = false;
-      }
+      await saveSection(banFooter, BanFooterSettingsSchema,
+        () => settingsClient.updateBanFooterSettings({ settings: banFooter.data }));
     },
 
     async loadModmail(guildId: string) {
-      modmail.loading = true;
-      modmail.error = null;
-      try {
-        const res = await settingsClient.getModmailSettings({ guildId });
-        modmail.data = res;
-        modmail.saved = clone(ModmailSettingsSchema, res);
-      } catch (e: any) {
-        modmail.error = e.message;
-      } finally {
-        modmail.loading = false;
-      }
+      await loadSection(modmail, ModmailSettingsSchema,
+        () => settingsClient.getModmailSettings({ guildId }));
     },
-
     async saveModmail() {
-      modmail.saving = true;
-      modmail.error = null;
-      try {
-        const res = await settingsClient.updateModmailSettings({ settings: modmail.data });
-        modmail.data = res;
-        modmail.saved = clone(ModmailSettingsSchema, res);
-      } catch (e: any) {
-        modmail.error = e.message;
-      } finally {
-        modmail.saving = false;
-      }
+      await saveSection(modmail, ModmailSettingsSchema,
+        () => settingsClient.updateModmailSettings({ settings: modmail.data }));
     },
   };
 }

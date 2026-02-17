@@ -3,13 +3,12 @@
   import TextareaField from "../ui/TextareaField.svelte";
   import SaveButton from "../ui/SaveButton.svelte";
   import { settingsStore } from "../../stores/settings.svelte";
+  import { isDirty } from "../../utils/dirty";
+  import { BanFooterSettingsSchema } from "../../../gen/heimdallr/v1/guild_settings_pb";
 
   const settings = settingsStore();
   const section = $derived(settings.banFooter);
-  const dirty = $derived(
-    section.data.footer !== section.saved.footer ||
-    section.data.alwaysSend !== section.saved.alwaysSend
-  );
+  const dirty = $derived(isDirty(BanFooterSettingsSchema, section.data, section.saved));
 </script>
 
 <div id="ban-footer" class="card bg-base-100 shadow-md">

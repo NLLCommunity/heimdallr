@@ -5,19 +5,13 @@
   import SaveButton from "../ui/SaveButton.svelte";
   import { settingsStore } from "../../stores/settings.svelte";
   import { guildDataStore } from "../../stores/guild-data.svelte";
+  import { isDirty } from "../../utils/dirty";
+  import { GatekeepSettingsSchema } from "../../../gen/heimdallr/v1/guild_settings_pb";
 
   const settings = settingsStore();
   const guildData = guildDataStore();
   const section = $derived(settings.gatekeep);
-  const dirty = $derived(
-    section.data.enabled !== section.saved.enabled ||
-    section.data.pendingRole !== section.saved.pendingRole ||
-    section.data.approvedRole !== section.saved.approvedRole ||
-    section.data.addPendingRoleOnJoin !== section.saved.addPendingRoleOnJoin ||
-    section.data.approvedMessage !== section.saved.approvedMessage ||
-    section.data.approvedMessageV2 !== section.saved.approvedMessageV2 ||
-    section.data.approvedMessageV2Json !== section.saved.approvedMessageV2Json
-  );
+  const dirty = $derived(isDirty(GatekeepSettingsSchema, section.data, section.saved));
 
   $effect(() => { guildData.loadPlaceholders(); });
 

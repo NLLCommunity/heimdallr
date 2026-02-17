@@ -3,14 +3,12 @@
   import NumberField from "../ui/NumberField.svelte";
   import SaveButton from "../ui/SaveButton.svelte";
   import { settingsStore } from "../../stores/settings.svelte";
+  import { isDirty } from "../../utils/dirty";
+  import { AntiSpamSettingsSchema } from "../../../gen/heimdallr/v1/guild_settings_pb";
 
   const settings = settingsStore();
   const section = $derived(settings.antiSpam);
-  const dirty = $derived(
-    section.data.enabled !== section.saved.enabled ||
-    section.data.count !== section.saved.count ||
-    section.data.cooldownSeconds !== section.saved.cooldownSeconds
-  );
+  const dirty = $derived(isDirty(AntiSpamSettingsSchema, section.data, section.saved));
 </script>
 
 <div id="anti-spam" class="card bg-base-100 shadow-md">

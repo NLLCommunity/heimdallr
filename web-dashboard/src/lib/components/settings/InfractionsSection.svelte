@@ -3,14 +3,12 @@
   import ToggleField from "../ui/ToggleField.svelte";
   import SaveButton from "../ui/SaveButton.svelte";
   import { settingsStore } from "../../stores/settings.svelte";
+  import { isDirty } from "../../utils/dirty";
+  import { InfractionSettingsSchema } from "../../../gen/heimdallr/v1/guild_settings_pb";
 
   const settings = settingsStore();
   const section = $derived(settings.infractions);
-  const dirty = $derived(
-    section.data.halfLifeDays !== section.saved.halfLifeDays ||
-    section.data.notifyOnWarnedUserJoin !== section.saved.notifyOnWarnedUserJoin ||
-    section.data.notifyWarnSeverityThreshold !== section.saved.notifyWarnSeverityThreshold
-  );
+  const dirty = $derived(isDirty(InfractionSettingsSchema, section.data, section.saved));
 </script>
 
 <div id="infractions" class="card bg-base-100 shadow-md">
