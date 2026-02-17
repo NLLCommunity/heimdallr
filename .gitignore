@@ -33,7 +33,7 @@ go.work.sum
 
 # Heimdallr-specific files
 # Heimdallr binary
-heimdallr
+/heimdallr
 # Heimdallr configuration file
 config.toml
 # Database file
