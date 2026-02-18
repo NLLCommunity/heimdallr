@@ -1,7 +1,6 @@
 package listeners
 
 import (
-	"fmt"
 	"math"
 	"time"
 
@@ -13,7 +12,6 @@ import (
 )
 
 func OnWarnedUserJoin(e *events.GuildMemberJoin) {
-	fmt.Println("OnWarnedUserJoin called")
 	guildSettings, err := model.GetGuildSettings(e.GuildID)
 	if err != nil {
 		return
