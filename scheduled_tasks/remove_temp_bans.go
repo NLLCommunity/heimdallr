@@ -13,8 +13,8 @@ import (
 )
 
 func RemoveTempBansScheduledTask(client *bot.Client) task.Task {
-	values := map[string]any{
-		"client": client,
+	values := task.ContextKeyMap{
+		task.ContextKeyBotClientRef: client,
 	}
 
 	t := task.New("remove-temp-bans", removeTempBans, values, 15*time.Minute)
@@ -24,8 +24,9 @@ func RemoveTempBansScheduledTask(client *bot.Client) task.Task {
 }
 
 func removeTempBans(ctx context.Context) {
-	client, hasClient := ctx.Value("client").(bot.Client)
+	client, hasClient := ctx.Value(task.ContextKeyBotClientRef).(*bot.Client)
 	if !hasClient {
+		slog.Error("could not retrieve client for removing temp bans")
 		return
 	}
 

@@ -8,8 +8,6 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/dgryski/trifles v0.0.0-20230903005119-f50d829f2e54 h1:SG7nF6SRlWhcT7cNTs5R6Hk4V2lcmLz2NsG2VnInyNo=
 github.com/dgryski/trifles v0.0.0-20230903005119-f50d829f2e54/go.mod h1:if7Fbed8SFyPtHLHbg49SI7NAdJiC5WIA09pe59rfAA=
-github.com/disgoorg/disgo v0.19.1 h1:QkX5Z2fvLlg5YG4k5VmILH8U1m3ztx6vvbWVqv2c9Oc=
-github.com/disgoorg/disgo v0.19.1/go.mod h1:rLCcf3vnlyfOTGw8ksVmq5UE5CMzBA0eeA9oeZ+N0x4=
 github.com/disgoorg/disgo v0.19.2 h1:9FTTnYZ5RnLX6oybPr18d9+ht2KxIMkG/+HY0ADqTbM=
 github.com/disgoorg/disgo v0.19.2/go.mod h1:rLCcf3vnlyfOTGw8ksVmq5UE5CMzBA0eeA9oeZ+N0x4=
 github.com/disgoorg/godave v0.0.0-20260211223842-18cd5c306076 h1:GN4w6H8zlH/kFRFnzjk+4Kg9KEUJ+jY0e4MZaGlFKh8=
