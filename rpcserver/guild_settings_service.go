@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"strconv"
 	"strings"
 
@@ -494,7 +495,11 @@ func (s *guildSettingsService) ListRoles(ctx context.Context, req *heimdallrv1.L
 	return &heimdallrv1.ListRolesResponse{Roles: roles}, nil
 }
 
-func (s *guildSettingsService) GetTemplatePlaceholders(_ context.Context, _ *heimdallrv1.GetTemplatePlaceholdersRequest) (*heimdallrv1.GetTemplatePlaceholdersResponse, error) {
+func (s *guildSettingsService) GetTemplatePlaceholders(ctx context.Context, _ *heimdallrv1.GetTemplatePlaceholdersRequest) (*heimdallrv1.GetTemplatePlaceholdersResponse, error) {
+	if SessionFromContext(ctx) == nil {
+		return nil, connect.NewError(connect.CodeUnauthenticated, nil)
+	}
+
 	placeholders := make([]*heimdallrv1.TemplatePlaceholder, len(utils.MessageTemplatePlaceholders))
 	for i, p := range utils.MessageTemplatePlaceholders {
 		placeholders[i] = &heimdallrv1.TemplatePlaceholder{
@@ -534,7 +539,8 @@ func (s *guildSettingsService) SendComponentsMessage(ctx context.Context, req *h
 
 	var parsed any
 	if err := json.Unmarshal([]byte(req.GetComponentsJson()), &parsed); err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid components JSON: "+err.Error()))
+		slog.Error("invalid components JSON from client", "error", err)
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid components JSON"))
 	}
 
 	utils.ResolveEmojis(parsed, s.buildEmojiMap(guildID))
@@ -546,7 +552,8 @@ func (s *guildSettingsService) SendComponentsMessage(ctx context.Context, req *h
 
 	components, err := utils.ParseComponents(string(resolvedJSON))
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid components JSON: "+err.Error()))
+		slog.Error("failed to parse resolved components", "error", err)
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid components JSON"))
 	}
 
 	msg, err := s.client.Rest.CreateMessage(channelID, discord.MessageCreate{
@@ -554,7 +561,8 @@ func (s *guildSettingsService) SendComponentsMessage(ctx context.Context, req *h
 		Components: components,
 	})
 	if err != nil {
-		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to send message: "+err.Error()))
+		slog.Error("failed to send Discord message", "error", err, "channel_id", channelID)
+		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to send message"))
 	}
 
 	return &heimdallrv1.SendComponentsMessageResponse{

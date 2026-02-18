@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import { querystring, push } from "svelte-spa-router";
   import { authClient } from "../api/client";
-  import { setToken } from "../auth/auth";
   import { userStore } from "../stores/user.svelte";
 
   const user = userStore();
@@ -20,7 +19,6 @@
 
     try {
       const res = await authClient.exchangeCode({ code });
-      setToken(res.token);
       if (res.user) {
         user.user = res.user;
       }

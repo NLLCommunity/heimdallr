@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"net/http"
+	"strings"
 
 	"connectrpc.com/connect"
 	"github.com/disgoorg/disgo/bot"
+	"github.com/spf13/viper"
 
 	heimdallrv1 "github.com/NLLCommunity/heimdallr/gen/heimdallr/v1"
 	"github.com/NLLCommunity/heimdallr/model"
@@ -23,11 +26,14 @@ func (s *authService) GetLoginURL(_ context.Context, _ *heimdallrv1.GetLoginURLR
 	)
 }
 
-func (s *authService) ExchangeCode(_ context.Context, req *heimdallrv1.ExchangeCodeRequest) (*heimdallrv1.ExchangeCodeResponse, error) {
+func (s *authService) ExchangeCode(ctx context.Context, req *heimdallrv1.ExchangeCodeRequest) (*heimdallrv1.ExchangeCodeResponse, error) {
 	session, err := model.ExchangeLoginCode(req.GetCode())
 	if err != nil {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid or expired login code"))
 	}
+
+	// Set session token as an HttpOnly cookie.
+	SetResponseCookie(ctx, makeSessionCookie(session.Token, 86400))
 
 	return &heimdallrv1.ExchangeCodeResponse{
 		Token: session.Token,
@@ -95,5 +101,23 @@ func (s *authService) Logout(ctx context.Context, _ *heimdallrv1.LogoutRequest) 
 		slog.Error("failed to delete session", "error", err)
 	}
 
+	// Clear the session cookie.
+	SetResponseCookie(ctx, makeSessionCookie("", 0))
+
 	return &heimdallrv1.LogoutResponse{}, nil
+}
+
+// makeSessionCookie creates a session cookie with the given token and max age.
+// A maxAge of 0 clears the cookie.
+func makeSessionCookie(token string, maxAge int) *http.Cookie {
+	secure := strings.HasPrefix(viper.GetString("dashboard.base_url"), "https")
+	return &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    token,
+		Path:     "/",
+		MaxAge:   maxAge,
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteStrictMode,
+	}
 }

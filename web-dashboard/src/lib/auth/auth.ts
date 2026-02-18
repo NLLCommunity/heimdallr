@@ -1,17 +1,5 @@
-const TOKEN_KEY = "heimdallr_token";
-
-export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-export function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-
-export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
-}
+import { userStore } from "../stores/user.svelte";
 
 export function isLoggedIn(): boolean {
-  return getToken() !== null;
+  return userStore().isLoggedIn;
 }

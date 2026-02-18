@@ -1,10 +1,12 @@
 <script lang="ts">
-  import { isLoggedIn } from "../auth/auth";
   import { push } from "svelte-spa-router";
   import { onMount } from "svelte";
+  import { userStore } from "../stores/user.svelte";
+
+  const user = userStore();
 
   onMount(() => {
-    if (isLoggedIn()) {
+    if (user.isLoggedIn) {
       push("/guilds");
     }
   });

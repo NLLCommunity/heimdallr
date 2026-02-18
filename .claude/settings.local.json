@@ -18,7 +18,9 @@
       "Bash(go doc:*)",
       "Bash(node -e:*)",
       "Bash(bun run check:*)",
-      "Bash(bun run build:*)"
+      "Bash(bun run build:*)",
+      "Bash(go mod tidy:*)",
+      "Bash(go test:*)"
     ]
   }
 }

@@ -2,7 +2,6 @@
   import { onMount } from "svelte";
   import { push } from "svelte-spa-router";
   import { authClient } from "../api/client";
-  import { isLoggedIn } from "../auth/auth";
   import { guildsStore } from "../stores/guilds.svelte";
   import { userStore } from "../stores/user.svelte";
   import Layout from "../components/layout/Layout.svelte";
@@ -13,11 +12,6 @@
   let error = $state<string | null>(null);
 
   onMount(async () => {
-    if (!isLoggedIn()) {
-      push("/");
-      return;
-    }
-
     if (!user.user) {
       try {
         const res = await authClient.getCurrentUser({});

@@ -3,7 +3,6 @@
   import { guildsStore } from "../../stores/guilds.svelte";
   import { push } from "svelte-spa-router";
   import { authClient } from "../../api/client";
-  import { clearToken } from "../../auth/auth";
 
   interface Props {
     currentGuildId?: string;
@@ -24,7 +23,6 @@
     } catch {
       // Ignore errors, clear token regardless
     }
-    clearToken();
     user.user = null;
     push("/");
   }
