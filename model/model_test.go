@@ -162,7 +162,7 @@ func (suite *ModelTestSuite) TestDeleteInfractionBySqid() {
 	sqid := infraction.Sqid()
 
 	// Delete by sqid.
-	err = DeleteInfractionBySqid(sqid)
+	err = DeleteInfractionBySqid(sqid, guildID)
 	assert.NoError(suite.T(), err)
 
 	// Verify it's deleted.
@@ -172,7 +172,7 @@ func (suite *ModelTestSuite) TestDeleteInfractionBySqid() {
 	assert.Equal(suite.T(), int64(0), count)
 
 	// Test deleting non-existent sqid.
-	err = DeleteInfractionBySqid("nonexistent")
+	err = DeleteInfractionBySqid("nonexistent", guildID)
 	assert.Error(suite.T(), err)
 	assert.Equal(suite.T(), ErrNoSqid, err)
 }
