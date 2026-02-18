@@ -1,14 +1,10 @@
 package listeners
 
 import (
-	"math"
-	"time"
-
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 
 	"github.com/NLLCommunity/heimdallr/model"
-	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 func OnWarnedUserJoin(e *events.GuildMemberJoin) {
@@ -21,16 +17,9 @@ func OnWarnedUserJoin(e *events.GuildMemberJoin) {
 		return
 	}
 
-	infractions, _, err := model.GetUserInfractions(e.GuildID, e.Member.User.ID, math.MaxInt, 0)
+	totalSeverity, err := model.GetUserTotalInfractionWeight(e.GuildID, e.Member.User.ID, guildSettings.InfractionHalfLifeDays)
 	if err != nil {
 		return
-	}
-
-	totalSeverity := 0.0
-	for _, infraction := range infractions {
-		diff := time.Since(infraction.CreatedAt)
-		severity := utils.CalcHalfLife(diff, guildSettings.InfractionHalfLifeDays, infraction.Weight)
-		totalSeverity += severity
 	}
 
 	if totalSeverity < 1.0 {

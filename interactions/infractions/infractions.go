@@ -62,15 +62,9 @@ func getUserInfractions(guildID, userID snowflake.ID, limit, offset int) (userIn
 		return userInfractions{}, fmt.Errorf("failed to get guild settings: %w", err)
 	}
 
-	allInfractions, _, err := model.GetUserInfractions(guildID, userID, math.MaxInt, 0)
+	severity, err := model.GetUserTotalInfractionWeight(guildID, userID, guildSettings.InfractionHalfLifeDays)
 	if err != nil {
-		return userInfractions{}, fmt.Errorf("failed to get all user infractions: %w", err)
-	}
-
-	severity := 0.0
-	for _, inf := range allInfractions {
-		diff := time.Since(inf.CreatedAt)
-		severity += utils.CalcHalfLife(diff, guildSettings.InfractionHalfLifeDays, inf.Weight)
+		return userInfractions{}, fmt.Errorf("failed to get user total infraction weight: %w", err)
 	}
 
 	embeds := createInfractionEmbeds(infractions, guildSettings)
@@ -135,7 +129,7 @@ func createInfractionEmbeds(infractions []model.Infraction, guildSettings *model
 
 	for _, inf := range infractions {
 		weightWithHalfLife := utils.CalcHalfLife(
-			time.Since(inf.CreatedAt),
+			time.Since(inf.Timestamp),
 			halfLifeDays,
 			inf.Weight,
 		)
