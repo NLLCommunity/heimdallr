@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -46,6 +47,15 @@ func CreateInfraction(guildID, userID, moderator snowflake.ID, reason string, we
 	return inf, nil
 }
 
+func GetUserTotalInfractionWeight(guildID, userID snowflake.ID, halfLifeDays float64) (float64, error) {
+	var totalWeight float64
+
+	err := gorm.G[Infraction](DB).Select("SUM(weight * POW(0.5, (unixepoch('now') - unixepoch(timestamp)) / 3600.0 / (? * 24.0)))", halfLifeDays).
+		Where("guild_id = ? AND user_id = ?", guildID, userID).Scan(context.Background(), &totalWeight)
+
+	return totalWeight, err
+}
+
 func GetUserInfractions(guildID, userID snowflake.ID, limit, offset int) ([]Infraction, int64, error) {
 	var infractions []Infraction
 	res := DB.Order("timestamp desc").Where("guild_id = ? AND user_id = ?", guildID, userID).
@@ -64,16 +74,13 @@ func GetUserInfractions(guildID, userID snowflake.ID, limit, offset int) ([]Infr
 
 var ErrNoSqid = errors.New("no sqid could be decoded")
 
-func DeleteInfractionBySqid(sqid string) error {
+func DeleteInfractionBySqid(sqid string, guildID snowflake.ID) error {
 	ids := sqidGen.Decode(sqid)
 	if len(ids) < 1 {
 		return ErrNoSqid
 	}
 	id := uint(ids[0])
 
-	res := DB.Delete(&Infraction{}, id)
-	if res.Error != nil {
-		return res.Error
-	}
-	return nil
+	_, res := gorm.G[Infraction](DB).Where("id = ? AND guild_id = ?", id, guildID).Delete(context.Background())
+	return res
 }
