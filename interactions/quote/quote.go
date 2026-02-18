@@ -265,10 +265,8 @@ func userCanReadChannelMessages(userID, channelID snowflake.ID, client *bot.Clie
 			}
 		case discord.RolePermissionOverwrite:
 			role := roleMap[o.RoleID]
-			fmt.Printf("Role: %s\n", role.Name)
 
 			if !slices.Contains(member.RoleIDs, o.RoleID) && o.RoleID != guildID {
-				fmt.Println("User doesn't have role")
 				continue
 			}
 
