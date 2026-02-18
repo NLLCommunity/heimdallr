@@ -14,6 +14,13 @@ const (
 	TaskStatusStopped
 )
 
+type ContextKey string
+type ContextKeyMap map[ContextKey]any
+
+const (
+	ContextKeyBotClientRef ContextKey = "botClientRef"
+)
+
 type Task interface {
 	Start()
 	StartNoWait()
@@ -33,7 +40,7 @@ type taskImpl struct {
 	taskStatus TaskStatus
 }
 
-func New(name string, exec func(ctx context.Context), contextValues map[string]any, interval time.Duration) Task {
+func New(name string, exec func(ctx context.Context), contextValues map[ContextKey]any, interval time.Duration) Task {
 	ctx := context.Background()
 	for k, v := range contextValues {
 		//nolint:staticcheck

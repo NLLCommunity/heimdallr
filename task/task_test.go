@@ -11,8 +11,10 @@ import (
 
 func TestNew(t *testing.T) {
 	execFunc := func(ctx context.Context) {}
-	contextValues := map[string]any{
-		"test_key": "test_value",
+	testKey := ContextKey("test_key")
+
+	contextValues := ContextKeyMap{
+		testKey: "test_value",
 	}
 	interval := time.Second
 
@@ -95,20 +97,22 @@ func TestTaskStartNoWait(t *testing.T) {
 }
 
 func TestTaskContextValues(t *testing.T) {
+	testKey := ContextKey("test_key")
+
 	expectedValue := "test_value"
 	var actualValue string
 	var mu sync.Mutex
 
 	execFunc := func(ctx context.Context) {
-		if val := ctx.Value("test_key"); val != nil {
+		if val := ctx.Value(testKey); val != nil {
 			mu.Lock()
 			actualValue = val.(string)
 			mu.Unlock()
 		}
 	}
 
-	contextValues := map[string]any{
-		"test_key": expectedValue,
+	contextValues := ContextKeyMap{
+		testKey: expectedValue,
 	}
 
 	task := New("test-task", execFunc, contextValues, 100*time.Millisecond)
