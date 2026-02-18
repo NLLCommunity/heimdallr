@@ -162,7 +162,7 @@ func InfractionsRemoveHandler(e *handler.CommandEvent) error {
 		return interactions.ErrEventNoGuildID
 	}
 
-	err := model.DeleteInfractionBySqid(infID)
+	err := model.DeleteInfractionBySqid(infID, guild.ID)
 	if err != nil {
 		return e.CreateMessage(
 			interactions.EphemeralMessageContent(

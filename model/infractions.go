@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"errors"
 	"time"
 
@@ -64,16 +65,13 @@ func GetUserInfractions(guildID, userID snowflake.ID, limit, offset int) ([]Infr
 
 var ErrNoSqid = errors.New("no sqid could be decoded")
 
-func DeleteInfractionBySqid(sqid string) error {
+func DeleteInfractionBySqid(sqid string, guildID snowflake.ID) error {
 	ids := sqidGen.Decode(sqid)
 	if len(ids) < 1 {
 		return ErrNoSqid
 	}
 	id := uint(ids[0])
 
-	res := DB.Delete(&Infraction{}, id)
-	if res.Error != nil {
-		return res.Error
-	}
-	return nil
+	_, res := gorm.G[Infraction](DB).Where("id = ? AND guild_id = ?", id, guildID).Delete(context.Background())
+	return res
 }
