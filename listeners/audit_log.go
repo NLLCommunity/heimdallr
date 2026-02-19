@@ -7,7 +7,6 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 
-	"github.com/NLLCommunity/heimdallr/globals"
 	"github.com/NLLCommunity/heimdallr/model"
 )
 
@@ -28,13 +27,6 @@ func OnAuditLog(e *events.GuildAuditLogEntryCreate) {
 		}
 
 		if pruned, _ := model.IsMemberPruned(e.GuildID, targetUser.ID); pruned {
-			return
-		}
-
-		if _, ok := globals.ExcludedFromModKickLog[targetUser.ID]; ok {
-			// User is excluded from mod kick log, likely because they were pruned.
-			// Remove from excluded list and don't log.
-			delete(globals.ExcludedFromModKickLog, targetUser.ID)
 			return
 		}
 
