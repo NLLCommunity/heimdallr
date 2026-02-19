@@ -6,6 +6,7 @@ import JoinLeaveSection from "./components/settings/JoinLeaveSection.svelte";
 import AntiSpamSection from "./components/settings/AntiSpamSection.svelte";
 import BanFooterSection from "./components/settings/BanFooterSection.svelte";
 import ModmailSection from "./components/settings/ModmailSection.svelte";
+import PaceControlSection from "./components/settings/PaceControlSection.svelte";
 
 export interface SectionDef {
   id: string;
@@ -21,4 +22,5 @@ export const sections: SectionDef[] = [
   { id: "anti-spam", label: "Anti-Spam", component: AntiSpamSection },
   { id: "ban-footer", label: "Ban Footer", component: BanFooterSection },
   { id: "modmail", label: "Modmail", component: ModmailSection },
+  { id: "pace-control", label: "Pace Control", component: PaceControlSection },
 ];

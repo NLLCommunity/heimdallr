@@ -1176,6 +1176,299 @@ func (x *ModmailSettings) GetReportPingRole() string {
 	return ""
 }
 
+// PaceControl
+type PaceControlChannel struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	GuildId           string                 `protobuf:"bytes,1,opt,name=guild_id,json=guildId,proto3" json:"guild_id,omitempty"`
+	ChannelId         string                 `protobuf:"bytes,2,opt,name=channel_id,json=channelId,proto3" json:"channel_id,omitempty"`
+	Enabled           bool                   `protobuf:"varint,3,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	TargetWpm         int32                  `protobuf:"varint,4,opt,name=target_wpm,json=targetWpm,proto3" json:"target_wpm,omitempty"`
+	MinSlowmode       int32                  `protobuf:"varint,5,opt,name=min_slowmode,json=minSlowmode,proto3" json:"min_slowmode,omitempty"`
+	MaxSlowmode       int32                  `protobuf:"varint,6,opt,name=max_slowmode,json=maxSlowmode,proto3" json:"max_slowmode,omitempty"`
+	ActivationWpm     int32                  `protobuf:"varint,7,opt,name=activation_wpm,json=activationWpm,proto3" json:"activation_wpm,omitempty"`
+	WpmWindowSeconds  int32                  `protobuf:"varint,8,opt,name=wpm_window_seconds,json=wpmWindowSeconds,proto3" json:"wpm_window_seconds,omitempty"`
+	UserWindowSeconds int32                  `protobuf:"varint,9,opt,name=user_window_seconds,json=userWindowSeconds,proto3" json:"user_window_seconds,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *PaceControlChannel) Reset() {
+	*x = PaceControlChannel{}
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PaceControlChannel) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PaceControlChannel) ProtoMessage() {}
+
+func (x *PaceControlChannel) ProtoReflect() protoreflect.Message {
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PaceControlChannel.ProtoReflect.Descriptor instead.
+func (*PaceControlChannel) Descriptor() ([]byte, []int) {
+	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *PaceControlChannel) GetGuildId() string {
+	if x != nil {
+		return x.GuildId
+	}
+	return ""
+}
+
+func (x *PaceControlChannel) GetChannelId() string {
+	if x != nil {
+		return x.ChannelId
+	}
+	return ""
+}
+
+func (x *PaceControlChannel) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *PaceControlChannel) GetTargetWpm() int32 {
+	if x != nil {
+		return x.TargetWpm
+	}
+	return 0
+}
+
+func (x *PaceControlChannel) GetMinSlowmode() int32 {
+	if x != nil {
+		return x.MinSlowmode
+	}
+	return 0
+}
+
+func (x *PaceControlChannel) GetMaxSlowmode() int32 {
+	if x != nil {
+		return x.MaxSlowmode
+	}
+	return 0
+}
+
+func (x *PaceControlChannel) GetActivationWpm() int32 {
+	if x != nil {
+		return x.ActivationWpm
+	}
+	return 0
+}
+
+func (x *PaceControlChannel) GetWpmWindowSeconds() int32 {
+	if x != nil {
+		return x.WpmWindowSeconds
+	}
+	return 0
+}
+
+func (x *PaceControlChannel) GetUserWindowSeconds() int32 {
+	if x != nil {
+		return x.UserWindowSeconds
+	}
+	return 0
+}
+
+type GetPaceControlRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	GuildId       string                 `protobuf:"bytes,1,opt,name=guild_id,json=guildId,proto3" json:"guild_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPaceControlRequest) Reset() {
+	*x = GetPaceControlRequest{}
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPaceControlRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPaceControlRequest) ProtoMessage() {}
+
+func (x *GetPaceControlRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPaceControlRequest.ProtoReflect.Descriptor instead.
+func (*GetPaceControlRequest) Descriptor() ([]byte, []int) {
+	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *GetPaceControlRequest) GetGuildId() string {
+	if x != nil {
+		return x.GuildId
+	}
+	return ""
+}
+
+type GetPaceControlResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Channels      []*PaceControlChannel  `protobuf:"bytes,1,rep,name=channels,proto3" json:"channels,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetPaceControlResponse) Reset() {
+	*x = GetPaceControlResponse{}
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetPaceControlResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetPaceControlResponse) ProtoMessage() {}
+
+func (x *GetPaceControlResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetPaceControlResponse.ProtoReflect.Descriptor instead.
+func (*GetPaceControlResponse) Descriptor() ([]byte, []int) {
+	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{23}
+}
+
+func (x *GetPaceControlResponse) GetChannels() []*PaceControlChannel {
+	if x != nil {
+		return x.Channels
+	}
+	return nil
+}
+
+type UpdatePaceControlRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Channel       *PaceControlChannel    `protobuf:"bytes,1,opt,name=channel,proto3" json:"channel,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdatePaceControlRequest) Reset() {
+	*x = UpdatePaceControlRequest{}
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdatePaceControlRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdatePaceControlRequest) ProtoMessage() {}
+
+func (x *UpdatePaceControlRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdatePaceControlRequest.ProtoReflect.Descriptor instead.
+func (*UpdatePaceControlRequest) Descriptor() ([]byte, []int) {
+	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *UpdatePaceControlRequest) GetChannel() *PaceControlChannel {
+	if x != nil {
+		return x.Channel
+	}
+	return nil
+}
+
+type DeletePaceControlRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	GuildId       string                 `protobuf:"bytes,1,opt,name=guild_id,json=guildId,proto3" json:"guild_id,omitempty"`
+	ChannelId     string                 `protobuf:"bytes,2,opt,name=channel_id,json=channelId,proto3" json:"channel_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeletePaceControlRequest) Reset() {
+	*x = DeletePaceControlRequest{}
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeletePaceControlRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeletePaceControlRequest) ProtoMessage() {}
+
+func (x *DeletePaceControlRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeletePaceControlRequest.ProtoReflect.Descriptor instead.
+func (*DeletePaceControlRequest) Descriptor() ([]byte, []int) {
+	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *DeletePaceControlRequest) GetGuildId() string {
+	if x != nil {
+		return x.GuildId
+	}
+	return ""
+}
+
+func (x *DeletePaceControlRequest) GetChannelId() string {
+	if x != nil {
+		return x.ChannelId
+	}
+	return ""
+}
+
 // Guild data (channels & roles)
 type Channel struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -1190,7 +1483,7 @@ type Channel struct {
 
 func (x *Channel) Reset() {
 	*x = Channel{}
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[21]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1202,7 +1495,7 @@ func (x *Channel) String() string {
 func (*Channel) ProtoMessage() {}
 
 func (x *Channel) ProtoReflect() protoreflect.Message {
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[21]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1215,7 +1508,7 @@ func (x *Channel) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Channel.ProtoReflect.Descriptor instead.
 func (*Channel) Descriptor() ([]byte, []int) {
-	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{21}
+	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *Channel) GetId() string {
@@ -1266,7 +1559,7 @@ type Role struct {
 
 func (x *Role) Reset() {
 	*x = Role{}
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[22]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1278,7 +1571,7 @@ func (x *Role) String() string {
 func (*Role) ProtoMessage() {}
 
 func (x *Role) ProtoReflect() protoreflect.Message {
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[22]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1291,7 +1584,7 @@ func (x *Role) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Role.ProtoReflect.Descriptor instead.
 func (*Role) Descriptor() ([]byte, []int) {
-	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{22}
+	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *Role) GetId() string {
@@ -1338,7 +1631,7 @@ type ListChannelsRequest struct {
 
 func (x *ListChannelsRequest) Reset() {
 	*x = ListChannelsRequest{}
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[23]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1350,7 +1643,7 @@ func (x *ListChannelsRequest) String() string {
 func (*ListChannelsRequest) ProtoMessage() {}
 
 func (x *ListChannelsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[23]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1363,7 +1656,7 @@ func (x *ListChannelsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListChannelsRequest.ProtoReflect.Descriptor instead.
 func (*ListChannelsRequest) Descriptor() ([]byte, []int) {
-	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{23}
+	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *ListChannelsRequest) GetGuildId() string {
@@ -1382,7 +1675,7 @@ type ListChannelsResponse struct {
 
 func (x *ListChannelsResponse) Reset() {
 	*x = ListChannelsResponse{}
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[24]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1394,7 +1687,7 @@ func (x *ListChannelsResponse) String() string {
 func (*ListChannelsResponse) ProtoMessage() {}
 
 func (x *ListChannelsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[24]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1407,7 +1700,7 @@ func (x *ListChannelsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListChannelsResponse.ProtoReflect.Descriptor instead.
 func (*ListChannelsResponse) Descriptor() ([]byte, []int) {
-	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{24}
+	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *ListChannelsResponse) GetChannels() []*Channel {
@@ -1426,7 +1719,7 @@ type ListRolesRequest struct {
 
 func (x *ListRolesRequest) Reset() {
 	*x = ListRolesRequest{}
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[25]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1438,7 +1731,7 @@ func (x *ListRolesRequest) String() string {
 func (*ListRolesRequest) ProtoMessage() {}
 
 func (x *ListRolesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[25]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1451,7 +1744,7 @@ func (x *ListRolesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRolesRequest.ProtoReflect.Descriptor instead.
 func (*ListRolesRequest) Descriptor() ([]byte, []int) {
-	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{25}
+	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *ListRolesRequest) GetGuildId() string {
@@ -1470,7 +1763,7 @@ type ListRolesResponse struct {
 
 func (x *ListRolesResponse) Reset() {
 	*x = ListRolesResponse{}
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[26]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1482,7 +1775,7 @@ func (x *ListRolesResponse) String() string {
 func (*ListRolesResponse) ProtoMessage() {}
 
 func (x *ListRolesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[26]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1495,7 +1788,7 @@ func (x *ListRolesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListRolesResponse.ProtoReflect.Descriptor instead.
 func (*ListRolesResponse) Descriptor() ([]byte, []int) {
-	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{26}
+	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ListRolesResponse) GetRoles() []*Role {
@@ -1517,7 +1810,7 @@ type SendComponentsMessageRequest struct {
 
 func (x *SendComponentsMessageRequest) Reset() {
 	*x = SendComponentsMessageRequest{}
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[27]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1529,7 +1822,7 @@ func (x *SendComponentsMessageRequest) String() string {
 func (*SendComponentsMessageRequest) ProtoMessage() {}
 
 func (x *SendComponentsMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[27]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1542,7 +1835,7 @@ func (x *SendComponentsMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendComponentsMessageRequest.ProtoReflect.Descriptor instead.
 func (*SendComponentsMessageRequest) Descriptor() ([]byte, []int) {
-	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{27}
+	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *SendComponentsMessageRequest) GetGuildId() string {
@@ -1575,7 +1868,7 @@ type SendComponentsMessageResponse struct {
 
 func (x *SendComponentsMessageResponse) Reset() {
 	*x = SendComponentsMessageResponse{}
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[28]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1587,7 +1880,7 @@ func (x *SendComponentsMessageResponse) String() string {
 func (*SendComponentsMessageResponse) ProtoMessage() {}
 
 func (x *SendComponentsMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[28]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1600,7 +1893,7 @@ func (x *SendComponentsMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendComponentsMessageResponse.ProtoReflect.Descriptor instead.
 func (*SendComponentsMessageResponse) Descriptor() ([]byte, []int) {
-	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{28}
+	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *SendComponentsMessageResponse) GetMessageId() string {
@@ -1621,7 +1914,7 @@ type TemplatePlaceholder struct {
 
 func (x *TemplatePlaceholder) Reset() {
 	*x = TemplatePlaceholder{}
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[29]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1633,7 +1926,7 @@ func (x *TemplatePlaceholder) String() string {
 func (*TemplatePlaceholder) ProtoMessage() {}
 
 func (x *TemplatePlaceholder) ProtoReflect() protoreflect.Message {
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[29]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1646,7 +1939,7 @@ func (x *TemplatePlaceholder) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TemplatePlaceholder.ProtoReflect.Descriptor instead.
 func (*TemplatePlaceholder) Descriptor() ([]byte, []int) {
-	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{29}
+	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *TemplatePlaceholder) GetPlaceholder() string {
@@ -1671,7 +1964,7 @@ type GetTemplatePlaceholdersRequest struct {
 
 func (x *GetTemplatePlaceholdersRequest) Reset() {
 	*x = GetTemplatePlaceholdersRequest{}
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[30]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1683,7 +1976,7 @@ func (x *GetTemplatePlaceholdersRequest) String() string {
 func (*GetTemplatePlaceholdersRequest) ProtoMessage() {}
 
 func (x *GetTemplatePlaceholdersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[30]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1696,7 +1989,7 @@ func (x *GetTemplatePlaceholdersRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTemplatePlaceholdersRequest.ProtoReflect.Descriptor instead.
 func (*GetTemplatePlaceholdersRequest) Descriptor() ([]byte, []int) {
-	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{30}
+	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{35}
 }
 
 type GetTemplatePlaceholdersResponse struct {
@@ -1708,7 +2001,7 @@ type GetTemplatePlaceholdersResponse struct {
 
 func (x *GetTemplatePlaceholdersResponse) Reset() {
 	*x = GetTemplatePlaceholdersResponse{}
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[31]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1720,7 +2013,7 @@ func (x *GetTemplatePlaceholdersResponse) String() string {
 func (*GetTemplatePlaceholdersResponse) ProtoMessage() {}
 
 func (x *GetTemplatePlaceholdersResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[31]
+	mi := &file_heimdallr_v1_guild_settings_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1733,7 +2026,7 @@ func (x *GetTemplatePlaceholdersResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTemplatePlaceholdersResponse.ProtoReflect.Descriptor instead.
 func (*GetTemplatePlaceholdersResponse) Descriptor() ([]byte, []int) {
-	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{31}
+	return file_heimdallr_v1_guild_settings_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *GetTemplatePlaceholdersResponse) GetPlaceholders() []*TemplatePlaceholder {
@@ -1819,7 +2112,29 @@ const file_heimdallr_v1_guild_settings_proto_rawDesc = "" +
 	"\bguild_id\x18\x01 \x01(\tR\aguildId\x124\n" +
 	"\x16report_threads_channel\x18\x02 \x01(\tR\x14reportThreadsChannel\x12>\n" +
 	"\x1breport_notification_channel\x18\x03 \x01(\tR\x19reportNotificationChannel\x12(\n" +
-	"\x10report_ping_role\x18\x04 \x01(\tR\x0ereportPingRole\"z\n" +
+	"\x10report_ping_role\x18\x04 \x01(\tR\x0ereportPingRole\"\xd2\x02\n" +
+	"\x12PaceControlChannel\x12\x19\n" +
+	"\bguild_id\x18\x01 \x01(\tR\aguildId\x12\x1d\n" +
+	"\n" +
+	"channel_id\x18\x02 \x01(\tR\tchannelId\x12\x18\n" +
+	"\aenabled\x18\x03 \x01(\bR\aenabled\x12\x1d\n" +
+	"\n" +
+	"target_wpm\x18\x04 \x01(\x05R\ttargetWpm\x12!\n" +
+	"\fmin_slowmode\x18\x05 \x01(\x05R\vminSlowmode\x12!\n" +
+	"\fmax_slowmode\x18\x06 \x01(\x05R\vmaxSlowmode\x12%\n" +
+	"\x0eactivation_wpm\x18\a \x01(\x05R\ractivationWpm\x12,\n" +
+	"\x12wpm_window_seconds\x18\b \x01(\x05R\x10wpmWindowSeconds\x12.\n" +
+	"\x13user_window_seconds\x18\t \x01(\x05R\x11userWindowSeconds\"2\n" +
+	"\x15GetPaceControlRequest\x12\x19\n" +
+	"\bguild_id\x18\x01 \x01(\tR\aguildId\"V\n" +
+	"\x16GetPaceControlResponse\x12<\n" +
+	"\bchannels\x18\x01 \x03(\v2 .heimdallr.v1.PaceControlChannelR\bchannels\"V\n" +
+	"\x18UpdatePaceControlRequest\x12:\n" +
+	"\achannel\x18\x01 \x01(\v2 .heimdallr.v1.PaceControlChannelR\achannel\"T\n" +
+	"\x18DeletePaceControlRequest\x12\x19\n" +
+	"\bguild_id\x18\x01 \x01(\tR\aguildId\x12\x1d\n" +
+	"\n" +
+	"channel_id\x18\x02 \x01(\tR\tchannelId\"z\n" +
 	"\aChannel\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x12\n" +
@@ -1853,7 +2168,7 @@ const file_heimdallr_v1_guild_settings_proto_rawDesc = "" +
 	"\vdescription\x18\x02 \x01(\tR\vdescription\" \n" +
 	"\x1eGetTemplatePlaceholdersRequest\"h\n" +
 	"\x1fGetTemplatePlaceholdersResponse\x12E\n" +
-	"\fplaceholders\x18\x01 \x03(\v2!.heimdallr.v1.TemplatePlaceholderR\fplaceholders2\x9b\x0e\n" +
+	"\fplaceholders\x18\x01 \x03(\v2!.heimdallr.v1.TemplatePlaceholderR\fplaceholders2\xb6\x10\n" +
 	"\x14GuildSettingsService\x12U\n" +
 	"\rGetModChannel\x12\".heimdallr.v1.GetModChannelRequest\x1a .heimdallr.v1.ModChannelSettings\x12[\n" +
 	"\x10UpdateModChannel\x12%.heimdallr.v1.UpdateModChannelRequest\x1a .heimdallr.v1.ModChannelSettings\x12e\n" +
@@ -1872,7 +2187,10 @@ const file_heimdallr_v1_guild_settings_proto_rawDesc = "" +
 	"\fListChannels\x12!.heimdallr.v1.ListChannelsRequest\x1a\".heimdallr.v1.ListChannelsResponse\x12L\n" +
 	"\tListRoles\x12\x1e.heimdallr.v1.ListRolesRequest\x1a\x1f.heimdallr.v1.ListRolesResponse\x12v\n" +
 	"\x17GetTemplatePlaceholders\x12,.heimdallr.v1.GetTemplatePlaceholdersRequest\x1a-.heimdallr.v1.GetTemplatePlaceholdersResponse\x12p\n" +
-	"\x15SendComponentsMessage\x12*.heimdallr.v1.SendComponentsMessageRequest\x1a+.heimdallr.v1.SendComponentsMessageResponseB\xb7\x01\n" +
+	"\x15SendComponentsMessage\x12*.heimdallr.v1.SendComponentsMessageRequest\x1a+.heimdallr.v1.SendComponentsMessageResponse\x12[\n" +
+	"\x0eGetPaceControl\x12#.heimdallr.v1.GetPaceControlRequest\x1a$.heimdallr.v1.GetPaceControlResponse\x12]\n" +
+	"\x11UpdatePaceControl\x12&.heimdallr.v1.UpdatePaceControlRequest\x1a .heimdallr.v1.PaceControlChannel\x12]\n" +
+	"\x11DeletePaceControl\x12&.heimdallr.v1.DeletePaceControlRequest\x1a .heimdallr.v1.PaceControlChannelB\xb7\x01\n" +
 	"\x10com.heimdallr.v1B\x12GuildSettingsProtoP\x01Z>github.com/NLLCommunity/heimdallr/gen/heimdallr/v1;heimdallrv1\xa2\x02\x03HXX\xaa\x02\fHeimdallr.V1\xca\x02\fHeimdallr\\V1\xe2\x02\x18Heimdallr\\V1\\GPBMetadata\xea\x02\rHeimdallr::V1b\x06proto3"
 
 var (
@@ -1887,7 +2205,7 @@ func file_heimdallr_v1_guild_settings_proto_rawDescGZIP() []byte {
 	return file_heimdallr_v1_guild_settings_proto_rawDescData
 }
 
-var file_heimdallr_v1_guild_settings_proto_msgTypes = make([]protoimpl.MessageInfo, 32)
+var file_heimdallr_v1_guild_settings_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_heimdallr_v1_guild_settings_proto_goTypes = []any{
 	(*GetModChannelRequest)(nil),            // 0: heimdallr.v1.GetModChannelRequest
 	(*UpdateModChannelRequest)(nil),         // 1: heimdallr.v1.UpdateModChannelRequest
@@ -1910,17 +2228,22 @@ var file_heimdallr_v1_guild_settings_proto_goTypes = []any{
 	(*GetModmailSettingsRequest)(nil),       // 18: heimdallr.v1.GetModmailSettingsRequest
 	(*UpdateModmailSettingsRequest)(nil),    // 19: heimdallr.v1.UpdateModmailSettingsRequest
 	(*ModmailSettings)(nil),                 // 20: heimdallr.v1.ModmailSettings
-	(*Channel)(nil),                         // 21: heimdallr.v1.Channel
-	(*Role)(nil),                            // 22: heimdallr.v1.Role
-	(*ListChannelsRequest)(nil),             // 23: heimdallr.v1.ListChannelsRequest
-	(*ListChannelsResponse)(nil),            // 24: heimdallr.v1.ListChannelsResponse
-	(*ListRolesRequest)(nil),                // 25: heimdallr.v1.ListRolesRequest
-	(*ListRolesResponse)(nil),               // 26: heimdallr.v1.ListRolesResponse
-	(*SendComponentsMessageRequest)(nil),    // 27: heimdallr.v1.SendComponentsMessageRequest
-	(*SendComponentsMessageResponse)(nil),   // 28: heimdallr.v1.SendComponentsMessageResponse
-	(*TemplatePlaceholder)(nil),             // 29: heimdallr.v1.TemplatePlaceholder
-	(*GetTemplatePlaceholdersRequest)(nil),  // 30: heimdallr.v1.GetTemplatePlaceholdersRequest
-	(*GetTemplatePlaceholdersResponse)(nil), // 31: heimdallr.v1.GetTemplatePlaceholdersResponse
+	(*PaceControlChannel)(nil),              // 21: heimdallr.v1.PaceControlChannel
+	(*GetPaceControlRequest)(nil),           // 22: heimdallr.v1.GetPaceControlRequest
+	(*GetPaceControlResponse)(nil),          // 23: heimdallr.v1.GetPaceControlResponse
+	(*UpdatePaceControlRequest)(nil),        // 24: heimdallr.v1.UpdatePaceControlRequest
+	(*DeletePaceControlRequest)(nil),        // 25: heimdallr.v1.DeletePaceControlRequest
+	(*Channel)(nil),                         // 26: heimdallr.v1.Channel
+	(*Role)(nil),                            // 27: heimdallr.v1.Role
+	(*ListChannelsRequest)(nil),             // 28: heimdallr.v1.ListChannelsRequest
+	(*ListChannelsResponse)(nil),            // 29: heimdallr.v1.ListChannelsResponse
+	(*ListRolesRequest)(nil),                // 30: heimdallr.v1.ListRolesRequest
+	(*ListRolesResponse)(nil),               // 31: heimdallr.v1.ListRolesResponse
+	(*SendComponentsMessageRequest)(nil),    // 32: heimdallr.v1.SendComponentsMessageRequest
+	(*SendComponentsMessageResponse)(nil),   // 33: heimdallr.v1.SendComponentsMessageResponse
+	(*TemplatePlaceholder)(nil),             // 34: heimdallr.v1.TemplatePlaceholder
+	(*GetTemplatePlaceholdersRequest)(nil),  // 35: heimdallr.v1.GetTemplatePlaceholdersRequest
+	(*GetTemplatePlaceholdersResponse)(nil), // 36: heimdallr.v1.GetTemplatePlaceholdersResponse
 }
 var file_heimdallr_v1_guild_settings_proto_depIdxs = []int32{
 	2,  // 0: heimdallr.v1.UpdateModChannelRequest.settings:type_name -> heimdallr.v1.ModChannelSettings
@@ -1930,50 +2253,58 @@ var file_heimdallr_v1_guild_settings_proto_depIdxs = []int32{
 	14, // 4: heimdallr.v1.UpdateAntiSpamSettingsRequest.settings:type_name -> heimdallr.v1.AntiSpamSettings
 	17, // 5: heimdallr.v1.UpdateBanFooterSettingsRequest.settings:type_name -> heimdallr.v1.BanFooterSettings
 	20, // 6: heimdallr.v1.UpdateModmailSettingsRequest.settings:type_name -> heimdallr.v1.ModmailSettings
-	21, // 7: heimdallr.v1.ListChannelsResponse.channels:type_name -> heimdallr.v1.Channel
-	22, // 8: heimdallr.v1.ListRolesResponse.roles:type_name -> heimdallr.v1.Role
-	29, // 9: heimdallr.v1.GetTemplatePlaceholdersResponse.placeholders:type_name -> heimdallr.v1.TemplatePlaceholder
-	0,  // 10: heimdallr.v1.GuildSettingsService.GetModChannel:input_type -> heimdallr.v1.GetModChannelRequest
-	1,  // 11: heimdallr.v1.GuildSettingsService.UpdateModChannel:input_type -> heimdallr.v1.UpdateModChannelRequest
-	3,  // 12: heimdallr.v1.GuildSettingsService.GetInfractionSettings:input_type -> heimdallr.v1.GetInfractionSettingsRequest
-	4,  // 13: heimdallr.v1.GuildSettingsService.UpdateInfractionSettings:input_type -> heimdallr.v1.UpdateInfractionSettingsRequest
-	6,  // 14: heimdallr.v1.GuildSettingsService.GetGatekeepSettings:input_type -> heimdallr.v1.GetGatekeepSettingsRequest
-	7,  // 15: heimdallr.v1.GuildSettingsService.UpdateGatekeepSettings:input_type -> heimdallr.v1.UpdateGatekeepSettingsRequest
-	9,  // 16: heimdallr.v1.GuildSettingsService.GetJoinLeaveSettings:input_type -> heimdallr.v1.GetJoinLeaveSettingsRequest
-	10, // 17: heimdallr.v1.GuildSettingsService.UpdateJoinLeaveSettings:input_type -> heimdallr.v1.UpdateJoinLeaveSettingsRequest
-	12, // 18: heimdallr.v1.GuildSettingsService.GetAntiSpamSettings:input_type -> heimdallr.v1.GetAntiSpamSettingsRequest
-	13, // 19: heimdallr.v1.GuildSettingsService.UpdateAntiSpamSettings:input_type -> heimdallr.v1.UpdateAntiSpamSettingsRequest
-	15, // 20: heimdallr.v1.GuildSettingsService.GetBanFooterSettings:input_type -> heimdallr.v1.GetBanFooterSettingsRequest
-	16, // 21: heimdallr.v1.GuildSettingsService.UpdateBanFooterSettings:input_type -> heimdallr.v1.UpdateBanFooterSettingsRequest
-	18, // 22: heimdallr.v1.GuildSettingsService.GetModmailSettings:input_type -> heimdallr.v1.GetModmailSettingsRequest
-	19, // 23: heimdallr.v1.GuildSettingsService.UpdateModmailSettings:input_type -> heimdallr.v1.UpdateModmailSettingsRequest
-	23, // 24: heimdallr.v1.GuildSettingsService.ListChannels:input_type -> heimdallr.v1.ListChannelsRequest
-	25, // 25: heimdallr.v1.GuildSettingsService.ListRoles:input_type -> heimdallr.v1.ListRolesRequest
-	30, // 26: heimdallr.v1.GuildSettingsService.GetTemplatePlaceholders:input_type -> heimdallr.v1.GetTemplatePlaceholdersRequest
-	27, // 27: heimdallr.v1.GuildSettingsService.SendComponentsMessage:input_type -> heimdallr.v1.SendComponentsMessageRequest
-	2,  // 28: heimdallr.v1.GuildSettingsService.GetModChannel:output_type -> heimdallr.v1.ModChannelSettings
-	2,  // 29: heimdallr.v1.GuildSettingsService.UpdateModChannel:output_type -> heimdallr.v1.ModChannelSettings
-	5,  // 30: heimdallr.v1.GuildSettingsService.GetInfractionSettings:output_type -> heimdallr.v1.InfractionSettings
-	5,  // 31: heimdallr.v1.GuildSettingsService.UpdateInfractionSettings:output_type -> heimdallr.v1.InfractionSettings
-	8,  // 32: heimdallr.v1.GuildSettingsService.GetGatekeepSettings:output_type -> heimdallr.v1.GatekeepSettings
-	8,  // 33: heimdallr.v1.GuildSettingsService.UpdateGatekeepSettings:output_type -> heimdallr.v1.GatekeepSettings
-	11, // 34: heimdallr.v1.GuildSettingsService.GetJoinLeaveSettings:output_type -> heimdallr.v1.JoinLeaveSettings
-	11, // 35: heimdallr.v1.GuildSettingsService.UpdateJoinLeaveSettings:output_type -> heimdallr.v1.JoinLeaveSettings
-	14, // 36: heimdallr.v1.GuildSettingsService.GetAntiSpamSettings:output_type -> heimdallr.v1.AntiSpamSettings
-	14, // 37: heimdallr.v1.GuildSettingsService.UpdateAntiSpamSettings:output_type -> heimdallr.v1.AntiSpamSettings
-	17, // 38: heimdallr.v1.GuildSettingsService.GetBanFooterSettings:output_type -> heimdallr.v1.BanFooterSettings
-	17, // 39: heimdallr.v1.GuildSettingsService.UpdateBanFooterSettings:output_type -> heimdallr.v1.BanFooterSettings
-	20, // 40: heimdallr.v1.GuildSettingsService.GetModmailSettings:output_type -> heimdallr.v1.ModmailSettings
-	20, // 41: heimdallr.v1.GuildSettingsService.UpdateModmailSettings:output_type -> heimdallr.v1.ModmailSettings
-	24, // 42: heimdallr.v1.GuildSettingsService.ListChannels:output_type -> heimdallr.v1.ListChannelsResponse
-	26, // 43: heimdallr.v1.GuildSettingsService.ListRoles:output_type -> heimdallr.v1.ListRolesResponse
-	31, // 44: heimdallr.v1.GuildSettingsService.GetTemplatePlaceholders:output_type -> heimdallr.v1.GetTemplatePlaceholdersResponse
-	28, // 45: heimdallr.v1.GuildSettingsService.SendComponentsMessage:output_type -> heimdallr.v1.SendComponentsMessageResponse
-	28, // [28:46] is the sub-list for method output_type
-	10, // [10:28] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	21, // 7: heimdallr.v1.GetPaceControlResponse.channels:type_name -> heimdallr.v1.PaceControlChannel
+	21, // 8: heimdallr.v1.UpdatePaceControlRequest.channel:type_name -> heimdallr.v1.PaceControlChannel
+	26, // 9: heimdallr.v1.ListChannelsResponse.channels:type_name -> heimdallr.v1.Channel
+	27, // 10: heimdallr.v1.ListRolesResponse.roles:type_name -> heimdallr.v1.Role
+	34, // 11: heimdallr.v1.GetTemplatePlaceholdersResponse.placeholders:type_name -> heimdallr.v1.TemplatePlaceholder
+	0,  // 12: heimdallr.v1.GuildSettingsService.GetModChannel:input_type -> heimdallr.v1.GetModChannelRequest
+	1,  // 13: heimdallr.v1.GuildSettingsService.UpdateModChannel:input_type -> heimdallr.v1.UpdateModChannelRequest
+	3,  // 14: heimdallr.v1.GuildSettingsService.GetInfractionSettings:input_type -> heimdallr.v1.GetInfractionSettingsRequest
+	4,  // 15: heimdallr.v1.GuildSettingsService.UpdateInfractionSettings:input_type -> heimdallr.v1.UpdateInfractionSettingsRequest
+	6,  // 16: heimdallr.v1.GuildSettingsService.GetGatekeepSettings:input_type -> heimdallr.v1.GetGatekeepSettingsRequest
+	7,  // 17: heimdallr.v1.GuildSettingsService.UpdateGatekeepSettings:input_type -> heimdallr.v1.UpdateGatekeepSettingsRequest
+	9,  // 18: heimdallr.v1.GuildSettingsService.GetJoinLeaveSettings:input_type -> heimdallr.v1.GetJoinLeaveSettingsRequest
+	10, // 19: heimdallr.v1.GuildSettingsService.UpdateJoinLeaveSettings:input_type -> heimdallr.v1.UpdateJoinLeaveSettingsRequest
+	12, // 20: heimdallr.v1.GuildSettingsService.GetAntiSpamSettings:input_type -> heimdallr.v1.GetAntiSpamSettingsRequest
+	13, // 21: heimdallr.v1.GuildSettingsService.UpdateAntiSpamSettings:input_type -> heimdallr.v1.UpdateAntiSpamSettingsRequest
+	15, // 22: heimdallr.v1.GuildSettingsService.GetBanFooterSettings:input_type -> heimdallr.v1.GetBanFooterSettingsRequest
+	16, // 23: heimdallr.v1.GuildSettingsService.UpdateBanFooterSettings:input_type -> heimdallr.v1.UpdateBanFooterSettingsRequest
+	18, // 24: heimdallr.v1.GuildSettingsService.GetModmailSettings:input_type -> heimdallr.v1.GetModmailSettingsRequest
+	19, // 25: heimdallr.v1.GuildSettingsService.UpdateModmailSettings:input_type -> heimdallr.v1.UpdateModmailSettingsRequest
+	28, // 26: heimdallr.v1.GuildSettingsService.ListChannels:input_type -> heimdallr.v1.ListChannelsRequest
+	30, // 27: heimdallr.v1.GuildSettingsService.ListRoles:input_type -> heimdallr.v1.ListRolesRequest
+	35, // 28: heimdallr.v1.GuildSettingsService.GetTemplatePlaceholders:input_type -> heimdallr.v1.GetTemplatePlaceholdersRequest
+	32, // 29: heimdallr.v1.GuildSettingsService.SendComponentsMessage:input_type -> heimdallr.v1.SendComponentsMessageRequest
+	22, // 30: heimdallr.v1.GuildSettingsService.GetPaceControl:input_type -> heimdallr.v1.GetPaceControlRequest
+	24, // 31: heimdallr.v1.GuildSettingsService.UpdatePaceControl:input_type -> heimdallr.v1.UpdatePaceControlRequest
+	25, // 32: heimdallr.v1.GuildSettingsService.DeletePaceControl:input_type -> heimdallr.v1.DeletePaceControlRequest
+	2,  // 33: heimdallr.v1.GuildSettingsService.GetModChannel:output_type -> heimdallr.v1.ModChannelSettings
+	2,  // 34: heimdallr.v1.GuildSettingsService.UpdateModChannel:output_type -> heimdallr.v1.ModChannelSettings
+	5,  // 35: heimdallr.v1.GuildSettingsService.GetInfractionSettings:output_type -> heimdallr.v1.InfractionSettings
+	5,  // 36: heimdallr.v1.GuildSettingsService.UpdateInfractionSettings:output_type -> heimdallr.v1.InfractionSettings
+	8,  // 37: heimdallr.v1.GuildSettingsService.GetGatekeepSettings:output_type -> heimdallr.v1.GatekeepSettings
+	8,  // 38: heimdallr.v1.GuildSettingsService.UpdateGatekeepSettings:output_type -> heimdallr.v1.GatekeepSettings
+	11, // 39: heimdallr.v1.GuildSettingsService.GetJoinLeaveSettings:output_type -> heimdallr.v1.JoinLeaveSettings
+	11, // 40: heimdallr.v1.GuildSettingsService.UpdateJoinLeaveSettings:output_type -> heimdallr.v1.JoinLeaveSettings
+	14, // 41: heimdallr.v1.GuildSettingsService.GetAntiSpamSettings:output_type -> heimdallr.v1.AntiSpamSettings
+	14, // 42: heimdallr.v1.GuildSettingsService.UpdateAntiSpamSettings:output_type -> heimdallr.v1.AntiSpamSettings
+	17, // 43: heimdallr.v1.GuildSettingsService.GetBanFooterSettings:output_type -> heimdallr.v1.BanFooterSettings
+	17, // 44: heimdallr.v1.GuildSettingsService.UpdateBanFooterSettings:output_type -> heimdallr.v1.BanFooterSettings
+	20, // 45: heimdallr.v1.GuildSettingsService.GetModmailSettings:output_type -> heimdallr.v1.ModmailSettings
+	20, // 46: heimdallr.v1.GuildSettingsService.UpdateModmailSettings:output_type -> heimdallr.v1.ModmailSettings
+	29, // 47: heimdallr.v1.GuildSettingsService.ListChannels:output_type -> heimdallr.v1.ListChannelsResponse
+	31, // 48: heimdallr.v1.GuildSettingsService.ListRoles:output_type -> heimdallr.v1.ListRolesResponse
+	36, // 49: heimdallr.v1.GuildSettingsService.GetTemplatePlaceholders:output_type -> heimdallr.v1.GetTemplatePlaceholdersResponse
+	33, // 50: heimdallr.v1.GuildSettingsService.SendComponentsMessage:output_type -> heimdallr.v1.SendComponentsMessageResponse
+	23, // 51: heimdallr.v1.GuildSettingsService.GetPaceControl:output_type -> heimdallr.v1.GetPaceControlResponse
+	21, // 52: heimdallr.v1.GuildSettingsService.UpdatePaceControl:output_type -> heimdallr.v1.PaceControlChannel
+	21, // 53: heimdallr.v1.GuildSettingsService.DeletePaceControl:output_type -> heimdallr.v1.PaceControlChannel
+	33, // [33:54] is the sub-list for method output_type
+	12, // [12:33] is the sub-list for method input_type
+	12, // [12:12] is the sub-list for extension type_name
+	12, // [12:12] is the sub-list for extension extendee
+	0,  // [0:12] is the sub-list for field type_name
 }
 
 func init() { file_heimdallr_v1_guild_settings_proto_init() }
@@ -1987,7 +2318,7 @@ func file_heimdallr_v1_guild_settings_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_heimdallr_v1_guild_settings_proto_rawDesc), len(file_heimdallr_v1_guild_settings_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   32,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

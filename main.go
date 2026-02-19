@@ -30,6 +30,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/interactions/infractions"
 	"github.com/NLLCommunity/heimdallr/interactions/kick"
 	"github.com/NLLCommunity/heimdallr/interactions/modmail"
+	"github.com/NLLCommunity/heimdallr/interactions/pace_control"
 	"github.com/NLLCommunity/heimdallr/interactions/ping"
 	"github.com/NLLCommunity/heimdallr/interactions/prune"
 	"github.com/NLLCommunity/heimdallr/interactions/quote"
@@ -95,6 +96,7 @@ func main() {
 		quote.Register,
 		role_button.Register,
 		modmail.Register,
+		pace_control.Register,
 	}
 
 	var commandCreates []discord.ApplicationCommandCreate
@@ -128,6 +130,7 @@ func main() {
 		bot.WithEventListenerFunc(listeners.OnMemberBan),
 		bot.WithEventListenerFunc(listeners.OnAuditLog),
 		bot.WithEventListenerFunc(listeners.OnAntispamMessageCreate),
+		bot.WithEventListenerFunc(listeners.OnPaceControlMessageCreate),
 		bot.WithGatewayConfigOpts(gateway.WithIntents(intents)),
 		bot.WithCacheConfigOpts(
 			cache.WithCaches(cache.FlagsAll),
@@ -161,6 +164,7 @@ func main() {
 
 	removeTempBansTask := scheduled_tasks.RemoveTempBansScheduledTask(client)
 	removeStalePrunesTask := scheduled_tasks.RemoveStalePendingPrunes()
+	paceControlTask := scheduled_tasks.PaceControlTask(client)
 
 	go func() {
 		if err := rpcserver.StartServer(viper.GetString("rpc.address"), client); err != nil {
@@ -173,6 +177,7 @@ func main() {
 	<-s
 	removeTempBansTask.Stop()
 	removeStalePrunesTask.Stop()
+	paceControlTask.Stop()
 }
 
 func getLogLevel(level string) slog.Level {

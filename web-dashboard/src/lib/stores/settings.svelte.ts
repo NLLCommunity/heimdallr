@@ -16,6 +16,8 @@ import {
   BanFooterSettingsSchema,
   type ModmailSettings,
   ModmailSettingsSchema,
+  type PaceControlChannel,
+  PaceControlChannelSchema,
 } from "../../gen/heimdallr/v1/guild_settings_pb";
 
 export interface SectionState<T> {
@@ -24,6 +26,7 @@ export interface SectionState<T> {
   saving: boolean;
   loading: boolean;
   error: string | null;
+  success: boolean;
 }
 
 function makeDefault<T extends Message>(schema: GenMessage<T>): SectionState<T> {
@@ -33,6 +36,7 @@ function makeDefault<T extends Message>(schema: GenMessage<T>): SectionState<T> 
     saving: false,
     loading: false,
     error: null,
+    success: false,
   };
 }
 
@@ -61,10 +65,13 @@ async function saveSection<T extends Message>(
 ) {
   section.saving = true;
   section.error = null;
+  section.success = false;
   try {
     const res = await request();
     section.data = res;
     section.saved = clone(schema, res);
+    section.success = true;
+    setTimeout(() => (section.success = false), 2000);
   } catch (e: any) {
     section.error = e.message;
   } finally {
@@ -80,6 +87,25 @@ let antiSpam = $state<SectionState<AntiSpamSettings>>(makeDefault(AntiSpamSettin
 let banFooter = $state<SectionState<BanFooterSettings>>(makeDefault(BanFooterSettingsSchema));
 let modmail = $state<SectionState<ModmailSettings>>(makeDefault(ModmailSettingsSchema));
 
+export interface PaceControlState {
+  channels: PaceControlChannel[];
+  savedChannels: PaceControlChannel[];
+  loading: boolean;
+  saving: boolean;
+  error: string | null;
+  /** Channel ID that was just saved/deleted successfully, cleared after 2s. */
+  successChannelId: string | null;
+}
+
+let paceControl = $state<PaceControlState>({
+  channels: [],
+  savedChannels: [],
+  loading: false,
+  saving: false,
+  error: null,
+  successChannelId: null,
+});
+
 export function settingsStore() {
   return {
     get modChannel() { return modChannel; },
@@ -89,6 +115,7 @@ export function settingsStore() {
     get antiSpam() { return antiSpam; },
     get banFooter() { return banFooter; },
     get modmail() { return modmail; },
+    get paceControl() { return paceControl; },
 
     async loadAll(guildId: string) {
       await Promise.all([
@@ -99,6 +126,7 @@ export function settingsStore() {
         this.loadAntiSpam(guildId),
         this.loadBanFooter(guildId),
         this.loadModmail(guildId),
+        this.loadPaceControl(guildId),
       ]);
     },
 
@@ -163,6 +191,68 @@ export function settingsStore() {
     async saveModmail() {
       await saveSection(modmail, ModmailSettingsSchema,
         () => settingsClient.updateModmailSettings({ settings: modmail.data }));
+    },
+
+    async loadPaceControl(guildId: string) {
+      paceControl.loading = true;
+      paceControl.error = null;
+      try {
+        const res = await settingsClient.getPaceControl({ guildId });
+        paceControl.channels = res.channels;
+        paceControl.savedChannels = res.channels.map((c) =>
+          clone(PaceControlChannelSchema, c),
+        );
+      } catch (e: any) {
+        paceControl.error = e.message;
+      } finally {
+        paceControl.loading = false;
+      }
+    },
+
+    async savePaceControlChannel(channel: PaceControlChannel) {
+      paceControl.saving = true;
+      paceControl.error = null;
+      paceControl.successChannelId = null;
+      try {
+        const res = await settingsClient.updatePaceControl({ channel });
+        const idx = paceControl.channels.findIndex(
+          (c) => c.channelId === res.channelId,
+        );
+        if (idx >= 0) {
+          paceControl.channels[idx] = res;
+          paceControl.savedChannels[idx] = clone(PaceControlChannelSchema, res);
+        } else {
+          paceControl.channels = [...paceControl.channels, res];
+          paceControl.savedChannels = [
+            ...paceControl.savedChannels,
+            clone(PaceControlChannelSchema, res),
+          ];
+        }
+        paceControl.successChannelId = res.channelId;
+        setTimeout(() => (paceControl.successChannelId = null), 2000);
+      } catch (e: any) {
+        paceControl.error = e.message;
+      } finally {
+        paceControl.saving = false;
+      }
+    },
+
+    async deletePaceControlChannel(guildId: string, channelId: string) {
+      paceControl.saving = true;
+      paceControl.error = null;
+      try {
+        await settingsClient.deletePaceControl({ guildId, channelId });
+        paceControl.channels = paceControl.channels.filter(
+          (c) => c.channelId !== channelId,
+        );
+        paceControl.savedChannels = paceControl.savedChannels.filter(
+          (c) => c.channelId !== channelId,
+        );
+      } catch (e: any) {
+        paceControl.error = e.message;
+      } finally {
+        paceControl.saving = false;
+      }
     },
   };
 }

@@ -569,3 +569,94 @@ func (s *guildSettingsService) SendComponentsMessage(ctx context.Context, req *h
 		MessageId: msg.ID.String(),
 	}, nil
 }
+
+// --- PaceControl ---
+
+func paceControlToProto(pc *model.PaceControl) *heimdallrv1.PaceControlChannel {
+	return &heimdallrv1.PaceControlChannel{
+		GuildId:           pc.GuildID.String(),
+		ChannelId:         pc.ChannelID.String(),
+		Enabled:           pc.Enabled,
+		TargetWpm:         int32(pc.TargetWPM),
+		MinSlowmode:       int32(pc.MinSlowmode),
+		MaxSlowmode:       int32(pc.MaxSlowmode),
+		ActivationWpm:     int32(pc.ActivationWPM),
+		WpmWindowSeconds:  int32(pc.WPMWindowSeconds),
+		UserWindowSeconds: int32(pc.UserWindowSeconds),
+	}
+}
+
+func (s *guildSettingsService) GetPaceControl(ctx context.Context, req *heimdallrv1.GetPaceControlRequest) (*heimdallrv1.GetPaceControlResponse, error) {
+	guildID, err := checkGuildAdmin(ctx, s.client, req.GetGuildId())
+	if err != nil {
+		return nil, err
+	}
+
+	channels, err := model.GetPaceControlChannels(guildID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to load pace control settings"))
+	}
+
+	var result []*heimdallrv1.PaceControlChannel
+	for i := range channels {
+		result = append(result, paceControlToProto(&channels[i]))
+	}
+
+	return &heimdallrv1.GetPaceControlResponse{Channels: result}, nil
+}
+
+func (s *guildSettingsService) UpdatePaceControl(ctx context.Context, req *heimdallrv1.UpdatePaceControlRequest) (*heimdallrv1.PaceControlChannel, error) {
+	proto := req.GetChannel()
+	guildID, err := checkGuildAdmin(ctx, s.client, proto.GetGuildId())
+	if err != nil {
+		return nil, err
+	}
+
+	channelID := parseSnowflake(proto.GetChannelId())
+	if channelID == 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid channel ID"))
+	}
+
+	pc := &model.PaceControl{
+		GuildID:           guildID,
+		ChannelID:         channelID,
+		Enabled:           proto.GetEnabled(),
+		TargetWPM:         int(proto.GetTargetWpm()),
+		MinSlowmode:       int(proto.GetMinSlowmode()),
+		MaxSlowmode:       int(proto.GetMaxSlowmode()),
+		ActivationWPM:     int(proto.GetActivationWpm()),
+		WPMWindowSeconds:  int(proto.GetWpmWindowSeconds()),
+		UserWindowSeconds: int(proto.GetUserWindowSeconds()),
+	}
+
+	if err := model.SetPaceControl(pc); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to save pace control settings"))
+	}
+
+	return paceControlToProto(pc), nil
+}
+
+func (s *guildSettingsService) DeletePaceControl(ctx context.Context, req *heimdallrv1.DeletePaceControlRequest) (*heimdallrv1.PaceControlChannel, error) {
+	guildID, err := checkGuildAdmin(ctx, s.client, req.GetGuildId())
+	if err != nil {
+		return nil, err
+	}
+
+	channelID := parseSnowflake(req.GetChannelId())
+	if channelID == 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid channel ID"))
+	}
+
+	pc, err := model.GetPaceControl(guildID, channelID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("pace control not found"))
+	}
+
+	result := paceControlToProto(pc)
+
+	if err := model.DeletePaceControl(guildID, channelID); err != nil {
+		return nil, connect.NewError(connect.CodeInternal, errors.New("failed to delete pace control settings"))
+	}
+
+	return result, nil
+}

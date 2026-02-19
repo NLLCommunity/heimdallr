@@ -2,11 +2,12 @@
   interface Props {
     dirty: boolean;
     saving: boolean;
+    success: boolean;
     error: string | null;
     onsave: () => void;
   }
 
-  let { dirty, saving, error, onsave }: Props = $props();
+  let { dirty, saving, success, error, onsave }: Props = $props();
 </script>
 
 <div class="mt-4 flex items-center gap-3">
@@ -22,6 +23,9 @@
       Save
     {/if}
   </button>
+  {#if success}
+    <span class="text-success text-sm">Saved</span>
+  {/if}
   {#if error}
     <span class="text-error text-sm">{error}</span>
   {/if}

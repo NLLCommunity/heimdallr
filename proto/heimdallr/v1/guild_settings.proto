@@ -121,6 +121,36 @@ message ModmailSettings {
   string report_ping_role = 4;
 }
 
+// PaceControl
+message PaceControlChannel {
+  string guild_id = 1;
+  string channel_id = 2;
+  bool enabled = 3;
+  int32 target_wpm = 4;
+  int32 min_slowmode = 5;
+  int32 max_slowmode = 6;
+  int32 activation_wpm = 7;
+  int32 wpm_window_seconds = 8;
+  int32 user_window_seconds = 9;
+}
+
+message GetPaceControlRequest {
+  string guild_id = 1;
+}
+
+message GetPaceControlResponse {
+  repeated PaceControlChannel channels = 1;
+}
+
+message UpdatePaceControlRequest {
+  PaceControlChannel channel = 1;
+}
+
+message DeletePaceControlRequest {
+  string guild_id = 1;
+  string channel_id = 2;
+}
+
 // Guild data (channels & roles)
 message Channel {
   string id = 1;
@@ -205,4 +235,8 @@ service GuildSettingsService {
   rpc GetTemplatePlaceholders(GetTemplatePlaceholdersRequest) returns (GetTemplatePlaceholdersResponse);
 
   rpc SendComponentsMessage(SendComponentsMessageRequest) returns (SendComponentsMessageResponse);
+
+  rpc GetPaceControl(GetPaceControlRequest) returns (GetPaceControlResponse);
+  rpc UpdatePaceControl(UpdatePaceControlRequest) returns (PaceControlChannel);
+  rpc DeletePaceControl(DeletePaceControlRequest) returns (PaceControlChannel);
 }

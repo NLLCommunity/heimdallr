@@ -10,7 +10,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file heimdallr/v1/guild_settings.proto.
  */
 export const file_heimdallr_v1_guild_settings: GenFile = /*@__PURE__*/
-  fileDesc("CiFoZWltZGFsbHIvdjEvZ3VpbGRfc2V0dGluZ3MucHJvdG8SDGhlaW1kYWxsci52MSIoChRHZXRNb2RDaGFubmVsUmVxdWVzdBIQCghndWlsZF9pZBgBIAEoCSJNChdVcGRhdGVNb2RDaGFubmVsUmVxdWVzdBIyCghzZXR0aW5ncxgBIAEoCzIgLmhlaW1kYWxsci52MS5Nb2RDaGFubmVsU2V0dGluZ3MiQQoSTW9kQ2hhbm5lbFNldHRpbmdzEhAKCGd1aWxkX2lkGAEgASgJEhkKEW1vZGVyYXRvcl9jaGFubmVsGAIgASgJIjAKHEdldEluZnJhY3Rpb25TZXR0aW5nc1JlcXVlc3QSEAoIZ3VpbGRfaWQYASABKAkiVQofVXBkYXRlSW5mcmFjdGlvblNldHRpbmdzUmVxdWVzdBIyCghzZXR0aW5ncxgBIAEoCzIgLmhlaW1kYWxsci52MS5JbmZyYWN0aW9uU2V0dGluZ3MiigEKEkluZnJhY3Rpb25TZXR0aW5ncxIQCghndWlsZF9pZBgBIAEoCRIWCg5oYWxmX2xpZmVfZGF5cxgCIAEoARIiChpub3RpZnlfb25fd2FybmVkX3VzZXJfam9pbhgDIAEoCBImCh5ub3RpZnlfd2Fybl9zZXZlcml0eV90aHJlc2hvbGQYBCABKAEiLgoaR2V0R2F0ZWtlZXBTZXR0aW5nc1JlcXVlc3QSEAoIZ3VpbGRfaWQYASABKAkiUQodVXBkYXRlR2F0ZWtlZXBTZXR0aW5nc1JlcXVlc3QSMAoIc2V0dGluZ3MYASABKAsyHi5oZWltZGFsbHIudjEuR2F0ZWtlZXBTZXR0aW5ncyLdAQoQR2F0ZWtlZXBTZXR0aW5ncxIQCghndWlsZF9pZBgBIAEoCRIPCgdlbmFibGVkGAIgASgIEhQKDHBlbmRpbmdfcm9sZRgDIAEoCRIVCg1hcHByb3ZlZF9yb2xlGAQgASgJEiAKGGFkZF9wZW5kaW5nX3JvbGVfb25fam9pbhgFIAEoCBIYChBhcHByb3ZlZF9tZXNzYWdlGAYgASgJEhsKE2FwcHJvdmVkX21lc3NhZ2VfdjIYByABKAgSIAoYYXBwcm92ZWRfbWVzc2FnZV92Ml9qc29uGAggASgJIi8KG0dldEpvaW5MZWF2ZVNldHRpbmdzUmVxdWVzdBIQCghndWlsZF9pZBgBIAEoCSJTCh5VcGRhdGVKb2luTGVhdmVTZXR0aW5nc1JlcXVlc3QSMQoIc2V0dGluZ3MYASABKAsyHy5oZWltZGFsbHIudjEuSm9pbkxlYXZlU2V0dGluZ3MikAIKEUpvaW5MZWF2ZVNldHRpbmdzEhAKCGd1aWxkX2lkGAEgASgJEhwKFGpvaW5fbWVzc2FnZV9lbmFibGVkGAIgASgIEhQKDGpvaW5fbWVzc2FnZRgDIAEoCRIdChVsZWF2ZV9tZXNzYWdlX2VuYWJsZWQYBCABKAgSFQoNbGVhdmVfbWVzc2FnZRgFIAEoCRIPCgdjaGFubmVsGAYgASgJEhcKD2pvaW5fbWVzc2FnZV92MhgHIAEoCBIcChRqb2luX21lc3NhZ2VfdjJfanNvbhgIIAEoCRIYChBsZWF2ZV9tZXNzYWdlX3YyGAkgASgIEh0KFWxlYXZlX21lc3NhZ2VfdjJfanNvbhgKIAEoCSIuChpHZXRBbnRpU3BhbVNldHRpbmdzUmVxdWVzdBIQCghndWlsZF9pZBgBIAEoCSJRCh1VcGRhdGVBbnRpU3BhbVNldHRpbmdzUmVxdWVzdBIwCghzZXR0aW5ncxgBIAEoCzIeLmhlaW1kYWxsci52MS5BbnRpU3BhbVNldHRpbmdzIl4KEEFudGlTcGFtU2V0dGluZ3MSEAoIZ3VpbGRfaWQYASABKAkSDwoHZW5hYmxlZBgCIAEoCBINCgVjb3VudBgDIAEoBRIYChBjb29sZG93bl9zZWNvbmRzGAQgASgFIi8KG0dldEJhbkZvb3RlclNldHRpbmdzUmVxdWVzdBIQCghndWlsZF9pZBgBIAEoCSJTCh5VcGRhdGVCYW5Gb290ZXJTZXR0aW5nc1JlcXVlc3QSMQoIc2V0dGluZ3MYASABKAsyHy5oZWltZGFsbHIudjEuQmFuRm9vdGVyU2V0dGluZ3MiSgoRQmFuRm9vdGVyU2V0dGluZ3MSEAoIZ3VpbGRfaWQYASABKAkSDgoGZm9vdGVyGAIgASgJEhMKC2Fsd2F5c19zZW5kGAMgASgIIi0KGUdldE1vZG1haWxTZXR0aW5nc1JlcXVlc3QSEAoIZ3VpbGRfaWQYASABKAkiTwocVXBkYXRlTW9kbWFpbFNldHRpbmdzUmVxdWVzdBIvCghzZXR0aW5ncxgBIAEoCzIdLmhlaW1kYWxsci52MS5Nb2RtYWlsU2V0dGluZ3MiggEKD01vZG1haWxTZXR0aW5ncxIQCghndWlsZF9pZBgBIAEoCRIeChZyZXBvcnRfdGhyZWFkc19jaGFubmVsGAIgASgJEiMKG3JlcG9ydF9ub3RpZmljYXRpb25fY2hhbm5lbBgDIAEoCRIYChByZXBvcnRfcGluZ19yb2xlGAQgASgJIlYKB0NoYW5uZWwSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIMCgR0eXBlGAMgASgFEhAKCHBvc2l0aW9uGAQgASgFEhEKCXBhcmVudF9pZBgFIAEoCSJSCgRSb2xlEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDQoFY29sb3IYAyABKAUSEAoIcG9zaXRpb24YBCABKAUSDwoHbWFuYWdlZBgFIAEoCCInChNMaXN0Q2hhbm5lbHNSZXF1ZXN0EhAKCGd1aWxkX2lkGAEgASgJIj8KFExpc3RDaGFubmVsc1Jlc3BvbnNlEicKCGNoYW5uZWxzGAEgAygLMhUuaGVpbWRhbGxyLnYxLkNoYW5uZWwiJAoQTGlzdFJvbGVzUmVxdWVzdBIQCghndWlsZF9pZBgBIAEoCSI2ChFMaXN0Um9sZXNSZXNwb25zZRIhCgVyb2xlcxgBIAMoCzISLmhlaW1kYWxsci52MS5Sb2xlIl0KHFNlbmRDb21wb25lbnRzTWVzc2FnZVJlcXVlc3QSEAoIZ3VpbGRfaWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRIXCg9jb21wb25lbnRzX2pzb24YAyABKAkiMwodU2VuZENvbXBvbmVudHNNZXNzYWdlUmVzcG9uc2USEgoKbWVzc2FnZV9pZBgBIAEoCSI/ChNUZW1wbGF0ZVBsYWNlaG9sZGVyEhMKC3BsYWNlaG9sZGVyGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJIiAKHkdldFRlbXBsYXRlUGxhY2Vob2xkZXJzUmVxdWVzdCJaCh9HZXRUZW1wbGF0ZVBsYWNlaG9sZGVyc1Jlc3BvbnNlEjcKDHBsYWNlaG9sZGVycxgBIAMoCzIhLmhlaW1kYWxsci52MS5UZW1wbGF0ZVBsYWNlaG9sZGVyMpsOChRHdWlsZFNldHRpbmdzU2VydmljZRJVCg1HZXRNb2RDaGFubmVsEiIuaGVpbWRhbGxyLnYxLkdldE1vZENoYW5uZWxSZXF1ZXN0GiAuaGVpbWRhbGxyLnYxLk1vZENoYW5uZWxTZXR0aW5ncxJbChBVcGRhdGVNb2RDaGFubmVsEiUuaGVpbWRhbGxyLnYxLlVwZGF0ZU1vZENoYW5uZWxSZXF1ZXN0GiAuaGVpbWRhbGxyLnYxLk1vZENoYW5uZWxTZXR0aW5ncxJlChVHZXRJbmZyYWN0aW9uU2V0dGluZ3MSKi5oZWltZGFsbHIudjEuR2V0SW5mcmFjdGlvblNldHRpbmdzUmVxdWVzdBogLmhlaW1kYWxsci52MS5JbmZyYWN0aW9uU2V0dGluZ3MSawoYVXBkYXRlSW5mcmFjdGlvblNldHRpbmdzEi0uaGVpbWRhbGxyLnYxLlVwZGF0ZUluZnJhY3Rpb25TZXR0aW5nc1JlcXVlc3QaIC5oZWltZGFsbHIudjEuSW5mcmFjdGlvblNldHRpbmdzEl8KE0dldEdhdGVrZWVwU2V0dGluZ3MSKC5oZWltZGFsbHIudjEuR2V0R2F0ZWtlZXBTZXR0aW5nc1JlcXVlc3QaHi5oZWltZGFsbHIudjEuR2F0ZWtlZXBTZXR0aW5ncxJlChZVcGRhdGVHYXRla2VlcFNldHRpbmdzEisuaGVpbWRhbGxyLnYxLlVwZGF0ZUdhdGVrZWVwU2V0dGluZ3NSZXF1ZXN0Gh4uaGVpbWRhbGxyLnYxLkdhdGVrZWVwU2V0dGluZ3MSYgoUR2V0Sm9pbkxlYXZlU2V0dGluZ3MSKS5oZWltZGFsbHIudjEuR2V0Sm9pbkxlYXZlU2V0dGluZ3NSZXF1ZXN0Gh8uaGVpbWRhbGxyLnYxLkpvaW5MZWF2ZVNldHRpbmdzEmgKF1VwZGF0ZUpvaW5MZWF2ZVNldHRpbmdzEiwuaGVpbWRhbGxyLnYxLlVwZGF0ZUpvaW5MZWF2ZVNldHRpbmdzUmVxdWVzdBofLmhlaW1kYWxsci52MS5Kb2luTGVhdmVTZXR0aW5ncxJfChNHZXRBbnRpU3BhbVNldHRpbmdzEiguaGVpbWRhbGxyLnYxLkdldEFudGlTcGFtU2V0dGluZ3NSZXF1ZXN0Gh4uaGVpbWRhbGxyLnYxLkFudGlTcGFtU2V0dGluZ3MSZQoWVXBkYXRlQW50aVNwYW1TZXR0aW5ncxIrLmhlaW1kYWxsci52MS5VcGRhdGVBbnRpU3BhbVNldHRpbmdzUmVxdWVzdBoeLmhlaW1kYWxsci52MS5BbnRpU3BhbVNldHRpbmdzEmIKFEdldEJhbkZvb3RlclNldHRpbmdzEikuaGVpbWRhbGxyLnYxLkdldEJhbkZvb3RlclNldHRpbmdzUmVxdWVzdBofLmhlaW1kYWxsci52MS5CYW5Gb290ZXJTZXR0aW5ncxJoChdVcGRhdGVCYW5Gb290ZXJTZXR0aW5ncxIsLmhlaW1kYWxsci52MS5VcGRhdGVCYW5Gb290ZXJTZXR0aW5nc1JlcXVlc3QaHy5oZWltZGFsbHIudjEuQmFuRm9vdGVyU2V0dGluZ3MSXAoSR2V0TW9kbWFpbFNldHRpbmdzEicuaGVpbWRhbGxyLnYxLkdldE1vZG1haWxTZXR0aW5nc1JlcXVlc3QaHS5oZWltZGFsbHIudjEuTW9kbWFpbFNldHRpbmdzEmIKFVVwZGF0ZU1vZG1haWxTZXR0aW5ncxIqLmhlaW1kYWxsci52MS5VcGRhdGVNb2RtYWlsU2V0dGluZ3NSZXF1ZXN0Gh0uaGVpbWRhbGxyLnYxLk1vZG1haWxTZXR0aW5ncxJVCgxMaXN0Q2hhbm5lbHMSIS5oZWltZGFsbHIudjEuTGlzdENoYW5uZWxzUmVxdWVzdBoiLmhlaW1kYWxsci52MS5MaXN0Q2hhbm5lbHNSZXNwb25zZRJMCglMaXN0Um9sZXMSHi5oZWltZGFsbHIudjEuTGlzdFJvbGVzUmVxdWVzdBofLmhlaW1kYWxsci52MS5MaXN0Um9sZXNSZXNwb25zZRJ2ChdHZXRUZW1wbGF0ZVBsYWNlaG9sZGVycxIsLmhlaW1kYWxsci52MS5HZXRUZW1wbGF0ZVBsYWNlaG9sZGVyc1JlcXVlc3QaLS5oZWltZGFsbHIudjEuR2V0VGVtcGxhdGVQbGFjZWhvbGRlcnNSZXNwb25zZRJwChVTZW5kQ29tcG9uZW50c01lc3NhZ2USKi5oZWltZGFsbHIudjEuU2VuZENvbXBvbmVudHNNZXNzYWdlUmVxdWVzdBorLmhlaW1kYWxsci52MS5TZW5kQ29tcG9uZW50c01lc3NhZ2VSZXNwb25zZUK3AQoQY29tLmhlaW1kYWxsci52MUISR3VpbGRTZXR0aW5nc1Byb3RvUAFaPmdpdGh1Yi5jb20vTkxMQ29tbXVuaXR5L2hlaW1kYWxsci9nZW4vaGVpbWRhbGxyL3YxO2hlaW1kYWxscnYxogIDSFhYqgIMSGVpbWRhbGxyLlYxygIMSGVpbWRhbGxyXFYx4gIYSGVpbWRhbGxyXFYxXEdQQk1ldGFkYXRh6gINSGVpbWRhbGxyOjpWMWIGcHJvdG8z");
+  fileDesc("CiFoZWltZGFsbHIvdjEvZ3VpbGRfc2V0dGluZ3MucHJvdG8SDGhlaW1kYWxsci52MSIoChRHZXRNb2RDaGFubmVsUmVxdWVzdBIQCghndWlsZF9pZBgBIAEoCSJNChdVcGRhdGVNb2RDaGFubmVsUmVxdWVzdBIyCghzZXR0aW5ncxgBIAEoCzIgLmhlaW1kYWxsci52MS5Nb2RDaGFubmVsU2V0dGluZ3MiQQoSTW9kQ2hhbm5lbFNldHRpbmdzEhAKCGd1aWxkX2lkGAEgASgJEhkKEW1vZGVyYXRvcl9jaGFubmVsGAIgASgJIjAKHEdldEluZnJhY3Rpb25TZXR0aW5nc1JlcXVlc3QSEAoIZ3VpbGRfaWQYASABKAkiVQofVXBkYXRlSW5mcmFjdGlvblNldHRpbmdzUmVxdWVzdBIyCghzZXR0aW5ncxgBIAEoCzIgLmhlaW1kYWxsci52MS5JbmZyYWN0aW9uU2V0dGluZ3MiigEKEkluZnJhY3Rpb25TZXR0aW5ncxIQCghndWlsZF9pZBgBIAEoCRIWCg5oYWxmX2xpZmVfZGF5cxgCIAEoARIiChpub3RpZnlfb25fd2FybmVkX3VzZXJfam9pbhgDIAEoCBImCh5ub3RpZnlfd2Fybl9zZXZlcml0eV90aHJlc2hvbGQYBCABKAEiLgoaR2V0R2F0ZWtlZXBTZXR0aW5nc1JlcXVlc3QSEAoIZ3VpbGRfaWQYASABKAkiUQodVXBkYXRlR2F0ZWtlZXBTZXR0aW5nc1JlcXVlc3QSMAoIc2V0dGluZ3MYASABKAsyHi5oZWltZGFsbHIudjEuR2F0ZWtlZXBTZXR0aW5ncyLdAQoQR2F0ZWtlZXBTZXR0aW5ncxIQCghndWlsZF9pZBgBIAEoCRIPCgdlbmFibGVkGAIgASgIEhQKDHBlbmRpbmdfcm9sZRgDIAEoCRIVCg1hcHByb3ZlZF9yb2xlGAQgASgJEiAKGGFkZF9wZW5kaW5nX3JvbGVfb25fam9pbhgFIAEoCBIYChBhcHByb3ZlZF9tZXNzYWdlGAYgASgJEhsKE2FwcHJvdmVkX21lc3NhZ2VfdjIYByABKAgSIAoYYXBwcm92ZWRfbWVzc2FnZV92Ml9qc29uGAggASgJIi8KG0dldEpvaW5MZWF2ZVNldHRpbmdzUmVxdWVzdBIQCghndWlsZF9pZBgBIAEoCSJTCh5VcGRhdGVKb2luTGVhdmVTZXR0aW5nc1JlcXVlc3QSMQoIc2V0dGluZ3MYASABKAsyHy5oZWltZGFsbHIudjEuSm9pbkxlYXZlU2V0dGluZ3MikAIKEUpvaW5MZWF2ZVNldHRpbmdzEhAKCGd1aWxkX2lkGAEgASgJEhwKFGpvaW5fbWVzc2FnZV9lbmFibGVkGAIgASgIEhQKDGpvaW5fbWVzc2FnZRgDIAEoCRIdChVsZWF2ZV9tZXNzYWdlX2VuYWJsZWQYBCABKAgSFQoNbGVhdmVfbWVzc2FnZRgFIAEoCRIPCgdjaGFubmVsGAYgASgJEhcKD2pvaW5fbWVzc2FnZV92MhgHIAEoCBIcChRqb2luX21lc3NhZ2VfdjJfanNvbhgIIAEoCRIYChBsZWF2ZV9tZXNzYWdlX3YyGAkgASgIEh0KFWxlYXZlX21lc3NhZ2VfdjJfanNvbhgKIAEoCSIuChpHZXRBbnRpU3BhbVNldHRpbmdzUmVxdWVzdBIQCghndWlsZF9pZBgBIAEoCSJRCh1VcGRhdGVBbnRpU3BhbVNldHRpbmdzUmVxdWVzdBIwCghzZXR0aW5ncxgBIAEoCzIeLmhlaW1kYWxsci52MS5BbnRpU3BhbVNldHRpbmdzIl4KEEFudGlTcGFtU2V0dGluZ3MSEAoIZ3VpbGRfaWQYASABKAkSDwoHZW5hYmxlZBgCIAEoCBINCgVjb3VudBgDIAEoBRIYChBjb29sZG93bl9zZWNvbmRzGAQgASgFIi8KG0dldEJhbkZvb3RlclNldHRpbmdzUmVxdWVzdBIQCghndWlsZF9pZBgBIAEoCSJTCh5VcGRhdGVCYW5Gb290ZXJTZXR0aW5nc1JlcXVlc3QSMQoIc2V0dGluZ3MYASABKAsyHy5oZWltZGFsbHIudjEuQmFuRm9vdGVyU2V0dGluZ3MiSgoRQmFuRm9vdGVyU2V0dGluZ3MSEAoIZ3VpbGRfaWQYASABKAkSDgoGZm9vdGVyGAIgASgJEhMKC2Fsd2F5c19zZW5kGAMgASgIIi0KGUdldE1vZG1haWxTZXR0aW5nc1JlcXVlc3QSEAoIZ3VpbGRfaWQYASABKAkiTwocVXBkYXRlTW9kbWFpbFNldHRpbmdzUmVxdWVzdBIvCghzZXR0aW5ncxgBIAEoCzIdLmhlaW1kYWxsci52MS5Nb2RtYWlsU2V0dGluZ3MiggEKD01vZG1haWxTZXR0aW5ncxIQCghndWlsZF9pZBgBIAEoCRIeChZyZXBvcnRfdGhyZWFkc19jaGFubmVsGAIgASgJEiMKG3JlcG9ydF9ub3RpZmljYXRpb25fY2hhbm5lbBgDIAEoCRIYChByZXBvcnRfcGluZ19yb2xlGAQgASgJItwBChJQYWNlQ29udHJvbENoYW5uZWwSEAoIZ3VpbGRfaWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRIPCgdlbmFibGVkGAMgASgIEhIKCnRhcmdldF93cG0YBCABKAUSFAoMbWluX3Nsb3dtb2RlGAUgASgFEhQKDG1heF9zbG93bW9kZRgGIAEoBRIWCg5hY3RpdmF0aW9uX3dwbRgHIAEoBRIaChJ3cG1fd2luZG93X3NlY29uZHMYCCABKAUSGwoTdXNlcl93aW5kb3dfc2Vjb25kcxgJIAEoBSIpChVHZXRQYWNlQ29udHJvbFJlcXVlc3QSEAoIZ3VpbGRfaWQYASABKAkiTAoWR2V0UGFjZUNvbnRyb2xSZXNwb25zZRIyCghjaGFubmVscxgBIAMoCzIgLmhlaW1kYWxsci52MS5QYWNlQ29udHJvbENoYW5uZWwiTQoYVXBkYXRlUGFjZUNvbnRyb2xSZXF1ZXN0EjEKB2NoYW5uZWwYASABKAsyIC5oZWltZGFsbHIudjEuUGFjZUNvbnRyb2xDaGFubmVsIkAKGERlbGV0ZVBhY2VDb250cm9sUmVxdWVzdBIQCghndWlsZF9pZBgBIAEoCRISCgpjaGFubmVsX2lkGAIgASgJIlYKB0NoYW5uZWwSCgoCaWQYASABKAkSDAoEbmFtZRgCIAEoCRIMCgR0eXBlGAMgASgFEhAKCHBvc2l0aW9uGAQgASgFEhEKCXBhcmVudF9pZBgFIAEoCSJSCgRSb2xlEgoKAmlkGAEgASgJEgwKBG5hbWUYAiABKAkSDQoFY29sb3IYAyABKAUSEAoIcG9zaXRpb24YBCABKAUSDwoHbWFuYWdlZBgFIAEoCCInChNMaXN0Q2hhbm5lbHNSZXF1ZXN0EhAKCGd1aWxkX2lkGAEgASgJIj8KFExpc3RDaGFubmVsc1Jlc3BvbnNlEicKCGNoYW5uZWxzGAEgAygLMhUuaGVpbWRhbGxyLnYxLkNoYW5uZWwiJAoQTGlzdFJvbGVzUmVxdWVzdBIQCghndWlsZF9pZBgBIAEoCSI2ChFMaXN0Um9sZXNSZXNwb25zZRIhCgVyb2xlcxgBIAMoCzISLmhlaW1kYWxsci52MS5Sb2xlIl0KHFNlbmRDb21wb25lbnRzTWVzc2FnZVJlcXVlc3QSEAoIZ3VpbGRfaWQYASABKAkSEgoKY2hhbm5lbF9pZBgCIAEoCRIXCg9jb21wb25lbnRzX2pzb24YAyABKAkiMwodU2VuZENvbXBvbmVudHNNZXNzYWdlUmVzcG9uc2USEgoKbWVzc2FnZV9pZBgBIAEoCSI/ChNUZW1wbGF0ZVBsYWNlaG9sZGVyEhMKC3BsYWNlaG9sZGVyGAEgASgJEhMKC2Rlc2NyaXB0aW9uGAIgASgJIiAKHkdldFRlbXBsYXRlUGxhY2Vob2xkZXJzUmVxdWVzdCJaCh9HZXRUZW1wbGF0ZVBsYWNlaG9sZGVyc1Jlc3BvbnNlEjcKDHBsYWNlaG9sZGVycxgBIAMoCzIhLmhlaW1kYWxsci52MS5UZW1wbGF0ZVBsYWNlaG9sZGVyMrYQChRHdWlsZFNldHRpbmdzU2VydmljZRJVCg1HZXRNb2RDaGFubmVsEiIuaGVpbWRhbGxyLnYxLkdldE1vZENoYW5uZWxSZXF1ZXN0GiAuaGVpbWRhbGxyLnYxLk1vZENoYW5uZWxTZXR0aW5ncxJbChBVcGRhdGVNb2RDaGFubmVsEiUuaGVpbWRhbGxyLnYxLlVwZGF0ZU1vZENoYW5uZWxSZXF1ZXN0GiAuaGVpbWRhbGxyLnYxLk1vZENoYW5uZWxTZXR0aW5ncxJlChVHZXRJbmZyYWN0aW9uU2V0dGluZ3MSKi5oZWltZGFsbHIudjEuR2V0SW5mcmFjdGlvblNldHRpbmdzUmVxdWVzdBogLmhlaW1kYWxsci52MS5JbmZyYWN0aW9uU2V0dGluZ3MSawoYVXBkYXRlSW5mcmFjdGlvblNldHRpbmdzEi0uaGVpbWRhbGxyLnYxLlVwZGF0ZUluZnJhY3Rpb25TZXR0aW5nc1JlcXVlc3QaIC5oZWltZGFsbHIudjEuSW5mcmFjdGlvblNldHRpbmdzEl8KE0dldEdhdGVrZWVwU2V0dGluZ3MSKC5oZWltZGFsbHIudjEuR2V0R2F0ZWtlZXBTZXR0aW5nc1JlcXVlc3QaHi5oZWltZGFsbHIudjEuR2F0ZWtlZXBTZXR0aW5ncxJlChZVcGRhdGVHYXRla2VlcFNldHRpbmdzEisuaGVpbWRhbGxyLnYxLlVwZGF0ZUdhdGVrZWVwU2V0dGluZ3NSZXF1ZXN0Gh4uaGVpbWRhbGxyLnYxLkdhdGVrZWVwU2V0dGluZ3MSYgoUR2V0Sm9pbkxlYXZlU2V0dGluZ3MSKS5oZWltZGFsbHIudjEuR2V0Sm9pbkxlYXZlU2V0dGluZ3NSZXF1ZXN0Gh8uaGVpbWRhbGxyLnYxLkpvaW5MZWF2ZVNldHRpbmdzEmgKF1VwZGF0ZUpvaW5MZWF2ZVNldHRpbmdzEiwuaGVpbWRhbGxyLnYxLlVwZGF0ZUpvaW5MZWF2ZVNldHRpbmdzUmVxdWVzdBofLmhlaW1kYWxsci52MS5Kb2luTGVhdmVTZXR0aW5ncxJfChNHZXRBbnRpU3BhbVNldHRpbmdzEiguaGVpbWRhbGxyLnYxLkdldEFudGlTcGFtU2V0dGluZ3NSZXF1ZXN0Gh4uaGVpbWRhbGxyLnYxLkFudGlTcGFtU2V0dGluZ3MSZQoWVXBkYXRlQW50aVNwYW1TZXR0aW5ncxIrLmhlaW1kYWxsci52MS5VcGRhdGVBbnRpU3BhbVNldHRpbmdzUmVxdWVzdBoeLmhlaW1kYWxsci52MS5BbnRpU3BhbVNldHRpbmdzEmIKFEdldEJhbkZvb3RlclNldHRpbmdzEikuaGVpbWRhbGxyLnYxLkdldEJhbkZvb3RlclNldHRpbmdzUmVxdWVzdBofLmhlaW1kYWxsci52MS5CYW5Gb290ZXJTZXR0aW5ncxJoChdVcGRhdGVCYW5Gb290ZXJTZXR0aW5ncxIsLmhlaW1kYWxsci52MS5VcGRhdGVCYW5Gb290ZXJTZXR0aW5nc1JlcXVlc3QaHy5oZWltZGFsbHIudjEuQmFuRm9vdGVyU2V0dGluZ3MSXAoSR2V0TW9kbWFpbFNldHRpbmdzEicuaGVpbWRhbGxyLnYxLkdldE1vZG1haWxTZXR0aW5nc1JlcXVlc3QaHS5oZWltZGFsbHIudjEuTW9kbWFpbFNldHRpbmdzEmIKFVVwZGF0ZU1vZG1haWxTZXR0aW5ncxIqLmhlaW1kYWxsci52MS5VcGRhdGVNb2RtYWlsU2V0dGluZ3NSZXF1ZXN0Gh0uaGVpbWRhbGxyLnYxLk1vZG1haWxTZXR0aW5ncxJVCgxMaXN0Q2hhbm5lbHMSIS5oZWltZGFsbHIudjEuTGlzdENoYW5uZWxzUmVxdWVzdBoiLmhlaW1kYWxsci52MS5MaXN0Q2hhbm5lbHNSZXNwb25zZRJMCglMaXN0Um9sZXMSHi5oZWltZGFsbHIudjEuTGlzdFJvbGVzUmVxdWVzdBofLmhlaW1kYWxsci52MS5MaXN0Um9sZXNSZXNwb25zZRJ2ChdHZXRUZW1wbGF0ZVBsYWNlaG9sZGVycxIsLmhlaW1kYWxsci52MS5HZXRUZW1wbGF0ZVBsYWNlaG9sZGVyc1JlcXVlc3QaLS5oZWltZGFsbHIudjEuR2V0VGVtcGxhdGVQbGFjZWhvbGRlcnNSZXNwb25zZRJwChVTZW5kQ29tcG9uZW50c01lc3NhZ2USKi5oZWltZGFsbHIudjEuU2VuZENvbXBvbmVudHNNZXNzYWdlUmVxdWVzdBorLmhlaW1kYWxsci52MS5TZW5kQ29tcG9uZW50c01lc3NhZ2VSZXNwb25zZRJbCg5HZXRQYWNlQ29udHJvbBIjLmhlaW1kYWxsci52MS5HZXRQYWNlQ29udHJvbFJlcXVlc3QaJC5oZWltZGFsbHIudjEuR2V0UGFjZUNvbnRyb2xSZXNwb25zZRJdChFVcGRhdGVQYWNlQ29udHJvbBImLmhlaW1kYWxsci52MS5VcGRhdGVQYWNlQ29udHJvbFJlcXVlc3QaIC5oZWltZGFsbHIudjEuUGFjZUNvbnRyb2xDaGFubmVsEl0KEURlbGV0ZVBhY2VDb250cm9sEiYuaGVpbWRhbGxyLnYxLkRlbGV0ZVBhY2VDb250cm9sUmVxdWVzdBogLmhlaW1kYWxsci52MS5QYWNlQ29udHJvbENoYW5uZWxCtwEKEGNvbS5oZWltZGFsbHIudjFCEkd1aWxkU2V0dGluZ3NQcm90b1ABWj5naXRodWIuY29tL05MTENvbW11bml0eS9oZWltZGFsbHIvZ2VuL2hlaW1kYWxsci92MTtoZWltZGFsbHJ2MaICA0hYWKoCDEhlaW1kYWxsci5WMcoCDEhlaW1kYWxsclxWMeICGEhlaW1kYWxsclxWMVxHUEJNZXRhZGF0YeoCDUhlaW1kYWxscjo6VjFiBnByb3RvMw");
 
 /**
  * ModChannel
@@ -524,6 +524,138 @@ export const ModmailSettingsSchema: GenMessage<ModmailSettings> = /*@__PURE__*/
   messageDesc(file_heimdallr_v1_guild_settings, 20);
 
 /**
+ * PaceControl
+ *
+ * @generated from message heimdallr.v1.PaceControlChannel
+ */
+export type PaceControlChannel = Message<"heimdallr.v1.PaceControlChannel"> & {
+  /**
+   * @generated from field: string guild_id = 1;
+   */
+  guildId: string;
+
+  /**
+   * @generated from field: string channel_id = 2;
+   */
+  channelId: string;
+
+  /**
+   * @generated from field: bool enabled = 3;
+   */
+  enabled: boolean;
+
+  /**
+   * @generated from field: int32 target_wpm = 4;
+   */
+  targetWpm: number;
+
+  /**
+   * @generated from field: int32 min_slowmode = 5;
+   */
+  minSlowmode: number;
+
+  /**
+   * @generated from field: int32 max_slowmode = 6;
+   */
+  maxSlowmode: number;
+
+  /**
+   * @generated from field: int32 activation_wpm = 7;
+   */
+  activationWpm: number;
+
+  /**
+   * @generated from field: int32 wpm_window_seconds = 8;
+   */
+  wpmWindowSeconds: number;
+
+  /**
+   * @generated from field: int32 user_window_seconds = 9;
+   */
+  userWindowSeconds: number;
+};
+
+/**
+ * Describes the message heimdallr.v1.PaceControlChannel.
+ * Use `create(PaceControlChannelSchema)` to create a new message.
+ */
+export const PaceControlChannelSchema: GenMessage<PaceControlChannel> = /*@__PURE__*/
+  messageDesc(file_heimdallr_v1_guild_settings, 21);
+
+/**
+ * @generated from message heimdallr.v1.GetPaceControlRequest
+ */
+export type GetPaceControlRequest = Message<"heimdallr.v1.GetPaceControlRequest"> & {
+  /**
+   * @generated from field: string guild_id = 1;
+   */
+  guildId: string;
+};
+
+/**
+ * Describes the message heimdallr.v1.GetPaceControlRequest.
+ * Use `create(GetPaceControlRequestSchema)` to create a new message.
+ */
+export const GetPaceControlRequestSchema: GenMessage<GetPaceControlRequest> = /*@__PURE__*/
+  messageDesc(file_heimdallr_v1_guild_settings, 22);
+
+/**
+ * @generated from message heimdallr.v1.GetPaceControlResponse
+ */
+export type GetPaceControlResponse = Message<"heimdallr.v1.GetPaceControlResponse"> & {
+  /**
+   * @generated from field: repeated heimdallr.v1.PaceControlChannel channels = 1;
+   */
+  channels: PaceControlChannel[];
+};
+
+/**
+ * Describes the message heimdallr.v1.GetPaceControlResponse.
+ * Use `create(GetPaceControlResponseSchema)` to create a new message.
+ */
+export const GetPaceControlResponseSchema: GenMessage<GetPaceControlResponse> = /*@__PURE__*/
+  messageDesc(file_heimdallr_v1_guild_settings, 23);
+
+/**
+ * @generated from message heimdallr.v1.UpdatePaceControlRequest
+ */
+export type UpdatePaceControlRequest = Message<"heimdallr.v1.UpdatePaceControlRequest"> & {
+  /**
+   * @generated from field: heimdallr.v1.PaceControlChannel channel = 1;
+   */
+  channel?: PaceControlChannel;
+};
+
+/**
+ * Describes the message heimdallr.v1.UpdatePaceControlRequest.
+ * Use `create(UpdatePaceControlRequestSchema)` to create a new message.
+ */
+export const UpdatePaceControlRequestSchema: GenMessage<UpdatePaceControlRequest> = /*@__PURE__*/
+  messageDesc(file_heimdallr_v1_guild_settings, 24);
+
+/**
+ * @generated from message heimdallr.v1.DeletePaceControlRequest
+ */
+export type DeletePaceControlRequest = Message<"heimdallr.v1.DeletePaceControlRequest"> & {
+  /**
+   * @generated from field: string guild_id = 1;
+   */
+  guildId: string;
+
+  /**
+   * @generated from field: string channel_id = 2;
+   */
+  channelId: string;
+};
+
+/**
+ * Describes the message heimdallr.v1.DeletePaceControlRequest.
+ * Use `create(DeletePaceControlRequestSchema)` to create a new message.
+ */
+export const DeletePaceControlRequestSchema: GenMessage<DeletePaceControlRequest> = /*@__PURE__*/
+  messageDesc(file_heimdallr_v1_guild_settings, 25);
+
+/**
  * Guild data (channels & roles)
  *
  * @generated from message heimdallr.v1.Channel
@@ -560,7 +692,7 @@ export type Channel = Message<"heimdallr.v1.Channel"> & {
  * Use `create(ChannelSchema)` to create a new message.
  */
 export const ChannelSchema: GenMessage<Channel> = /*@__PURE__*/
-  messageDesc(file_heimdallr_v1_guild_settings, 21);
+  messageDesc(file_heimdallr_v1_guild_settings, 26);
 
 /**
  * @generated from message heimdallr.v1.Role
@@ -597,7 +729,7 @@ export type Role = Message<"heimdallr.v1.Role"> & {
  * Use `create(RoleSchema)` to create a new message.
  */
 export const RoleSchema: GenMessage<Role> = /*@__PURE__*/
-  messageDesc(file_heimdallr_v1_guild_settings, 22);
+  messageDesc(file_heimdallr_v1_guild_settings, 27);
 
 /**
  * @generated from message heimdallr.v1.ListChannelsRequest
@@ -614,7 +746,7 @@ export type ListChannelsRequest = Message<"heimdallr.v1.ListChannelsRequest"> & 
  * Use `create(ListChannelsRequestSchema)` to create a new message.
  */
 export const ListChannelsRequestSchema: GenMessage<ListChannelsRequest> = /*@__PURE__*/
-  messageDesc(file_heimdallr_v1_guild_settings, 23);
+  messageDesc(file_heimdallr_v1_guild_settings, 28);
 
 /**
  * @generated from message heimdallr.v1.ListChannelsResponse
@@ -631,7 +763,7 @@ export type ListChannelsResponse = Message<"heimdallr.v1.ListChannelsResponse"> 
  * Use `create(ListChannelsResponseSchema)` to create a new message.
  */
 export const ListChannelsResponseSchema: GenMessage<ListChannelsResponse> = /*@__PURE__*/
-  messageDesc(file_heimdallr_v1_guild_settings, 24);
+  messageDesc(file_heimdallr_v1_guild_settings, 29);
 
 /**
  * @generated from message heimdallr.v1.ListRolesRequest
@@ -648,7 +780,7 @@ export type ListRolesRequest = Message<"heimdallr.v1.ListRolesRequest"> & {
  * Use `create(ListRolesRequestSchema)` to create a new message.
  */
 export const ListRolesRequestSchema: GenMessage<ListRolesRequest> = /*@__PURE__*/
-  messageDesc(file_heimdallr_v1_guild_settings, 25);
+  messageDesc(file_heimdallr_v1_guild_settings, 30);
 
 /**
  * @generated from message heimdallr.v1.ListRolesResponse
@@ -665,7 +797,7 @@ export type ListRolesResponse = Message<"heimdallr.v1.ListRolesResponse"> & {
  * Use `create(ListRolesResponseSchema)` to create a new message.
  */
 export const ListRolesResponseSchema: GenMessage<ListRolesResponse> = /*@__PURE__*/
-  messageDesc(file_heimdallr_v1_guild_settings, 26);
+  messageDesc(file_heimdallr_v1_guild_settings, 31);
 
 /**
  * SendComponentsMessage
@@ -696,7 +828,7 @@ export type SendComponentsMessageRequest = Message<"heimdallr.v1.SendComponentsM
  * Use `create(SendComponentsMessageRequestSchema)` to create a new message.
  */
 export const SendComponentsMessageRequestSchema: GenMessage<SendComponentsMessageRequest> = /*@__PURE__*/
-  messageDesc(file_heimdallr_v1_guild_settings, 27);
+  messageDesc(file_heimdallr_v1_guild_settings, 32);
 
 /**
  * @generated from message heimdallr.v1.SendComponentsMessageResponse
@@ -713,7 +845,7 @@ export type SendComponentsMessageResponse = Message<"heimdallr.v1.SendComponents
  * Use `create(SendComponentsMessageResponseSchema)` to create a new message.
  */
 export const SendComponentsMessageResponseSchema: GenMessage<SendComponentsMessageResponse> = /*@__PURE__*/
-  messageDesc(file_heimdallr_v1_guild_settings, 28);
+  messageDesc(file_heimdallr_v1_guild_settings, 33);
 
 /**
  * Template placeholders
@@ -737,7 +869,7 @@ export type TemplatePlaceholder = Message<"heimdallr.v1.TemplatePlaceholder"> & 
  * Use `create(TemplatePlaceholderSchema)` to create a new message.
  */
 export const TemplatePlaceholderSchema: GenMessage<TemplatePlaceholder> = /*@__PURE__*/
-  messageDesc(file_heimdallr_v1_guild_settings, 29);
+  messageDesc(file_heimdallr_v1_guild_settings, 34);
 
 /**
  * @generated from message heimdallr.v1.GetTemplatePlaceholdersRequest
@@ -750,7 +882,7 @@ export type GetTemplatePlaceholdersRequest = Message<"heimdallr.v1.GetTemplatePl
  * Use `create(GetTemplatePlaceholdersRequestSchema)` to create a new message.
  */
 export const GetTemplatePlaceholdersRequestSchema: GenMessage<GetTemplatePlaceholdersRequest> = /*@__PURE__*/
-  messageDesc(file_heimdallr_v1_guild_settings, 30);
+  messageDesc(file_heimdallr_v1_guild_settings, 35);
 
 /**
  * @generated from message heimdallr.v1.GetTemplatePlaceholdersResponse
@@ -767,7 +899,7 @@ export type GetTemplatePlaceholdersResponse = Message<"heimdallr.v1.GetTemplateP
  * Use `create(GetTemplatePlaceholdersResponseSchema)` to create a new message.
  */
 export const GetTemplatePlaceholdersResponseSchema: GenMessage<GetTemplatePlaceholdersResponse> = /*@__PURE__*/
-  messageDesc(file_heimdallr_v1_guild_settings, 31);
+  messageDesc(file_heimdallr_v1_guild_settings, 36);
 
 /**
  * @generated from service heimdallr.v1.GuildSettingsService
@@ -916,6 +1048,30 @@ export const GuildSettingsService: GenService<{
     methodKind: "unary";
     input: typeof SendComponentsMessageRequestSchema;
     output: typeof SendComponentsMessageResponseSchema;
+  },
+  /**
+   * @generated from rpc heimdallr.v1.GuildSettingsService.GetPaceControl
+   */
+  getPaceControl: {
+    methodKind: "unary";
+    input: typeof GetPaceControlRequestSchema;
+    output: typeof GetPaceControlResponseSchema;
+  },
+  /**
+   * @generated from rpc heimdallr.v1.GuildSettingsService.UpdatePaceControl
+   */
+  updatePaceControl: {
+    methodKind: "unary";
+    input: typeof UpdatePaceControlRequestSchema;
+    output: typeof PaceControlChannelSchema;
+  },
+  /**
+   * @generated from rpc heimdallr.v1.GuildSettingsService.DeletePaceControl
+   */
+  deletePaceControl: {
+    methodKind: "unary";
+    input: typeof DeletePaceControlRequestSchema;
+    output: typeof PaceControlChannelSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_heimdallr_v1_guild_settings, 0);

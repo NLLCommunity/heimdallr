@@ -39,6 +39,7 @@
       <SaveButton
         {dirty}
         saving={section.saving}
+        success={section.success}
         error={section.error}
         onsave={() => settings.saveBanFooter()}
       />

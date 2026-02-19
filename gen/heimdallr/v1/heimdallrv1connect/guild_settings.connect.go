@@ -87,6 +87,15 @@ const (
 	// GuildSettingsServiceSendComponentsMessageProcedure is the fully-qualified name of the
 	// GuildSettingsService's SendComponentsMessage RPC.
 	GuildSettingsServiceSendComponentsMessageProcedure = "/heimdallr.v1.GuildSettingsService/SendComponentsMessage"
+	// GuildSettingsServiceGetPaceControlProcedure is the fully-qualified name of the
+	// GuildSettingsService's GetPaceControl RPC.
+	GuildSettingsServiceGetPaceControlProcedure = "/heimdallr.v1.GuildSettingsService/GetPaceControl"
+	// GuildSettingsServiceUpdatePaceControlProcedure is the fully-qualified name of the
+	// GuildSettingsService's UpdatePaceControl RPC.
+	GuildSettingsServiceUpdatePaceControlProcedure = "/heimdallr.v1.GuildSettingsService/UpdatePaceControl"
+	// GuildSettingsServiceDeletePaceControlProcedure is the fully-qualified name of the
+	// GuildSettingsService's DeletePaceControl RPC.
+	GuildSettingsServiceDeletePaceControlProcedure = "/heimdallr.v1.GuildSettingsService/DeletePaceControl"
 )
 
 // GuildSettingsServiceClient is a client for the heimdallr.v1.GuildSettingsService service.
@@ -109,6 +118,9 @@ type GuildSettingsServiceClient interface {
 	ListRoles(context.Context, *v1.ListRolesRequest) (*v1.ListRolesResponse, error)
 	GetTemplatePlaceholders(context.Context, *v1.GetTemplatePlaceholdersRequest) (*v1.GetTemplatePlaceholdersResponse, error)
 	SendComponentsMessage(context.Context, *v1.SendComponentsMessageRequest) (*v1.SendComponentsMessageResponse, error)
+	GetPaceControl(context.Context, *v1.GetPaceControlRequest) (*v1.GetPaceControlResponse, error)
+	UpdatePaceControl(context.Context, *v1.UpdatePaceControlRequest) (*v1.PaceControlChannel, error)
+	DeletePaceControl(context.Context, *v1.DeletePaceControlRequest) (*v1.PaceControlChannel, error)
 }
 
 // NewGuildSettingsServiceClient constructs a client for the heimdallr.v1.GuildSettingsService
@@ -230,6 +242,24 @@ func NewGuildSettingsServiceClient(httpClient connect.HTTPClient, baseURL string
 			connect.WithSchema(guildSettingsServiceMethods.ByName("SendComponentsMessage")),
 			connect.WithClientOptions(opts...),
 		),
+		getPaceControl: connect.NewClient[v1.GetPaceControlRequest, v1.GetPaceControlResponse](
+			httpClient,
+			baseURL+GuildSettingsServiceGetPaceControlProcedure,
+			connect.WithSchema(guildSettingsServiceMethods.ByName("GetPaceControl")),
+			connect.WithClientOptions(opts...),
+		),
+		updatePaceControl: connect.NewClient[v1.UpdatePaceControlRequest, v1.PaceControlChannel](
+			httpClient,
+			baseURL+GuildSettingsServiceUpdatePaceControlProcedure,
+			connect.WithSchema(guildSettingsServiceMethods.ByName("UpdatePaceControl")),
+			connect.WithClientOptions(opts...),
+		),
+		deletePaceControl: connect.NewClient[v1.DeletePaceControlRequest, v1.PaceControlChannel](
+			httpClient,
+			baseURL+GuildSettingsServiceDeletePaceControlProcedure,
+			connect.WithSchema(guildSettingsServiceMethods.ByName("DeletePaceControl")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -253,6 +283,9 @@ type guildSettingsServiceClient struct {
 	listRoles                *connect.Client[v1.ListRolesRequest, v1.ListRolesResponse]
 	getTemplatePlaceholders  *connect.Client[v1.GetTemplatePlaceholdersRequest, v1.GetTemplatePlaceholdersResponse]
 	sendComponentsMessage    *connect.Client[v1.SendComponentsMessageRequest, v1.SendComponentsMessageResponse]
+	getPaceControl           *connect.Client[v1.GetPaceControlRequest, v1.GetPaceControlResponse]
+	updatePaceControl        *connect.Client[v1.UpdatePaceControlRequest, v1.PaceControlChannel]
+	deletePaceControl        *connect.Client[v1.DeletePaceControlRequest, v1.PaceControlChannel]
 }
 
 // GetModChannel calls heimdallr.v1.GuildSettingsService.GetModChannel.
@@ -417,6 +450,33 @@ func (c *guildSettingsServiceClient) SendComponentsMessage(ctx context.Context, 
 	return nil, err
 }
 
+// GetPaceControl calls heimdallr.v1.GuildSettingsService.GetPaceControl.
+func (c *guildSettingsServiceClient) GetPaceControl(ctx context.Context, req *v1.GetPaceControlRequest) (*v1.GetPaceControlResponse, error) {
+	response, err := c.getPaceControl.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
+// UpdatePaceControl calls heimdallr.v1.GuildSettingsService.UpdatePaceControl.
+func (c *guildSettingsServiceClient) UpdatePaceControl(ctx context.Context, req *v1.UpdatePaceControlRequest) (*v1.PaceControlChannel, error) {
+	response, err := c.updatePaceControl.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
+// DeletePaceControl calls heimdallr.v1.GuildSettingsService.DeletePaceControl.
+func (c *guildSettingsServiceClient) DeletePaceControl(ctx context.Context, req *v1.DeletePaceControlRequest) (*v1.PaceControlChannel, error) {
+	response, err := c.deletePaceControl.CallUnary(ctx, connect.NewRequest(req))
+	if response != nil {
+		return response.Msg, err
+	}
+	return nil, err
+}
+
 // GuildSettingsServiceHandler is an implementation of the heimdallr.v1.GuildSettingsService
 // service.
 type GuildSettingsServiceHandler interface {
@@ -438,6 +498,9 @@ type GuildSettingsServiceHandler interface {
 	ListRoles(context.Context, *v1.ListRolesRequest) (*v1.ListRolesResponse, error)
 	GetTemplatePlaceholders(context.Context, *v1.GetTemplatePlaceholdersRequest) (*v1.GetTemplatePlaceholdersResponse, error)
 	SendComponentsMessage(context.Context, *v1.SendComponentsMessageRequest) (*v1.SendComponentsMessageResponse, error)
+	GetPaceControl(context.Context, *v1.GetPaceControlRequest) (*v1.GetPaceControlResponse, error)
+	UpdatePaceControl(context.Context, *v1.UpdatePaceControlRequest) (*v1.PaceControlChannel, error)
+	DeletePaceControl(context.Context, *v1.DeletePaceControlRequest) (*v1.PaceControlChannel, error)
 }
 
 // NewGuildSettingsServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -555,6 +618,24 @@ func NewGuildSettingsServiceHandler(svc GuildSettingsServiceHandler, opts ...con
 		connect.WithSchema(guildSettingsServiceMethods.ByName("SendComponentsMessage")),
 		connect.WithHandlerOptions(opts...),
 	)
+	guildSettingsServiceGetPaceControlHandler := connect.NewUnaryHandlerSimple(
+		GuildSettingsServiceGetPaceControlProcedure,
+		svc.GetPaceControl,
+		connect.WithSchema(guildSettingsServiceMethods.ByName("GetPaceControl")),
+		connect.WithHandlerOptions(opts...),
+	)
+	guildSettingsServiceUpdatePaceControlHandler := connect.NewUnaryHandlerSimple(
+		GuildSettingsServiceUpdatePaceControlProcedure,
+		svc.UpdatePaceControl,
+		connect.WithSchema(guildSettingsServiceMethods.ByName("UpdatePaceControl")),
+		connect.WithHandlerOptions(opts...),
+	)
+	guildSettingsServiceDeletePaceControlHandler := connect.NewUnaryHandlerSimple(
+		GuildSettingsServiceDeletePaceControlProcedure,
+		svc.DeletePaceControl,
+		connect.WithSchema(guildSettingsServiceMethods.ByName("DeletePaceControl")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/heimdallr.v1.GuildSettingsService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case GuildSettingsServiceGetModChannelProcedure:
@@ -593,6 +674,12 @@ func NewGuildSettingsServiceHandler(svc GuildSettingsServiceHandler, opts ...con
 			guildSettingsServiceGetTemplatePlaceholdersHandler.ServeHTTP(w, r)
 		case GuildSettingsServiceSendComponentsMessageProcedure:
 			guildSettingsServiceSendComponentsMessageHandler.ServeHTTP(w, r)
+		case GuildSettingsServiceGetPaceControlProcedure:
+			guildSettingsServiceGetPaceControlHandler.ServeHTTP(w, r)
+		case GuildSettingsServiceUpdatePaceControlProcedure:
+			guildSettingsServiceUpdatePaceControlHandler.ServeHTTP(w, r)
+		case GuildSettingsServiceDeletePaceControlProcedure:
+			guildSettingsServiceDeletePaceControlHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -672,4 +759,16 @@ func (UnimplementedGuildSettingsServiceHandler) GetTemplatePlaceholders(context.
 
 func (UnimplementedGuildSettingsServiceHandler) SendComponentsMessage(context.Context, *v1.SendComponentsMessageRequest) (*v1.SendComponentsMessageResponse, error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("heimdallr.v1.GuildSettingsService.SendComponentsMessage is not implemented"))
+}
+
+func (UnimplementedGuildSettingsServiceHandler) GetPaceControl(context.Context, *v1.GetPaceControlRequest) (*v1.GetPaceControlResponse, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("heimdallr.v1.GuildSettingsService.GetPaceControl is not implemented"))
+}
+
+func (UnimplementedGuildSettingsServiceHandler) UpdatePaceControl(context.Context, *v1.UpdatePaceControlRequest) (*v1.PaceControlChannel, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("heimdallr.v1.GuildSettingsService.UpdatePaceControl is not implemented"))
+}
+
+func (UnimplementedGuildSettingsServiceHandler) DeletePaceControl(context.Context, *v1.DeletePaceControlRequest) (*v1.PaceControlChannel, error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("heimdallr.v1.GuildSettingsService.DeletePaceControl is not implemented"))
 }
