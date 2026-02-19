@@ -7,10 +7,9 @@ export default defineConfig({
   plugins: [svelte(), tailwindcss()],
   server: {
     proxy: {
-      '/api': {
+      '/heimdallr.v1.': {
         target: 'http://localhost:8484',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
       },
     },
   },

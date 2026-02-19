@@ -14,11 +14,20 @@ tasks:
   run:
     desc: Run heimdallr
     preconditions:
-      - sh: test -f ./heimdallr
+      - sh: test -f ./heimdallr{{exeExt}}
         msg: "heimdallr binary not found, please run 'task build' first"
     cmds:
-      - ./heimdallr
+      - ./heimdallr{{exeExt}}
   build:
     desc: Build heimdallr binary
     cmds:
-      - go build -o heimdallr .
+      - task: build-frontend
+      - go build -o heimdallr{{exeExt}} .
+  build-frontend:
+    desc: Build web dashboard and embed into rpcserver
+    dir: web-dashboard
+    cmds:
+      - bun install
+      - bun run build
+      - rm -rf ../rpcserver/frontend
+      - mv dist ../rpcserver/frontend

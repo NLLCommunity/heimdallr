@@ -20,7 +20,9 @@
       "Bash(bun run check:*)",
       "Bash(bun run build:*)",
       "Bash(go mod tidy:*)",
-      "Bash(go test:*)"
+      "Bash(go test:*)",
+      "Bash(go version:*)",
+      "Bash(bun install:*)"
     ]
   }
 }

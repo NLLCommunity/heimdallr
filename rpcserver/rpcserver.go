@@ -62,6 +62,9 @@ func StartServer(addr string, discordClient *bot.Client) error {
 		mux.Handle(grpcreflect.NewHandlerV1Alpha(reflector))
 	}
 
+	// Serve embedded frontend as SPA fallback (catch-all for non-RPC paths).
+	mux.Handle("/", newSPAHandler())
+
 	// Clean expired sessions periodically.
 	go func() {
 		ticker := time.NewTicker(15 * time.Minute)

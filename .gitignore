@@ -39,3 +39,6 @@ config.toml
 # Database file
 heimdallr.db
 pb_data/
+
+# Embedded frontend build output
+/rpcserver/frontend/

@@ -8,7 +8,10 @@ token = "INSERT_YOUR_TOKEN_HERE" # Discord bot token
 enabled = true # Enable or disable developer mode
 guild_id = 0   # Guild ID to use for developer mode
 
+[rpc]
+address = "localhost:8484" # RPC server address
+
 [dashboard]
-base_url = "http://localhost:5173" # Web dashboard URL
+base_url = "http://localhost:8484" # Web dashboard URL
 # In production, use a TLS-terminating reverse proxy (e.g. nginx, Caddy)
 # in front of the RPC server and set base_url to an https:// URL.
