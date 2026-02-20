@@ -5,8 +5,10 @@ import (
 	"strings"
 
 	"github.com/cbroglie/mustache"
+	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
+	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
@@ -38,41 +40,19 @@ func OnUserJoin(e *events.GuildMemberJoin) {
 
 	joinleaveInfo := utils.NewMessageTemplateData(e.Member, guild.Guild)
 
-	if guildSettings.JoinMessageV2 && guildSettings.JoinMessageV2Json != "" {
+	hasV2 := guildSettings.JoinMessageV2 && guildSettings.JoinMessageV2Json != ""
+
+	if hasV2 {
 		emojiMap := make(map[string]discord.Emoji)
 		for emoji := range e.Client().Caches.Emojis(guildID) {
 			emojiMap[strings.ToLower(emoji.Name)] = emoji
 		}
 
-		components, err := utils.BuildV2Message(guildSettings.JoinMessageV2Json, joinleaveInfo, emojiMap)
-		if err != nil {
-			slog.Error("Failed to build V2 join message.", "err", err, "guild_id", guildID)
-			return
-		}
-
-		_, err = e.Client().Rest.CreateMessage(joinLeaveChannel, discord.MessageCreate{
-			Flags:      discord.MessageFlagIsComponentsV2,
-			Components: components,
-		})
-		if err != nil {
-			slog.Error("Failed to send V2 join message.", "guild_id", guildID, "channel_id", joinLeaveChannel, "err", err)
-		}
-		return
+		_, err = createV2Message(joinleaveInfo, emojiMap, guildSettings.JoinMessageV2Json, guildID, joinLeaveChannel, e.Client())
+	} else {
+		_, err = createV1Message(joinleaveInfo, guildSettings.JoinMessage, guildID, joinLeaveChannel, e.Client())
 	}
 
-	contents, err := mustache.RenderRaw(guildSettings.JoinMessage, true, joinleaveInfo)
-	if err != nil {
-		slog.Error(
-			"Failed to render join message template.",
-			"err", err,
-			"guild_id", guildID,
-		)
-		return
-	}
-
-	_, err = e.Client().Rest.CreateMessage(
-		joinLeaveChannel, discord.NewMessageCreate().WithContent(contents),
-	)
 	if err != nil {
 		slog.Error(
 			"Failed to send join message.",
@@ -114,41 +94,19 @@ func OnUserLeave(e *events.GuildMemberLeave) {
 	e.Member.User = e.User
 	joinleaveInfo := utils.NewMessageTemplateData(e.Member, guild.Guild)
 
-	if guildSettings.LeaveMessageV2 && guildSettings.LeaveMessageV2Json != "" {
+	hasV2 := guildSettings.LeaveMessageV2 && guildSettings.LeaveMessageV2Json != ""
+
+	if hasV2 {
 		emojiMap := make(map[string]discord.Emoji)
 		for emoji := range e.Client().Caches.Emojis(guildID) {
 			emojiMap[strings.ToLower(emoji.Name)] = emoji
 		}
 
-		components, err := utils.BuildV2Message(guildSettings.LeaveMessageV2Json, joinleaveInfo, emojiMap)
-		if err != nil {
-			slog.Error("Failed to build V2 leave message.", "err", err, "guild_id", guildID)
-			return
-		}
-
-		_, err = e.Client().Rest.CreateMessage(joinLeaveChannel, discord.MessageCreate{
-			Flags:      discord.MessageFlagIsComponentsV2,
-			Components: components,
-		})
-		if err != nil {
-			slog.Error("Failed to send V2 leave message.", "guild_id", guildID, "channel_id", joinLeaveChannel, "err", err)
-		}
-		return
+		_, err = createV2Message(joinleaveInfo, emojiMap, guildSettings.LeaveMessageV2Json, guildID, joinLeaveChannel, e.Client())
+	} else {
+		_, err = createV1Message(joinleaveInfo, guildSettings.LeaveMessage, guildID, joinLeaveChannel, e.Client())
 	}
 
-	contents, err := mustache.RenderRaw(guildSettings.LeaveMessage, true, joinleaveInfo)
-	if err != nil {
-		slog.Error(
-			"Failed to render leave message template.",
-			"err", err,
-			"guild_id", guildID,
-		)
-		return
-	}
-
-	_, err = e.Client().Rest.CreateMessage(
-		joinLeaveChannel, discord.NewMessageCreate().WithContent(contents),
-	)
 	if err != nil {
 		slog.Error(
 			"Failed to send leave message.",
@@ -157,4 +115,52 @@ func OnUserLeave(e *events.GuildMemberLeave) {
 			"err", err,
 		)
 	}
+}
+
+func createV1Message(
+	data utils.MessageTemplateData,
+	messageTemplate string,
+	guildID snowflake.ID,
+	channelID snowflake.ID,
+	client *bot.Client,
+) (m *discord.Message, err error) {
+
+	contents, err := mustache.RenderRaw(messageTemplate, true, data)
+	if err != nil {
+		slog.Error("Failed to render V1 join message template.", "err", err, "guild_id", guildID)
+		return
+	}
+
+	m, err = client.Rest.CreateMessage(
+		channelID, discord.NewMessageCreate().WithContent(contents),
+	)
+	if err != nil {
+		slog.Error("Failed to send V1 join message.", "guild_id", guildID, "channel_id", channelID, "err", err)
+	}
+	return
+}
+
+func createV2Message(
+	data utils.MessageTemplateData,
+	emojiMap map[string]discord.Emoji,
+	messageJson string,
+	guildID snowflake.ID,
+	channelID snowflake.ID,
+	client *bot.Client,
+) (m *discord.Message, err error) {
+
+	components, err := utils.BuildV2Message(messageJson, data, emojiMap)
+	if err != nil {
+		slog.Error("Failed to build V2 join message.", "err", err, "guild_id", guildID)
+		return
+	}
+
+	m, err = client.Rest.CreateMessage(channelID, discord.MessageCreate{
+		Flags:      discord.MessageFlagIsComponentsV2,
+		Components: components,
+	})
+	if err != nil {
+		slog.Error("Failed to send V2 join message.", "guild_id", guildID, "channel_id", channelID, "err", err)
+	}
+	return
 }
