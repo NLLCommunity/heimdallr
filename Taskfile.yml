@@ -28,7 +28,7 @@ tasks:
     desc: Build heimdallr backend only (without frontend)
     cmds:
       - go generate ./...
-      - go build -o heimdallr{{exeExt}} .
+      - go build -tags web -o heimdallr{{exeExt}} .
   build-frontend:
     desc: Build web dashboard and embed into rpcserver
     dir: web-dashboard

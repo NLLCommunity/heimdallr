@@ -15,7 +15,7 @@ const (
 )
 
 type DashboardLoginCode struct {
-	Code      string       `gorm:"primaryKey"`
+	Code      string `gorm:"primaryKey"`
 	UserID    snowflake.ID
 	Username  string
 	Avatar    string

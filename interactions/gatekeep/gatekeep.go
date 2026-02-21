@@ -160,13 +160,6 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		)
 	}
 
-	channel := guildSettings.JoinLeaveChannel
-	if channel == 0 {
-		if guild.SystemChannelID != nil {
-			channel = *guild.SystemChannelID
-		}
-	}
-
 	templateData := utils.NewMessageTemplateData(member.Member, guild)
 
 	data := &gatekeepData{
@@ -217,8 +210,14 @@ func createV1Approvedtmessage(
 		slog.Warn("Failed to render approved message template.")
 		return nil, renderErr
 	}
+
+	channel := data.guildSettings.JoinLeaveChannel
+	if channel == 0 && data.guild.SystemChannelID != nil {
+		channel = *data.guild.SystemChannelID
+	}
+
 	return data.client.Rest.CreateMessage(
-		data.guildSettings.JoinLeaveChannel,
+		channel,
 		discord.NewMessageCreate().
 			WithContent(
 				contents+
@@ -250,7 +249,12 @@ func createV2ApprovedMessage(
 		fmt.Sprintf("-# Approved by %s", data.approver.Mention()),
 	))
 
-	return data.client.Rest.CreateMessage(data.guildSettings.JoinLeaveChannel, discord.MessageCreate{
+	channel := data.guildSettings.JoinLeaveChannel
+	if channel == 0 && data.guild.SystemChannelID != nil {
+		channel = *data.guild.SystemChannelID
+	}
+
+	return data.client.Rest.CreateMessage(channel, discord.MessageCreate{
 		Flags:      discord.MessageFlagIsComponentsV2,
 		Components: components,
 		AllowedMentions: &discord.AllowedMentions{

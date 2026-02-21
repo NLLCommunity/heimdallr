@@ -19,7 +19,7 @@ COPY ./ .
 COPY --from=frontend-builder /usr/src/app/dist ./rpcserver/frontend
 
 RUN go generate ./...
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags "-s -w" -o heimdallr .
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags "-s -w" -tags web -o heimdallr .
 
 FROM alpine:3.23
 
