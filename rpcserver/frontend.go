@@ -1,3 +1,5 @@
+//go:build web
+
 package rpcserver
 
 import (
@@ -13,7 +15,7 @@ var frontendFS embed.FS
 // spaHandler serves the embedded frontend files, falling back to index.html
 // for any path that doesn't match a real file (SPA client-side routing).
 type spaHandler struct {
-	fs http.Handler
+	fs   http.Handler
 	root fs.FS
 }
 

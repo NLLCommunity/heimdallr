@@ -1,3 +1,5 @@
+//go:build web
+
 package rpcserver
 
 import (
@@ -191,14 +193,14 @@ func (s *guildSettingsService) GetGatekeepSettings(ctx context.Context, req *hei
 	}
 
 	return &heimdallrv1.GatekeepSettings{
-		GuildId:                guildID.String(),
-		Enabled:                settings.GatekeepEnabled,
-		PendingRole:            idStr(settings.GatekeepPendingRole),
-		ApprovedRole:           idStr(settings.GatekeepApprovedRole),
-		AddPendingRoleOnJoin:   settings.GatekeepAddPendingRoleOnJoin,
-		ApprovedMessage:        settings.GatekeepApprovedMessage,
-		ApprovedMessageV2:      settings.GatekeepApprovedMessageV2,
-		ApprovedMessageV2Json:  settings.GatekeepApprovedMessageV2Json,
+		GuildId:               guildID.String(),
+		Enabled:               settings.GatekeepEnabled,
+		PendingRole:           idStr(settings.GatekeepPendingRole),
+		ApprovedRole:          idStr(settings.GatekeepApprovedRole),
+		AddPendingRoleOnJoin:  settings.GatekeepAddPendingRoleOnJoin,
+		ApprovedMessage:       settings.GatekeepApprovedMessage,
+		ApprovedMessageV2:     settings.GatekeepApprovedMessageV2,
+		ApprovedMessageV2Json: settings.GatekeepApprovedMessageV2Json,
 	}, nil
 }
 
@@ -227,14 +229,14 @@ func (s *guildSettingsService) UpdateGatekeepSettings(ctx context.Context, req *
 	}
 
 	return &heimdallrv1.GatekeepSettings{
-		GuildId:                guildID.String(),
-		Enabled:                settings.GatekeepEnabled,
-		PendingRole:            idStr(settings.GatekeepPendingRole),
-		ApprovedRole:           idStr(settings.GatekeepApprovedRole),
-		AddPendingRoleOnJoin:   settings.GatekeepAddPendingRoleOnJoin,
-		ApprovedMessage:        settings.GatekeepApprovedMessage,
-		ApprovedMessageV2:      settings.GatekeepApprovedMessageV2,
-		ApprovedMessageV2Json:  settings.GatekeepApprovedMessageV2Json,
+		GuildId:               guildID.String(),
+		Enabled:               settings.GatekeepEnabled,
+		PendingRole:           idStr(settings.GatekeepPendingRole),
+		ApprovedRole:          idStr(settings.GatekeepApprovedRole),
+		AddPendingRoleOnJoin:  settings.GatekeepAddPendingRoleOnJoin,
+		ApprovedMessage:       settings.GatekeepApprovedMessage,
+		ApprovedMessageV2:     settings.GatekeepApprovedMessageV2,
+		ApprovedMessageV2Json: settings.GatekeepApprovedMessageV2Json,
 	}, nil
 }
 
