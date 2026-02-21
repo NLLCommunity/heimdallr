@@ -4,6 +4,7 @@ version: "3"
 
 env:
   GOPRIVATE: github.com/myrkvi/grem
+  GOTOOLCHAIN: auto
 
 tasks:
   default:
@@ -22,6 +23,11 @@ tasks:
     desc: Build heimdallr binary
     cmds:
       - task: build-frontend
+      - task: build-backend
+  build-backend:
+    desc: Build heimdallr backend only (without frontend)
+    cmds:
+      - go generate ./...
       - go build -o heimdallr{{exeExt}} .
   build-frontend:
     desc: Build web dashboard and embed into rpcserver
@@ -30,4 +36,4 @@ tasks:
       - bun install
       - bun run build
       - rm -rf ../rpcserver/frontend
-      - mv dist ../rpcserver/frontend
+      - cp -rf dist ../rpcserver/frontend
