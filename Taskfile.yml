@@ -1,0 +1,39 @@
+# https://taskfile.dev
+
+version: "3"
+
+env:
+  GOPRIVATE: github.com/myrkvi/grem
+  GOTOOLCHAIN: auto
+
+tasks:
+  default:
+    desc: Build and run heimdallr
+    cmds:
+      - task: build
+      - task: run
+  run:
+    desc: Run heimdallr
+    preconditions:
+      - sh: test -f ./heimdallr{{exeExt}}
+        msg: "heimdallr binary not found, please run 'task build' first"
+    cmds:
+      - ./heimdallr{{exeExt}}
+  build:
+    desc: Build heimdallr binary
+    cmds:
+      - task: build-frontend
+      - task: build-backend
+  build-backend:
+    desc: Build heimdallr backend only (without frontend)
+    cmds:
+      - go generate ./...
+      - go build -tags web -o heimdallr{{exeExt}} .
+  build-frontend:
+    desc: Build web dashboard and embed into rpcserver
+    dir: web-dashboard
+    cmds:
+      - bun install
+      - bun run build
+      - rm -rf ../rpcserver/frontend
+      - cp -rf dist ../rpcserver/frontend

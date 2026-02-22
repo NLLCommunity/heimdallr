@@ -25,11 +25,17 @@ type GuildSettings struct {
 	GatekeepApprovedRole         snowflake.ID
 	GatekeepAddPendingRoleOnJoin bool
 	GatekeepApprovedMessage      string
+	GatekeepApprovedMessageV2    bool
+	GatekeepApprovedMessageV2Json string
 
 	JoinMessageEnabled  bool
 	JoinMessage         string
+	JoinMessageV2       bool
+	JoinMessageV2Json   string
 	LeaveMessageEnabled bool
 	LeaveMessage        string
+	LeaveMessageV2      bool
+	LeaveMessageV2Json  string
 	JoinLeaveChannel    snowflake.ID
 
 	AntiSpamEnabled         bool
