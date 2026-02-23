@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { querystring, push } from "svelte-spa-router";
+  import { querystring, replace } from "svelte-spa-router";
   import { authClient } from "../api/client";
   import { userStore } from "../stores/user.svelte";
 

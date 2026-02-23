@@ -267,7 +267,6 @@ func (x *ExchangeCodeRequest) GetCode() string {
 
 type ExchangeCodeResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Token         string                 `protobuf:"bytes,1,opt,name=token,proto3" json:"token,omitempty"`
 	User          *User                  `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -301,13 +300,6 @@ func (x *ExchangeCodeResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ExchangeCodeResponse.ProtoReflect.Descriptor instead.
 func (*ExchangeCodeResponse) Descriptor() ([]byte, []int) {
 	return file_heimdallr_v1_auth_proto_rawDescGZIP(), []int{5}
-}
-
-func (x *ExchangeCodeResponse) GetToken() string {
-	if x != nil {
-		return x.Token
-	}
-	return ""
 }
 
 func (x *ExchangeCodeResponse) GetUser() *User {
@@ -566,9 +558,8 @@ const file_heimdallr_v1_auth_proto_rawDesc = "" +
 	"\x13GetLoginURLResponse\x12\x10\n" +
 	"\x03url\x18\x01 \x01(\tR\x03url\")\n" +
 	"\x13ExchangeCodeRequest\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\tR\x04code\"T\n" +
-	"\x14ExchangeCodeResponse\x12\x14\n" +
-	"\x05token\x18\x01 \x01(\tR\x05token\x12&\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\">\n" +
+	"\x14ExchangeCodeResponse\x12&\n" +
 	"\x04user\x18\x02 \x01(\v2\x12.heimdallr.v1.UserR\x04user\"\x17\n" +
 	"\x15GetCurrentUserRequest\"@\n" +
 	"\x16GetCurrentUserResponse\x12&\n" +

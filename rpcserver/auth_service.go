@@ -38,7 +38,6 @@ func (s *authService) ExchangeCode(ctx context.Context, req *heimdallrv1.Exchang
 	SetResponseCookie(ctx, makeSessionCookie(session.Token, 86400))
 
 	return &heimdallrv1.ExchangeCodeResponse{
-		Token: session.Token,
 		User: &heimdallrv1.User{
 			Id:       session.UserID.String(),
 			Username: session.Username,

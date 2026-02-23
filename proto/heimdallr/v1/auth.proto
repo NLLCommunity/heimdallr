@@ -25,7 +25,6 @@ message ExchangeCodeRequest {
 }
 
 message ExchangeCodeResponse {
-  string token = 1;
   User user = 2;
 }
 

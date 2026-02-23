@@ -15,6 +15,7 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/rs/cors"
 	"github.com/spf13/viper"
+	"golang.org/x/time/rate"
 
 	"github.com/NLLCommunity/heimdallr/gen/heimdallr/v1/heimdallrv1connect"
 	"github.com/NLLCommunity/heimdallr/model"
@@ -67,22 +68,35 @@ func StartServer(addr string, discordClient *bot.Client) error {
 	// Serve embedded frontend as SPA fallback (catch-all for non-RPC paths).
 	mux.Handle("/", newSPAHandler())
 
-	// Clean expired sessions periodically.
+	// Clean expired sessions and stale rate-limiter entries periodically.
+	exchangeCodeLimiter := newIPRateLimiter(
+		rate.Every(time.Minute/exchangeCodeRatePerMinute),
+		exchangeCodeBurst,
+	)
 	go func() {
 		ticker := time.NewTicker(15 * time.Minute)
 		defer ticker.Stop()
 		for range ticker.C {
 			model.CleanExpiredSessions()
+			exchangeCodeLimiter.cleanup(rateLimiterTTL)
 		}
 	}()
 
-	// CORS configuration — only allow the dashboard origin.
+	// Build the middleware chain (innermost to outermost):
+	//   mux → body limit → rate limit → CORS
+	// CORS is outermost so OPTIONS preflight requests are handled before the
+	// body limit or rate limiter run.
+	withBodyLimit := newBodyLimitMiddleware()(mux)
+	withRateLimit := newRateLimitMiddleware(
+		exchangeCodeLimiter,
+		heimdallrv1connect.AuthServiceExchangeCodeProcedure,
+	)(withBodyLimit)
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins:   []string{baseURL},
 		AllowedMethods:   []string{"POST", "GET", "OPTIONS"},
 		AllowedHeaders:   []string{"Authorization", "Content-Type", "Connect-Protocol-Version"},
 		AllowCredentials: true,
-	}).Handler(mux)
+	}).Handler(withRateLimit)
 
 	p := new(http.Protocols)
 	p.SetHTTP1(true)

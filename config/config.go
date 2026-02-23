@@ -33,7 +33,7 @@ func init() {
 
 	viper.SetDefault("rpc.address", ":8484")
 
-	viper.SetDefault("dashboard.base_url", "http://localhost:5173")
+	viper.SetDefault("dashboard.base_url", "http://localhost:8484")
 
 	viper.AutomaticEnv()
 
