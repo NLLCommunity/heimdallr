@@ -31,7 +31,7 @@ func init() {
 	viper.SetDefault("dev_mode.enabled", false)
 	viper.SetDefault("dev_mode.guild_id", 0)
 
-	viper.SetDefault("rpc.address", ":8484")
+	viper.SetDefault("web.address", ":8484")
 
 	viper.SetDefault("dashboard.base_url", "http://localhost:8484")
 

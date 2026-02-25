@@ -163,7 +163,7 @@ func main() {
 	removeStalePrunesTask := scheduled_tasks.RemoveStalePendingPrunes()
 
 	go func() {
-		if err := rpcserver.StartServer(viper.GetString("rpc.address"), client); err != nil {
+		if err := rpcserver.StartServer(viper.GetString("web.address"), client); err != nil {
 			slog.Error("Failed to start RPC server", "error", err)
 		}
 	}()

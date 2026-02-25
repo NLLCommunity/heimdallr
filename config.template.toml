@@ -8,7 +8,7 @@ token = "INSERT_YOUR_TOKEN_HERE" # Discord bot token
 enabled = true # Enable or disable developer mode
 guild_id = 0   # Guild ID to use for developer mode
 
-[rpc]
+[web]
 address = "localhost:8484" # RPC server address
 
 [dashboard]

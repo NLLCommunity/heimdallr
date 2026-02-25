@@ -16,6 +16,7 @@ echo "DB_REPLICA_URL=${DB_REPLICA_URL:-}"
 
 readonly DB_PATH="${HEIMDALLR_BOT_DB:-heimdallr.db}"
 export DB_PATH
+export HEIMDALLR_WEB_ADDRESS=":${PORT:-8484}"
 
 if [ -f "$DB_PATH" ]; then
   echo "Existing database is $(stat -c %s "${DB_PATH}") bytes"
