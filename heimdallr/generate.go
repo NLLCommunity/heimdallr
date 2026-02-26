@@ -1,5 +1,3 @@
-//go:build generate
-
 package main
 
 //go:generate go tool buf dep update

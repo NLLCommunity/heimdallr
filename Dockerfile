@@ -11,15 +11,19 @@ FROM golang:1.26 AS builder
 
 WORKDIR /usr/src/app
 
-COPY go.mod go.sum ./
+COPY go.work go.work.sum ./
+
+
+COPY ./heimdallr ./heimdallr
+COPY --from=frontend-builder /usr/src/app/dist ./heimdallr/rpcserver/frontend
+COPY litestream.yml start.sh ./
 
 RUN go mod download
-
-COPY ./ .
-COPY --from=frontend-builder /usr/src/app/dist ./rpcserver/frontend
-
-RUN go generate ./...
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags "-s -w" -tags web -o heimdallr .
+RUN go generate github.com/NLLCommunity/heimdallr/...
+RUN CGO_ENABLED=0 GOOS=linux \
+  go build -a -installsuffix cgo -ldflags "-s -w" \
+  -tags web -o heimdallrbot \
+  github.com/NLLCommunity/heimdallr
 
 FROM alpine:3.23
 
@@ -32,7 +36,7 @@ VOLUME /var/lib/heimdallr
 RUN apk add --no-cache ca-certificates fuse3 sqlite tini
 
 COPY --from=litestream/litestream:0.5 /usr/local/bin/litestream /bin/litestream
-COPY --from=builder /usr/src/app/heimdallr /usr/src/app/bin/heimdallr
+COPY --from=builder /usr/src/app/heimdallrbot /usr/src/app/bin/heimdallr
 COPY --from=builder /usr/src/app/litestream.yml /usr/src/app/start.sh ./
 
 EXPOSE 8484

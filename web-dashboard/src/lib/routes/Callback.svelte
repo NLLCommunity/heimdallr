@@ -22,7 +22,7 @@
       if (res.user) {
         user.user = res.user;
       }
-      push("/guilds");
+      replace("/guilds");
     } catch (e: any) {
       error = e.message;
     }
