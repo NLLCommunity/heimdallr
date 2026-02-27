@@ -1,0 +1,26 @@
+version: v2
+plugins:
+  #- local: protoc-gen-go
+  - remote: buf.build/protocolbuffers/go:v1.36.11
+    out: gen
+    opt: paths=source_relative
+  #- local: protoc-gen-connect-go
+  - remote: buf.build/connectrpc/go:v1.19.1
+    out: gen
+    opt:
+      - paths=source_relative
+      - simple
+  #- local: protoc-gen-es
+  - remote: buf.build/bufbuild/es:v2.11.0
+    out: ../web-dashboard/src/gen
+    include_imports: true
+    opt: target=ts
+
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/NLLCommunity/heimdallr/gen
+  disable:
+    - file_option: go_package
+      module: buf.build/bufbuild/protovalidate

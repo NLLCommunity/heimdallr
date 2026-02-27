@@ -33,9 +33,14 @@ go.work.sum
 
 # Heimdallr-specific files
 # Heimdallr binary
-heimdallr
+/heimdallr
+/heimdallrbot
+!/heimdallr/
 # Heimdallr configuration file
 config.toml
 # Database file
 heimdallr.db
 pb_data/
+
+# Embedded frontend build output
+/rpcserver/frontend/

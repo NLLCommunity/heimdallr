@@ -1,0 +1,53 @@
+syntax = "proto3";
+
+package heimdallr.v1;
+
+message User {
+  string id = 1;
+  string username = 2;
+  string avatar = 3;
+}
+
+message Guild {
+  string id = 1;
+  string name = 2;
+  string icon = 3;
+}
+
+message GetLoginURLRequest {}
+
+message GetLoginURLResponse {
+  string url = 1;
+}
+
+message ExchangeCodeRequest {
+  string code = 1;
+}
+
+message ExchangeCodeResponse {
+  User user = 2;
+}
+
+message GetCurrentUserRequest {}
+
+message GetCurrentUserResponse {
+  User user = 1;
+}
+
+message ListGuildsRequest {}
+
+message ListGuildsResponse {
+  repeated Guild guilds = 1;
+}
+
+message LogoutRequest {}
+
+message LogoutResponse {}
+
+service AuthService {
+  rpc GetLoginURL(GetLoginURLRequest) returns (GetLoginURLResponse);
+  rpc ExchangeCode(ExchangeCodeRequest) returns (ExchangeCodeResponse);
+  rpc GetCurrentUser(GetCurrentUserRequest) returns (GetCurrentUserResponse);
+  rpc ListGuilds(ListGuildsRequest) returns (ListGuildsResponse);
+  rpc Logout(LogoutRequest) returns (LogoutResponse);
+}
