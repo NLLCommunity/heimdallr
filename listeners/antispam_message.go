@@ -73,13 +73,15 @@ func OnAntispamMessageCreate(e *events.GuildMessageCreate) {
 	}
 
 	info := messagesInfo.Value()
-	matchesPreviousMessage := compareToPreviousMessages(e.Message, info)
 
 	if len(info.Messages) >= maxMessages {
 		info.Messages = info.Messages[1:]
 	}
-	info.Messages = append(info.Messages, createMessageDetails(e.Message))
 
+	messageDetails := createMessageDetails(e.Message)
+	info.Messages = append(info.Messages, messageDetails)
+
+	matchesPreviousMessage := compareToPreviousMessages(messageDetails, info)
 	if matchesPreviousMessage {
 		info.Score++
 	}
@@ -97,7 +99,7 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 	cooldown := time.Duration(guildSettings.AntiSpamCooldownSeconds) * time.Second
 	cutoffTime := time.Now().Add(-cooldown)
 
-	expiry := time.Now().Add(24 * time.Hour)
+	expiry := time.Now().Add(time.Duration(guildSettings.AntiSpamTimeoutMinutes) * time.Minute)
 	_, err := e.Client().Rest.UpdateMember(
 		e.GuildID, userID, discord.MemberUpdate{
 			CommunicationDisabledUntil: omit.NewPtr(expiry),
@@ -153,13 +155,16 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 	}
 }
 
-func compareToPreviousMessages(m discord.Message, info userMessagesInfo) bool {
+func compareToPreviousMessages(details *messageDetails, info userMessagesInfo) bool {
 	if len(info.Messages) == 0 {
 		return false
 	}
+
+	slog.Debug("Comparing message to previous messages.", "current_message", details.Content, "previous_messages_count", len(info.Messages))
+
 	for _, mInfo := range info.Messages {
 		// Remove all whitespace from the message content
-		currentMessage := whitespaceReplacer.Replace(m.Content)
+		currentMessage := whitespaceReplacer.Replace(details.Content)
 		if len(currentMessage) < minMessageLength {
 			return false
 		}
@@ -167,7 +172,7 @@ func compareToPreviousMessages(m discord.Message, info userMessagesInfo) bool {
 		prevMessage := whitespaceReplacer.Replace(mInfo.Content)
 
 		distance := levenshtein.ComputeDistance(currentMessage, prevMessage)
-		if distance < maxLevenshteinDistance && m.ChannelID != mInfo.ChannelID {
+		if distance < maxLevenshteinDistance && details.ChannelID != mInfo.ChannelID {
 			// Return true if these are similar messages across channels
 			return true
 		}
@@ -187,8 +192,30 @@ func createMessageInfoForUser(uHash string, m discord.Message, ttl time.Duration
 
 func createMessageDetails(m discord.Message) *messageDetails {
 	return &messageDetails{
-		Content:   m.Content,
+		Content:   messageWithAttachmentInfo(m),
 		ChannelID: m.ChannelID,
 		MessageID: m.ID,
 	}
+}
+
+func messageWithAttachmentInfo(m discord.Message) string {
+	atts := make([]string, len(m.Attachments))
+	for i, att := range m.Attachments {
+		width := 0
+		height := 0
+		if att.Width != nil {
+			width = *att.Width
+		}
+		if att.Height != nil {
+			height = *att.Height
+		}
+
+		atts[i] = fmt.Sprintf("%s %dx%d %d", att.Filename, width, height, att.Size)
+	}
+
+	if len(atts) == 0 {
+		return m.Content
+	}
+
+	return fmt.Sprintf("%s\nAttachments:\n%s", m.Content, strings.Join(atts, "\n"))
 }

@@ -35,6 +35,7 @@ type GuildSettings struct {
 	AntiSpamEnabled         bool
 	AntiSpamCount           int `gorm:"default:5"`
 	AntiSpamCooldownSeconds int `gorm:"default:20"`
+	AntiSpamTimeoutMinutes  int `gorm:"default:720"` //12 hours
 
 	BanFooter           string
 	AlwaysSendBanFooter bool

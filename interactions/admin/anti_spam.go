@@ -23,10 +23,10 @@ var antiSpamSubcommand = discord.ApplicationCommandOptionSubCommand{
 		},
 		discord.ApplicationCommandOptionInt{
 			Name:        "count",
-			Description: "The number of messages needed for Heimdallr to take action (within the cooldown period)",
+			Description: "The number of messages allowed before Heimdallr takes action (within the cooldown period)",
 			Required:    false,
-			MinValue:    utils.Ref(2),
-			MaxValue:    utils.Ref(10),
+			MinValue:    utils.Ref(1),
+			MaxValue:    utils.Ref(15),
 		},
 		discord.ApplicationCommandOptionInt{
 			Name:        "cooldown",
@@ -34,6 +34,13 @@ var antiSpamSubcommand = discord.ApplicationCommandOptionSubCommand{
 			Required:    false,
 			MinValue:    utils.Ref(1),
 			MaxValue:    utils.Ref(60),
+		},
+		discord.ApplicationCommandOptionInt{
+			Name:        "timeout",
+			Description: "The time in minutes to timeout a user who has exceeded the message count",
+			Required:    false,
+			MinValue:    utils.Ref(1),
+			MaxValue:    utils.Ref(10080), // 7 days
 		},
 		discord.ApplicationCommandOptionString{
 			Name:        "reset",
@@ -56,7 +63,7 @@ func antiSpamInfo(settings *model.GuildSettings) string {
 		utils.Iif(settings.AntiSpamEnabled, "yes", "no"), antispamEnabledInfo,
 	)
 
-	antispamCountInfo := "> This is the number of messages needed for Heimdallr to take action (within the cooldown period)."
+	antispamCountInfo := "> This is the number of messages allowed before Heimdallr takes action (within the cooldown period)."
 	antispamCount := fmt.Sprintf(
 		"**Anti-spam count:** %d\n%s",
 		settings.AntiSpamCount, antispamCountInfo,
@@ -68,9 +75,15 @@ func antiSpamInfo(settings *model.GuildSettings) string {
 		settings.AntiSpamCooldownSeconds, antispamCooldownInfo,
 	)
 
+	antispamTimeoutInfo := "> This is the time in minutes to timeout a user who has exceeded the message count."
+	antispamTimeout := fmt.Sprintf(
+		"**Anti-spam timeout:** %d\n%s",
+		settings.AntiSpamTimeoutMinutes, antispamTimeoutInfo,
+	)
+
 	return fmt.Sprintf(
-		"## Anti-spam settings\n%s\n\n%s\n\n%s",
-		antispamEnabled, antispamCount, antispamCooldown,
+		"## Anti-spam settings\n%s\n\n%s\n\n%s\n\n%s",
+		antispamEnabled, antispamCount, antispamCooldown, antispamTimeout,
 	)
 }
 
@@ -102,6 +115,9 @@ func AdminAntiSpamHandler(e *handler.CommandEvent) error {
 		case "cooldown":
 			settings.AntiSpamCooldownSeconds = 20 // Default value
 			message += "Anti-spam cooldown has been reset.\n"
+		case "timeout":
+			settings.AntiSpamTimeoutMinutes = 720 // Default value: 12 hours
+			message += "Anti-spam timeout has been reset.\n"
 		case "all":
 			settings.AntiSpamEnabled = false
 			settings.AntiSpamCount = 5            // Default value
@@ -126,6 +142,12 @@ func AdminAntiSpamHandler(e *handler.CommandEvent) error {
 	if hasCooldown {
 		settings.AntiSpamCooldownSeconds = cooldown
 		message += fmt.Sprintf("Anti-spam cooldown (seconds) set to %d\n", cooldown)
+	}
+
+	timeout, hasTimeout := data.OptInt("timeout")
+	if hasTimeout {
+		settings.AntiSpamTimeoutMinutes = timeout
+		message += fmt.Sprintf("Anti-spam timeout (minutes) set to %d\n", timeout)
 	}
 
 	if !utils.Any(hasEnabled, hasCount, hasCooldown, hasReset) {
