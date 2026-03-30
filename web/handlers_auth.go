@@ -8,17 +8,20 @@ import (
 	"github.com/NLLCommunity/heimdallr/web/templates/pages"
 )
 
-func handleLogin(w http.ResponseWriter, r *http.Request) {
-	// If already logged in, redirect to guilds.
-	if session := sessionFromContext(r.Context()); session != nil {
-		http.Redirect(w, r, "/guilds", http.StatusSeeOther)
+// handleCallbackGET renders a confirmation page without consuming the login code.
+// This prevents Discord link previews and crawlers from exchanging the code.
+func handleCallbackGET(w http.ResponseWriter, r *http.Request) {
+	code := r.URL.Query().Get("code")
+	if code == "" {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	pages.Login().Render(r.Context(), w)
+	pages.Callback(code).Render(r.Context(), w)
 }
 
-func handleCallback(w http.ResponseWriter, r *http.Request) {
-	code := r.URL.Query().Get("code")
+// handleCallbackPOST exchanges the login code for a session.
+func handleCallbackPOST(w http.ResponseWriter, r *http.Request) {
+	code := r.FormValue("code")
 	if code == "" {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
@@ -34,6 +37,16 @@ func handleCallback(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, makeSessionCookie(session.Token, 86400))
 	http.Redirect(w, r, "/guilds", http.StatusSeeOther)
 }
+
+func handleLogin(w http.ResponseWriter, r *http.Request) {
+	// If already logged in, redirect to guilds.
+	if session := sessionFromContext(r.Context()); session != nil {
+		http.Redirect(w, r, "/guilds", http.StatusSeeOther)
+		return
+	}
+	pages.Login().Render(r.Context(), w)
+}
+
 
 func handleLogout(w http.ResponseWriter, r *http.Request) {
 	session := sessionFromContext(r.Context())

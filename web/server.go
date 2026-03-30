@@ -32,7 +32,8 @@ func StartServer(addr string, client *bot.Client) error {
 	// Auth routes.
 	mux.HandleFunc("GET /", handleRoot)
 	mux.HandleFunc("GET /login", handleLogin)
-	mux.HandleFunc("GET /callback", handleCallback)
+	mux.HandleFunc("GET /callback", handleCallbackGET)
+	mux.HandleFunc("POST /callback", handleCallbackPOST)
 	mux.HandleFunc("GET /logout", handleLogout)
 
 	// Guild routes.
