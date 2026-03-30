@@ -23,6 +23,8 @@ templ Dashboard(nav layouts.NavData, guildID string, settingsContent templ.Compo
 			<aside>
 				<nav>
 					<ul>
+						<li><a href="/guilds">&larr; Back to servers</a></li>
+						<li><hr/></li>
 						for _, s := range SidebarSections {
 							<li><a href={ templ.SafeURL("#" + s.ID) }>{ s.Label }</a></li>
 						}
