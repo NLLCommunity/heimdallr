@@ -1,5 +1,16 @@
 package components
 
 templ SaveButton() {
-	<button type="submit">Save</button>
+	<div class="form-actions">
+		<button type="submit" :disabled="saving">Save</button>
+		<button type="button" class="outline secondary btn-narrow"
+			x-show="dirty && !saving" @click="cancel()">Cancel</button>
+		<span class="form-status" role="status" aria-live="polite"
+			x-show="dirty && !saving">Unsaved changes</span>
+		<span class="form-status" role="status" aria-live="polite" x-show="saving">
+			<span class="spinner" aria-hidden="true"></span> Saving&hellip;
+		</span>
+		<span class="form-status form-status-saved" role="status" aria-live="polite"
+			x-show="saved" x-transition.opacity.duration.500ms>Saved</span>
+	</div>
 }

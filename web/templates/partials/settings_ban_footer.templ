@@ -17,6 +17,7 @@ templ SettingsBanFooter(data BanFooterData) {
 			hx-post={ "/guild/" + data.GuildID + "/settings/ban-footer" }
 			hx-target="#ban-footer"
 			hx-swap="outerHTML"
+			x-data="formTracker()" @input="checkDirty()" @change="checkDirty()"
 		>
 			if data.SaveSuccess {
 				@components.AlertSuccess("Settings saved.")

@@ -29,6 +29,7 @@ templ SettingsGatekeep(data GatekeepData) {
 			hx-post={ "/guild/" + data.GuildID + "/settings/gatekeep" }
 			hx-target="#gatekeep"
 			hx-swap="outerHTML"
+			x-data="formTracker()" @input="checkDirty()" @change="checkDirty()"
 		>
 			if data.SaveSuccess {
 				@components.AlertSuccess("Settings saved.")

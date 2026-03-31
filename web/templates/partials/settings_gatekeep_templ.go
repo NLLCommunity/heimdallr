@@ -64,7 +64,7 @@ func SettingsGatekeep(data GatekeepData) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" hx-target=\"#gatekeep\" hx-swap=\"outerHTML\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\" hx-target=\"#gatekeep\" hx-swap=\"outerHTML\" x-data=\"formTracker()\" @input=\"checkDirty()\" @change=\"checkDirty()\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -153,7 +153,7 @@ func PlaceholderHelp(placeholders []utils.MessageTemplatePlaceholder) templ.Comp
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(p.Placeholder)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_gatekeep.templ`, Line: 62, Col: 31}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_gatekeep.templ`, Line: 63, Col: 31}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -166,7 +166,7 @@ func PlaceholderHelp(placeholders []utils.MessageTemplatePlaceholder) templ.Comp
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(p.Description)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_gatekeep.templ`, Line: 63, Col: 25}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_gatekeep.templ`, Line: 64, Col: 25}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -213,7 +213,7 @@ func V2MessageToggle(prefix string, plainText string, v2Enabled bool, v2Json str
 		var templ_7745c5c3_Var7 string
 		templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs("{ v2: " + boolStr(v2Enabled) + " }")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_gatekeep.templ`, Line: 72, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_gatekeep.templ`, Line: 73, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 		if templ_7745c5c3_Err != nil {
@@ -226,7 +226,7 @@ func V2MessageToggle(prefix string, plainText string, v2Enabled bool, v2Json str
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(prefix + "_v2")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_gatekeep.templ`, Line: 74, Col: 74}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_gatekeep.templ`, Line: 75, Col: 74}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
@@ -239,7 +239,7 @@ func V2MessageToggle(prefix string, plainText string, v2Enabled bool, v2Json str
 		var templ_7745c5c3_Var9 string
 		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(prefix + "_v2")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_gatekeep.templ`, Line: 77, Col: 44}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_gatekeep.templ`, Line: 78, Col: 44}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 		if templ_7745c5c3_Err != nil {
@@ -260,7 +260,7 @@ func V2MessageToggle(prefix string, plainText string, v2Enabled bool, v2Json str
 		var templ_7745c5c3_Var10 string
 		templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs("messageBuilder(" + escapeJsonAttr(v2Json) + ")")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_gatekeep.templ`, Line: 82, Col: 65}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_gatekeep.templ`, Line: 83, Col: 65}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 		if templ_7745c5c3_Err != nil {
@@ -281,7 +281,7 @@ func V2MessageToggle(prefix string, plainText string, v2Enabled bool, v2Json str
 		var templ_7745c5c3_Var11 string
 		templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(prefix + "_v2_json")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_gatekeep.templ`, Line: 84, Col: 51}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_gatekeep.templ`, Line: 85, Col: 51}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 		if templ_7745c5c3_Err != nil {

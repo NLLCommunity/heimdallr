@@ -17,6 +17,7 @@ templ SettingsModChannel(data ModChannelData) {
 			hx-post={ "/guild/" + data.GuildID + "/settings/mod-channel" }
 			hx-target="#mod-channel"
 			hx-swap="outerHTML"
+			x-data="formTracker()" @input="checkDirty()" @change="checkDirty()"
 		>
 			if data.SaveSuccess {
 				@components.AlertSuccess("Settings saved.")

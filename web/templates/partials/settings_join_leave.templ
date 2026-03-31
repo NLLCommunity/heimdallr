@@ -29,6 +29,7 @@ templ SettingsJoinLeave(data JoinLeaveData) {
 			hx-post={ "/guild/" + data.GuildID + "/settings/join-leave" }
 			hx-target="#join-leave"
 			hx-swap="outerHTML"
+			x-data="formTracker()" @input="checkDirty()" @change="checkDirty()"
 		>
 			if data.SaveSuccess {
 				@components.AlertSuccess("Settings saved.")

@@ -18,6 +18,7 @@ templ SettingsAntiSpam(data AntiSpamData) {
 			hx-post={ "/guild/" + data.GuildID + "/settings/anti-spam" }
 			hx-target="#anti-spam"
 			hx-swap="outerHTML"
+			x-data="formTracker()" @input="checkDirty()" @change="checkDirty()"
 		>
 			if data.SaveSuccess {
 				@components.AlertSuccess("Settings saved.")

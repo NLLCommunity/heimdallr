@@ -20,6 +20,7 @@ templ SettingsModmail(data ModmailData) {
 			hx-post={ "/guild/" + data.GuildID + "/settings/modmail" }
 			hx-target="#modmail"
 			hx-swap="outerHTML"
+			x-data="formTracker()" @input="checkDirty()" @change="checkDirty()"
 		>
 			if data.SaveSuccess {
 				@components.AlertSuccess("Settings saved.")

@@ -29,7 +29,7 @@ func SaveButton() templ.Component {
 			templ_7745c5c3_Var1 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<button type=\"submit\">Save</button>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div class=\"form-actions\"><button type=\"submit\" :disabled=\"saving\">Save</button> <button type=\"button\" class=\"outline secondary btn-narrow\" x-show=\"dirty && !saving\" @click=\"cancel()\">Cancel</button> <span class=\"form-status\" role=\"status\" aria-live=\"polite\" x-show=\"dirty && !saving\">Unsaved changes</span> <span class=\"form-status\" role=\"status\" aria-live=\"polite\" x-show=\"saving\"><span class=\"spinner\" aria-hidden=\"true\"></span> Saving&hellip;</span> <span class=\"form-status form-status-saved\" role=\"status\" aria-live=\"polite\" x-show=\"saved\" x-transition.opacity.duration.500ms>Saved</span></div>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

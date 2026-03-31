@@ -18,6 +18,7 @@ templ SettingsInfractions(data InfractionsData) {
 			hx-post={ "/guild/" + data.GuildID + "/settings/infractions" }
 			hx-target="#infractions"
 			hx-swap="outerHTML"
+			x-data="formTracker()" @input="checkDirty()" @change="checkDirty()"
 		>
 			if data.SaveSuccess {
 				@components.AlertSuccess("Settings saved.")
