@@ -119,9 +119,9 @@ func QuoteHandler(e *handler.CommandEvent) error {
 
 	embed := CreateMessageQuoteEmbed(e.Client(), message, showReplyTo)
 
-	resp := discord.NewMessageCreate().WithEmbeds(embed)
-	resp.AddComponents(discord.NewActionRow(discord.NewLinkButton("Jump to message", url)))
-	resp.WithAllowedMentions(&discord.AllowedMentions{})
+	resp := discord.NewMessageCreate().WithEmbeds(embed).
+		AddActionRow(discord.NewLinkButton("Jump to message", url)).
+		WithAllowedMentions(&discord.AllowedMentions{})
 
 	return e.CreateMessage(resp)
 }
