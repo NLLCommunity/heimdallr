@@ -100,15 +100,19 @@ func SetMemberPruned(guildID snowflake.ID, userID snowflake.ID, pruned bool) err
 func IsMemberPruned(guildID, userID snowflake.ID) (bool, error) {
 	ctx := context.Background()
 	session := DB.Session(&gorm.Session{SkipDefaultTransaction: true})
-	member, err := gorm.G[MemberPendingPrune](session).
+	members, err := gorm.G[MemberPendingPrune](session).
 		Where("guild_id = ? AND user_id = ?", guildID, userID).
-		First(ctx)
+		Find(ctx)
 
 	if err != nil {
 		return false, err
 	}
 
-	return member.Pruned, err
+	if len(members) < 1 {
+		return false, nil
+	}
+
+	return members[0].Pruned, err
 }
 
 func DeletePrunesBeforeTime(t time.Time) error {
