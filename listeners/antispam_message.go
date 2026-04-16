@@ -81,6 +81,8 @@ func OnAntispamMessageCreate(e *events.GuildMessageCreate) {
 	messageDetails := createMessageDetails(e.Message)
 	info.Messages = append(info.Messages, messageDetails)
 
+	// Check if this message is similar to previous messages across channels
+	// matching minimum length and Levenshtein distance thresholds.
 	matchesPreviousMessage := compareToPreviousMessages(messageDetails, info)
 	if matchesPreviousMessage {
 		info.Score++
@@ -134,14 +136,10 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 		return
 	}
 
-	adminMessage := fmt.Sprintf(
-		"User %s has been timed out for spamming. Deleted %d messages.\n\nTriggering message:\n>>> %s",
-		e.Message.Author.Mention(), len(removableMessageIDs), e.Message.Content,
-	)
+	timeoutMessage, _ := timeoutMessage(e, info, len(removableMessageIDs))
 
 	_, err = e.Client().Rest.CreateMessage(
-		guildSettings.ModeratorChannel, discord.NewMessageCreate().
-			WithContent(adminMessage),
+		guildSettings.ModeratorChannel, timeoutMessage,
 	)
 
 	if err != nil {
@@ -153,6 +151,47 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 			"user", e.Message.Author.ID,
 		)
 	}
+}
+
+type Mentioner interface {
+	Mention() string
+}
+
+func timeoutMessage(e *events.GuildMessageCreate, info userMessagesInfo, deletedCount int) (discord.MessageCreate, error) {
+	messages := make([]discord.ContainerSubComponent, len(info.Messages))
+
+	for i, m := range info.Messages {
+		channel := "unknown channel"
+		ch, err := e.Client().Rest.GetChannel(m.ChannelID)
+		if err == nil {
+			if gch, ok := ch.(Mentioner); ok {
+				channel = gch.Mention()
+			} else {
+				channel = ch.Name()
+			}
+		} else {
+			slog.Warn(
+				"Failed to fetch channel for timeout message.",
+			)
+		}
+
+		user := "unknown user"
+		if e.Message.Author.ID != 0 {
+			user = e.Message.Author.Mention()
+		}
+
+		messages[i] = discord.NewSection(
+			discord.NewTextDisplayf(">>> %s", m.Content),
+			discord.NewTextDisplayf("-# Channel: %s,    User: %s", channel, user),
+		)
+	}
+
+	message := discord.NewMessageCreateV2(
+		discord.NewTextDisplayf("User %s has been timed out for spamming. Deleted %d messages.", e.Message.Author.Username, deletedCount),
+		discord.NewContainer(messages...),
+	)
+
+	return message, nil
 }
 
 func compareToPreviousMessages(details *messageDetails, info userMessagesInfo) bool {
