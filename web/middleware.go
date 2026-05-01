@@ -13,9 +13,9 @@ import (
 )
 
 const (
-	exchangeCodeRatePerMinute = 1
-	exchangeCodeBurst         = 5
-	rateLimiterTTL            = 10 * time.Minute
+	exchangeCodeRatePerMinute       = 1
+	exchangeCodeBurst               = 5
+	rateLimiterTTL                  = 10 * time.Minute
 	maxRequestBodyBytes       int64 = 1 << 20 // 1 MiB
 )
 

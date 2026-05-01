@@ -36,8 +36,8 @@ import (
 	"github.com/NLLCommunity/heimdallr/interactions/role_button"
 	"github.com/NLLCommunity/heimdallr/listeners"
 	"github.com/NLLCommunity/heimdallr/model"
-	"github.com/NLLCommunity/heimdallr/web"
 	"github.com/NLLCommunity/heimdallr/scheduled_tasks"
+	"github.com/NLLCommunity/heimdallr/web"
 )
 
 var rmGlobalCommands = flag.Bool("rm-global-commands", false, "Remove global commands")

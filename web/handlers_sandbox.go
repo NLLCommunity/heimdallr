@@ -32,10 +32,10 @@ func handleSandbox(client *bot.Client) http.HandlerFunc {
 			GuildName: guild.Name,
 		}
 
-		pages.Sandbox(nav, pages.SandboxData{
+		renderSafe(w, r, pages.Sandbox(nav, pages.SandboxData{
 			GuildID:  guildIDStr,
 			Channels: guildChannels(client, guildID),
-		}).Render(r.Context(), w)
+		}))
 	}
 }
 
@@ -56,20 +56,20 @@ func handleSandboxSend(client *bot.Client) http.HandlerFunc {
 
 		channelID, err := snowflake.Parse(channelIDStr)
 		if err != nil {
-			components.AlertError("Invalid channel.").Render(r.Context(), w)
+			renderSafe(w, r, components.AlertError("Invalid channel."))
 			return
 		}
 
 		ch, chOk := client.Caches.GuildMessageChannel(channelID)
 		if !chOk || ch.GuildID() != guildID {
-			components.AlertError("Channel not found in this guild.").Render(r.Context(), w)
+			renderSafe(w, r, components.AlertError("Channel not found in this guild."))
 			return
 		}
 
 		// Parse and resolve emojis.
 		var parsed any
 		if err := json.Unmarshal([]byte(componentsJSON), &parsed); err != nil {
-			components.AlertError("Invalid components JSON.").Render(r.Context(), w)
+			renderSafe(w, r, components.AlertError("Invalid components JSON."))
 			return
 		}
 
@@ -78,14 +78,14 @@ func handleSandboxSend(client *bot.Client) http.HandlerFunc {
 
 		resolvedJSON, err := json.Marshal(parsed)
 		if err != nil {
-			components.AlertError("Failed to process components.").Render(r.Context(), w)
+			renderSafe(w, r, components.AlertError("Failed to process components."))
 			return
 		}
 
 		discordComponents, err := utils.ParseComponents(string(resolvedJSON))
 		if err != nil {
 			slog.Error("failed to parse resolved components", "error", err)
-			components.AlertError("Invalid components format.").Render(r.Context(), w)
+			renderSafe(w, r, components.AlertError("Invalid components format."))
 			return
 		}
 
@@ -95,11 +95,11 @@ func handleSandboxSend(client *bot.Client) http.HandlerFunc {
 		})
 		if err != nil {
 			slog.Error("failed to send Discord message", "error", err, "channel_id", channelID)
-			components.AlertError("Failed to send message.").Render(r.Context(), w)
+			renderSafe(w, r, components.AlertError("Failed to send message."))
 			return
 		}
 
-		components.AlertSuccess("Message sent!").Render(r.Context(), w)
+		renderSafe(w, r, components.AlertSuccess("Message sent!"))
 	}
 }
 

@@ -16,7 +16,7 @@ func handleCallbackGET(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
-	pages.Callback(code).Render(r.Context(), w)
+	renderSafe(w, r, pages.Callback(code))
 }
 
 // handleCallbackPOST exchanges the login code for a session.
@@ -44,9 +44,8 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/guilds", http.StatusSeeOther)
 		return
 	}
-	pages.Login().Render(r.Context(), w)
+	renderSafe(w, r, pages.Login())
 }
-
 
 func handleLogout(w http.ResponseWriter, r *http.Request) {
 	session := sessionFromContext(r.Context())

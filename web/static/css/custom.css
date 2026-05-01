@@ -93,3 +93,41 @@
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* Toast notifications */
+.toast-container {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 9999;
+  pointer-events: none;
+  max-width: calc(100vw - 2rem);
+}
+.toast {
+  pointer-events: auto;
+  padding: 0.75rem 1rem;
+  border-radius: var(--pico-border-radius);
+  background: var(--pico-card-background-color);
+  border: 1px solid var(--pico-card-border-color);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  min-width: 250px;
+  max-width: 400px;
+  animation: toast-slide-in 0.2s ease-out;
+}
+.toast-error {
+  border-color: red;
+  background: color-mix(in srgb, red 15%, var(--pico-card-background-color));
+}
+.toast-leaving {
+  animation: toast-slide-out 0.2s ease-in forwards;
+}
+@keyframes toast-slide-in {
+  from { transform: translateX(110%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes toast-slide-out {
+  to { transform: translateX(110%); opacity: 0; }
+}

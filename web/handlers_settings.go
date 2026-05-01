@@ -84,7 +84,7 @@ func handleDashboard(client *bot.Client) http.HandlerFunc {
 		}
 
 		allSections := allSettingsSections(guildIDStr, settings, ms, channels, roles)
-		pages.Dashboard(nav, guildIDStr, allSections).Render(r.Context(), w)
+		renderSafe(w, r, pages.Dashboard(nav, guildIDStr, allSections))
 	}
 }
 
@@ -181,28 +181,28 @@ func handleSaveModChannel(client *bot.Client) http.HandlerFunc {
 		}
 		settings, err := model.GetGuildSettings(guildID)
 		if err != nil {
-			partials.SettingsModChannel(partials.ModChannelData{
+			renderSafe(w, r, partials.SettingsModChannel(partials.ModChannelData{
 				GuildID: guildIDStr, SaveError: "Failed to load settings.",
-			}).Render(r.Context(), w)
+			}))
 			return
 		}
 
 		settings.ModeratorChannel = parseSnowflake(r.FormValue("moderator_channel"))
 		if err := model.SetGuildSettings(settings); err != nil {
 			slog.Error("failed to save mod channel settings", "error", err)
-			partials.SettingsModChannel(partials.ModChannelData{
+			renderSafe(w, r, partials.SettingsModChannel(partials.ModChannelData{
 				GuildID: guildIDStr, SaveError: "Failed to save settings.",
 				Channels: guildChannels(client, guildID),
-			}).Render(r.Context(), w)
+			}))
 			return
 		}
 
-		partials.SettingsModChannel(partials.ModChannelData{
+		renderSafe(w, r, partials.SettingsModChannel(partials.ModChannelData{
 			GuildID:          guildIDStr,
 			ModeratorChannel: idStr(settings.ModeratorChannel),
 			Channels:         guildChannels(client, guildID),
 			SaveSuccess:      true,
-		}).Render(r.Context(), w)
+		}))
 	}
 }
 
@@ -214,12 +214,15 @@ func handleSaveInfractions(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
-		r.ParseForm()
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form data", http.StatusBadRequest)
+			return
+		}
 		settings, err := model.GetGuildSettings(guildID)
 		if err != nil {
-			partials.SettingsInfractions(partials.InfractionsData{
+			renderSafe(w, r, partials.SettingsInfractions(partials.InfractionsData{
 				GuildID: guildIDStr, SaveError: "Failed to load settings.",
-			}).Render(r.Context(), w)
+			}))
 			return
 		}
 
@@ -229,19 +232,19 @@ func handleSaveInfractions(client *bot.Client) http.HandlerFunc {
 
 		if err := model.SetGuildSettings(settings); err != nil {
 			slog.Error("failed to save infraction settings", "error", err)
-			partials.SettingsInfractions(partials.InfractionsData{
+			renderSafe(w, r, partials.SettingsInfractions(partials.InfractionsData{
 				GuildID: guildIDStr, SaveError: "Failed to save settings.",
-			}).Render(r.Context(), w)
+			}))
 			return
 		}
 
-		partials.SettingsInfractions(partials.InfractionsData{
+		renderSafe(w, r, partials.SettingsInfractions(partials.InfractionsData{
 			GuildID:                     guildIDStr,
 			HalfLifeDays:                settings.InfractionHalfLifeDays,
 			NotifyOnWarnedUserJoin:      settings.NotifyOnWarnedUserJoin,
 			NotifyWarnSeverityThreshold: settings.NotifyWarnSeverityThreshold,
 			SaveSuccess:                 true,
-		}).Render(r.Context(), w)
+		}))
 	}
 }
 
@@ -253,12 +256,15 @@ func handleSaveAntiSpam(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
-		r.ParseForm()
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form data", http.StatusBadRequest)
+			return
+		}
 		settings, err := model.GetGuildSettings(guildID)
 		if err != nil {
-			partials.SettingsAntiSpam(partials.AntiSpamData{
+			renderSafe(w, r, partials.SettingsAntiSpam(partials.AntiSpamData{
 				GuildID: guildIDStr, SaveError: "Failed to load settings.",
-			}).Render(r.Context(), w)
+			}))
 			return
 		}
 
@@ -268,19 +274,19 @@ func handleSaveAntiSpam(client *bot.Client) http.HandlerFunc {
 
 		if err := model.SetGuildSettings(settings); err != nil {
 			slog.Error("failed to save anti-spam settings", "error", err)
-			partials.SettingsAntiSpam(partials.AntiSpamData{
+			renderSafe(w, r, partials.SettingsAntiSpam(partials.AntiSpamData{
 				GuildID: guildIDStr, SaveError: "Failed to save settings.",
-			}).Render(r.Context(), w)
+			}))
 			return
 		}
 
-		partials.SettingsAntiSpam(partials.AntiSpamData{
+		renderSafe(w, r, partials.SettingsAntiSpam(partials.AntiSpamData{
 			GuildID:         guildIDStr,
 			Enabled:         settings.AntiSpamEnabled,
 			Count:           settings.AntiSpamCount,
 			CooldownSeconds: settings.AntiSpamCooldownSeconds,
 			SaveSuccess:     true,
-		}).Render(r.Context(), w)
+		}))
 	}
 }
 
@@ -292,12 +298,15 @@ func handleSaveBanFooter(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
-		r.ParseForm()
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form data", http.StatusBadRequest)
+			return
+		}
 		settings, err := model.GetGuildSettings(guildID)
 		if err != nil {
-			partials.SettingsBanFooter(partials.BanFooterData{
+			renderSafe(w, r, partials.SettingsBanFooter(partials.BanFooterData{
 				GuildID: guildIDStr, SaveError: "Failed to load settings.",
-			}).Render(r.Context(), w)
+			}))
 			return
 		}
 
@@ -306,18 +315,18 @@ func handleSaveBanFooter(client *bot.Client) http.HandlerFunc {
 
 		if err := model.SetGuildSettings(settings); err != nil {
 			slog.Error("failed to save ban footer settings", "error", err)
-			partials.SettingsBanFooter(partials.BanFooterData{
+			renderSafe(w, r, partials.SettingsBanFooter(partials.BanFooterData{
 				GuildID: guildIDStr, SaveError: "Failed to save settings.",
-			}).Render(r.Context(), w)
+			}))
 			return
 		}
 
-		partials.SettingsBanFooter(partials.BanFooterData{
+		renderSafe(w, r, partials.SettingsBanFooter(partials.BanFooterData{
 			GuildID:     guildIDStr,
 			Footer:      settings.BanFooter,
 			AlwaysSend:  settings.AlwaysSendBanFooter,
 			SaveSuccess: true,
-		}).Render(r.Context(), w)
+		}))
 	}
 }
 
@@ -329,12 +338,15 @@ func handleSaveModmail(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
-		r.ParseForm()
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form data", http.StatusBadRequest)
+			return
+		}
 		ms, err := model.GetModmailSettings(guildID)
 		if err != nil {
-			partials.SettingsModmail(partials.ModmailData{
+			renderSafe(w, r, partials.SettingsModmail(partials.ModmailData{
 				GuildID: guildIDStr, SaveError: "Failed to load settings.",
-			}).Render(r.Context(), w)
+			}))
 			return
 		}
 
@@ -344,15 +356,15 @@ func handleSaveModmail(client *bot.Client) http.HandlerFunc {
 
 		if err := model.SetModmailSettings(ms); err != nil {
 			slog.Error("failed to save modmail settings", "error", err)
-			partials.SettingsModmail(partials.ModmailData{
+			renderSafe(w, r, partials.SettingsModmail(partials.ModmailData{
 				GuildID: guildIDStr, SaveError: "Failed to save settings.",
 				Channels: guildChannels(client, guildID),
 				Roles:    guildRoles(client, guildID),
-			}).Render(r.Context(), w)
+			}))
 			return
 		}
 
-		partials.SettingsModmail(partials.ModmailData{
+		renderSafe(w, r, partials.SettingsModmail(partials.ModmailData{
 			GuildID:                   guildIDStr,
 			ReportThreadsChannel:      idStr(ms.ReportThreadsChannel),
 			ReportNotificationChannel: idStr(ms.ReportNotificationChannel),
@@ -360,7 +372,7 @@ func handleSaveModmail(client *bot.Client) http.HandlerFunc {
 			Channels:                  guildChannels(client, guildID),
 			Roles:                     guildRoles(client, guildID),
 			SaveSuccess:               true,
-		}).Render(r.Context(), w)
+		}))
 	}
 }
 
@@ -372,12 +384,15 @@ func handleSaveGatekeep(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
-		r.ParseForm()
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form data", http.StatusBadRequest)
+			return
+		}
 		settings, err := model.GetGuildSettings(guildID)
 		if err != nil {
-			partials.SettingsGatekeep(partials.GatekeepData{
+			renderSafe(w, r, partials.SettingsGatekeep(partials.GatekeepData{
 				GuildID: guildIDStr, SaveError: "Failed to load settings.",
-			}).Render(r.Context(), w)
+			}))
 			return
 		}
 
@@ -391,15 +406,15 @@ func handleSaveGatekeep(client *bot.Client) http.HandlerFunc {
 
 		if err := model.SetGuildSettings(settings); err != nil {
 			slog.Error("failed to save gatekeep settings", "error", err)
-			partials.SettingsGatekeep(partials.GatekeepData{
+			renderSafe(w, r, partials.SettingsGatekeep(partials.GatekeepData{
 				GuildID: guildIDStr, SaveError: "Failed to save settings.",
-				Roles:   guildRoles(client, guildID),
+				Roles:        guildRoles(client, guildID),
 				Placeholders: utils.MessageTemplatePlaceholders,
-			}).Render(r.Context(), w)
+			}))
 			return
 		}
 
-		partials.SettingsGatekeep(partials.GatekeepData{
+		renderSafe(w, r, partials.SettingsGatekeep(partials.GatekeepData{
 			GuildID:               guildIDStr,
 			Enabled:               settings.GatekeepEnabled,
 			PendingRole:           idStr(settings.GatekeepPendingRole),
@@ -411,7 +426,7 @@ func handleSaveGatekeep(client *bot.Client) http.HandlerFunc {
 			Roles:                 guildRoles(client, guildID),
 			Placeholders:          utils.MessageTemplatePlaceholders,
 			SaveSuccess:           true,
-		}).Render(r.Context(), w)
+		}))
 	}
 }
 
@@ -423,12 +438,15 @@ func handleSaveJoinLeave(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
-		r.ParseForm()
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form data", http.StatusBadRequest)
+			return
+		}
 		settings, err := model.GetGuildSettings(guildID)
 		if err != nil {
-			partials.SettingsJoinLeave(partials.JoinLeaveData{
+			renderSafe(w, r, partials.SettingsJoinLeave(partials.JoinLeaveData{
 				GuildID: guildIDStr, SaveError: "Failed to load settings.",
-			}).Render(r.Context(), w)
+			}))
 			return
 		}
 
@@ -444,15 +462,15 @@ func handleSaveJoinLeave(client *bot.Client) http.HandlerFunc {
 
 		if err := model.SetGuildSettings(settings); err != nil {
 			slog.Error("failed to save join/leave settings", "error", err)
-			partials.SettingsJoinLeave(partials.JoinLeaveData{
-				GuildID:  guildIDStr, SaveError: "Failed to save settings.",
-				Channels: guildChannels(client, guildID),
+			renderSafe(w, r, partials.SettingsJoinLeave(partials.JoinLeaveData{
+				GuildID: guildIDStr, SaveError: "Failed to save settings.",
+				Channels:     guildChannels(client, guildID),
 				Placeholders: utils.MessageTemplatePlaceholders,
-			}).Render(r.Context(), w)
+			}))
 			return
 		}
 
-		partials.SettingsJoinLeave(partials.JoinLeaveData{
+		renderSafe(w, r, partials.SettingsJoinLeave(partials.JoinLeaveData{
 			GuildID:             guildIDStr,
 			JoinMessageEnabled:  settings.JoinMessageEnabled,
 			JoinMessage:         settings.JoinMessage,
@@ -466,7 +484,7 @@ func handleSaveJoinLeave(client *bot.Client) http.HandlerFunc {
 			Channels:            guildChannels(client, guildID),
 			Placeholders:        utils.MessageTemplatePlaceholders,
 			SaveSuccess:         true,
-		}).Render(r.Context(), w)
+		}))
 	}
 }
 

@@ -35,6 +35,6 @@ func handleGuilds(client *bot.Client) http.HandlerFunc {
 		}
 
 		nav := layouts.NavData{User: session}
-		pages.Guilds(nav, guilds).Render(r.Context(), w)
+		renderSafe(w, r, pages.Guilds(nav, guilds))
 	}
 }
