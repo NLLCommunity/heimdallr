@@ -73,8 +73,9 @@ func StartServer(addr string, client *bot.Client) error {
 	withAuth := authMiddleware(mux)
 	withBodyLimit := bodyLimitMiddleware(withAuth)
 	withRateLimit := rateLimitMiddleware(exchangeCodeLimiter, "/callback")(withBodyLimit)
+	allowedOrigin := parsedURL.Scheme + "://" + parsedURL.Host
 	corsHandler := cors.New(cors.Options{
-		AllowedOrigins:   []string{baseURL},
+		AllowedOrigins:   []string{allowedOrigin},
 		AllowedMethods:   []string{"POST", "GET", "OPTIONS"},
 		AllowedHeaders:   []string{"Content-Type", "HX-Request", "HX-Target", "HX-Current-URL"},
 		AllowCredentials: true,

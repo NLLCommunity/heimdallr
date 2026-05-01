@@ -12,6 +12,9 @@ import (
 var staticFS embed.FS
 
 func getStaticFS() http.FileSystem {
-	sub, _ := fs.Sub(staticFS, "static")
+	sub, err := fs.Sub(staticFS, "static")
+	if err != nil {
+		panic("Failed to get embedded static files: " + err.Error())
+	}
 	return http.FS(sub)
 }

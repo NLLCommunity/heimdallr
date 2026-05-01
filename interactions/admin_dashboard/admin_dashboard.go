@@ -2,6 +2,7 @@ package admin_dashboard
 
 import (
 	"fmt"
+	"net/url"
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
@@ -45,7 +46,17 @@ func AdminDashboardHandler(e *handler.CommandEvent) error {
 	}
 
 	baseURL := viper.GetString("dashboard.base_url")
-	link := fmt.Sprintf("%s/callback?code=%s", baseURL, code)
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent("Failed to generate login link. Please try again."),
+		)
+	}
+	u = u.JoinPath("callback")
+	q := u.Query()
+	q.Set("code", code)
+	u.RawQuery = q.Encode()
+	link := u.String()
 
 	message := fmt.Sprintf(
 		"**Dashboard Login Link**\n\n"+
