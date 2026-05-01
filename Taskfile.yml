@@ -3,7 +3,6 @@
 version: "3"
 
 env:
-  GOPRIVATE: github.com/myrkvi/grem
   GOTOOLCHAIN: auto
 
 tasks:
