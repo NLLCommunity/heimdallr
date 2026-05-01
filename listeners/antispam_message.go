@@ -80,7 +80,6 @@ func OnAntispamMessageCreate(e *events.GuildMessageCreate) {
 	}
 
 	messageDetails := createMessageDetails(e.Message)
-	info.Messages = append(info.Messages, messageDetails)
 
 	// Check if this message is similar to previous messages across channels
 	// matching minimum length and Levenshtein distance thresholds.
@@ -88,6 +87,8 @@ func OnAntispamMessageCreate(e *events.GuildMessageCreate) {
 	if matchesPreviousMessage {
 		info.Score++
 	}
+
+	info.Messages = append(info.Messages, messageDetails)
 
 	userMessages.Set(uHash, info, cooldown)
 
@@ -124,7 +125,7 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 	}
 
 	for _, m := range removableMessages {
-		err := e.Client().Rest.DeleteMessage(m.ChannelID, m.MessageID)
+		err := e.Client().Rest.DeleteMessage(m.ChannelID, m.MessageID, rest.WithReason("Message deleted due to anti-spam settings."))
 		if err != nil {
 			slog.Error(
 				"Failed to delete message.", "err", err, "guild", e.GuildID, "channel", m.ChannelID, "message",
