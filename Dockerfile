@@ -6,7 +6,7 @@ WORKDIR /usr/src/app
 COPY go.mod go.sum ./
 RUN go mod download
 
-RUN go install github.com/a-h/templ/cmd/templ@latest
+RUN go install github.com/a-h/templ/cmd/templ@v0.3.1001
 
 COPY . .
 RUN templ generate
