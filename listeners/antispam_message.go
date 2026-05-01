@@ -140,7 +140,7 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 	timeoutMessage := createTimeoutMessage(e, removableMessages, len(removableMessages))
 
 	_, err = e.Client().Rest.CreateMessage(
-		guildSettings.ModeratorChannel, timeoutMessage,
+		guildSettings.ModeratorChannel, timeoutMessage.WithAllowedMentions(&discord.AllowedMentions{}),
 	)
 
 	if err != nil {
@@ -234,12 +234,12 @@ func compareToPreviousMessages(details *messageDetails, info userMessagesInfo) b
 		distance := levenshtein.ComputeDistance(currentMessage, prevMessage)
 		messageLength := float64(len(currentMessage))
 		maxLevenshteinDistance := int(math.Ceil(messageLength * maxLevenshteinDistancePercent / 100))
-		if distance <= maxLevenshteinDistance && details.ChannelID != mInfo.ChannelID {
-			// Return true if these are similar messages across channels
-			slog.Info("Found similar message across channels.", "current_message", details.Content, "previous_message", mInfo.Content, "distance", distance)
+		if distance <= maxLevenshteinDistance {
+			// Return true if these are similar messages
+			slog.Info("Found similar message.", "current_message", details.Content, "previous_message", mInfo.Content, "distance", distance)
 			return true
 		} else {
-			slog.Debug("Messages are not similar enough or are in the same channel.", "current_message", details.Content, "previous_message", mInfo.Content, "distance", distance)
+			slog.Debug("Messages are not similar enough.", "current_message", details.Content, "previous_message", mInfo.Content, "distance", distance)
 		}
 	}
 	return false
