@@ -127,7 +127,7 @@ func createV1Message(
 
 	contents, err := mustache.RenderRaw(messageTemplate, true, data)
 	if err != nil {
-		slog.Error("Failed to render V1 join message template.", "err", err, "guild_id", guildID)
+		slog.Error("Failed to render V1 message template.", "err", err, "guild_id", guildID)
 		return
 	}
 
