@@ -3,6 +3,7 @@ package listeners
 import (
 	"fmt"
 	"log/slog"
+	"math"
 	"strings"
 	"time"
 
@@ -18,7 +19,7 @@ import (
 )
 
 const minMessageLength = 10
-const maxLevenshteinDistance = 5
+const maxLevenshteinDistancePercent = 5
 const maxMessages = 20
 
 var whitespaceReplacer = strings.NewReplacer(
@@ -79,12 +80,15 @@ func OnAntispamMessageCreate(e *events.GuildMessageCreate) {
 	}
 
 	messageDetails := createMessageDetails(e.Message)
-	info.Messages = append(info.Messages, messageDetails)
 
+	// Check if this message is similar to previous messages across channels
+	// matching minimum length and Levenshtein distance thresholds.
 	matchesPreviousMessage := compareToPreviousMessages(messageDetails, info)
 	if matchesPreviousMessage {
 		info.Score++
 	}
+
+	info.Messages = append(info.Messages, messageDetails)
 
 	userMessages.Set(uHash, info, cooldown)
 
@@ -111,17 +115,17 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 		return
 	}
 
-	var removableMessageIDs []*messageDetails
+	var removableMessages []*messageDetails
 	for _, m := range info.Messages {
 		if m.MessageID.Time().Before(cutoffTime) {
 			continue
 		}
 
-		removableMessageIDs = append(removableMessageIDs, m)
+		removableMessages = append(removableMessages, m)
 	}
 
-	for _, m := range removableMessageIDs {
-		err := e.Client().Rest.DeleteMessage(m.ChannelID, m.MessageID)
+	for _, m := range removableMessages {
+		err := e.Client().Rest.DeleteMessage(m.ChannelID, m.MessageID, rest.WithReason("Message deleted due to anti-spam settings."))
 		if err != nil {
 			slog.Error(
 				"Failed to delete message.", "err", err, "guild", e.GuildID, "channel", m.ChannelID, "message",
@@ -134,14 +138,10 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 		return
 	}
 
-	adminMessage := fmt.Sprintf(
-		"User %s has been timed out for spamming. Deleted %d messages.\n\nTriggering message:\n>>> %s",
-		e.Message.Author.Mention(), len(removableMessageIDs), e.Message.Content,
-	)
+	timeoutMessage := createTimeoutMessage(e, removableMessages, len(removableMessages))
 
 	_, err = e.Client().Rest.CreateMessage(
-		guildSettings.ModeratorChannel, discord.NewMessageCreate().
-			WithContent(adminMessage),
+		guildSettings.ModeratorChannel, timeoutMessage.WithAllowedMentions(&discord.AllowedMentions{}),
 	)
 
 	if err != nil {
@@ -153,6 +153,67 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 			"user", e.Message.Author.ID,
 		)
 	}
+}
+
+// Discord V2 component message limits.
+const (
+	maxTopLevelComponents = 10
+	maxTotalComponents    = 40
+	maxTotalTextLength    = 4000
+	maxPerMessageContent  = 500
+	truncationMarker      = "…"
+)
+
+func createTimeoutMessage(e *events.GuildMessageCreate, msgs []*messageDetails, deletedCount int) discord.MessageCreate {
+	summary := fmt.Sprintf("User %s has been timed out for spamming. Deleted %d messages.", e.Message.Author.Username, deletedCount)
+
+	components := []discord.LayoutComponent{discord.NewTextDisplay(summary)}
+	totalComponents := 1
+	totalText := len(summary)
+
+	const omissionReserveText = 64
+	omitted := 0
+
+	for i, m := range msgs {
+		content := m.Content
+		if len(content) > maxPerMessageContent {
+			content = content[:maxPerMessageContent] + truncationMarker
+		}
+		contentText := fmt.Sprintf(">>> %s", content)
+		channelText := fmt.Sprintf("-# Channel: <#%d>", m.ChannelID)
+
+		// Each entry adds 1 container + 2 text displays.
+		const addComponents = 3
+		addText := len(contentText) + len(channelText)
+
+		// Reserve budget for a possible "N omitted" notice if there are more entries after this one.
+		reserveComponents := 0
+		reserveText := 0
+		if i < len(msgs)-1 {
+			reserveComponents = 1
+			reserveText = omissionReserveText
+		}
+
+		if len(components)+1+reserveComponents > maxTopLevelComponents ||
+			totalComponents+addComponents+reserveComponents > maxTotalComponents ||
+			totalText+addText+reserveText > maxTotalTextLength {
+			omitted = len(msgs) - i
+			break
+		}
+
+		components = append(components, discord.NewContainer(
+			discord.NewTextDisplay(contentText),
+			discord.NewTextDisplay(channelText),
+		))
+		totalComponents += addComponents
+		totalText += addText
+	}
+
+	if omitted > 0 {
+		components = append(components, discord.NewTextDisplayf("-# … and %d more message(s) omitted.", omitted))
+	}
+
+	return discord.NewMessageCreateV2(components...)
 }
 
 func compareToPreviousMessages(details *messageDetails, info userMessagesInfo) bool {
@@ -172,9 +233,14 @@ func compareToPreviousMessages(details *messageDetails, info userMessagesInfo) b
 		prevMessage := whitespaceReplacer.Replace(mInfo.Content)
 
 		distance := levenshtein.ComputeDistance(currentMessage, prevMessage)
-		if distance < maxLevenshteinDistance && details.ChannelID != mInfo.ChannelID {
-			// Return true if these are similar messages across channels
+		messageLength := float64(len(currentMessage))
+		maxLevenshteinDistance := int(math.Ceil(messageLength * maxLevenshteinDistancePercent / 100))
+		if distance <= maxLevenshteinDistance {
+			// Return true if these are similar messages
+			slog.Info("Found similar message.", "current_message", details.Content, "previous_message", mInfo.Content, "distance", distance)
 			return true
+		} else {
+			slog.Debug("Messages are not similar enough.", "current_message", details.Content, "previous_message", mInfo.Content, "distance", distance)
 		}
 	}
 	return false
