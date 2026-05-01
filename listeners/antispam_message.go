@@ -153,35 +153,65 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 	}
 }
 
-type Mentioner interface {
-	Mention() string
-}
+// Discord V2 component message limits.
+const (
+	maxTopLevelComponents = 10
+	maxTotalComponents    = 40
+	maxTotalTextLength    = 4000
+	maxPerMessageContent  = 500
+	truncationMarker      = "…"
+)
 
 func createTimeoutMessage(e *events.GuildMessageCreate, msgs []*messageDetails, deletedCount int) discord.MessageCreate {
-	messages := make([]discord.ContainerComponent, len(msgs))
+	summary := fmt.Sprintf("User %s has been timed out for spamming. Deleted %d messages.", e.Message.Author.Username, deletedCount)
+
+	components := []discord.LayoutComponent{discord.NewTextDisplay(summary)}
+	totalComponents := 1
+	totalText := len(summary)
+
+	const omissionReserveText = 64
+	omitted := 0
 
 	for i, m := range msgs {
-		channel := fmt.Sprintf("<#%s>", m.ChannelID)
+		content := m.Content
+		if len(content) > maxPerMessageContent {
+			content = content[:maxPerMessageContent] + truncationMarker
+		}
+		contentText := fmt.Sprintf(">>> %s", content)
+		channelText := fmt.Sprintf("-# Channel: <#%s>", m.ChannelID)
 
-		messages[i] = discord.NewContainer(
-			discord.NewTextDisplayf(">>> %s", m.Content),
-			discord.NewTextDisplayf("-# Channel: %s", channel),
-		)
+		// Each entry adds 1 container + 2 text displays.
+		const addComponents = 3
+		addText := len(contentText) + len(channelText)
+
+		// Reserve budget for a possible "N omitted" notice if there are more entries after this one.
+		reserveComponents := 0
+		reserveText := 0
+		if i < len(msgs)-1 {
+			reserveComponents = 1
+			reserveText = omissionReserveText
+		}
+
+		if len(components)+1+reserveComponents > maxTopLevelComponents ||
+			totalComponents+addComponents+reserveComponents > maxTotalComponents ||
+			totalText+addText+reserveText > maxTotalTextLength {
+			omitted = len(msgs) - i
+			break
+		}
+
+		components = append(components, discord.NewContainer(
+			discord.NewTextDisplay(contentText),
+			discord.NewTextDisplay(channelText),
+		))
+		totalComponents += addComponents
+		totalText += addText
 	}
 
-	components := []discord.LayoutComponent{
-		discord.NewTextDisplayf("User %s has been timed out for spamming. Deleted %d messages.", e.Message.Author.Username, deletedCount),
+	if omitted > 0 {
+		components = append(components, discord.NewTextDisplayf("-# … and %d more message(s) omitted.", omitted))
 	}
 
-	for _, c := range messages {
-		components = append(components, c)
-	}
-
-	message := discord.NewMessageCreateV2(
-		components...,
-	)
-
-	return message
+	return discord.NewMessageCreateV2(components...)
 }
 
 func compareToPreviousMessages(details *messageDetails, info userMessagesInfo) bool {
