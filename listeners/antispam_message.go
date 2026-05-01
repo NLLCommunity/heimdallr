@@ -3,6 +3,7 @@ package listeners
 import (
 	"fmt"
 	"log/slog"
+	"math"
 	"strings"
 	"time"
 
@@ -113,16 +114,16 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 		return
 	}
 
-	var removableMessageIDs []*messageDetails
+	var removableMessages []*messageDetails
 	for _, m := range info.Messages {
 		if m.MessageID.Time().Before(cutoffTime) {
 			continue
 		}
 
-		removableMessageIDs = append(removableMessageIDs, m)
+		removableMessages = append(removableMessages, m)
 	}
 
-	for _, m := range removableMessageIDs {
+	for _, m := range removableMessages {
 		err := e.Client().Rest.DeleteMessage(m.ChannelID, m.MessageID)
 		if err != nil {
 			slog.Error(
@@ -136,7 +137,7 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 		return
 	}
 
-	timeoutMessage := createTimeoutMessage(e, removableMessageIDs, len(removableMessageIDs))
+	timeoutMessage := createTimeoutMessage(e, removableMessages, len(removableMessages))
 
 	_, err = e.Client().Rest.CreateMessage(
 		guildSettings.ModeratorChannel, timeoutMessage,
@@ -178,7 +179,7 @@ func createTimeoutMessage(e *events.GuildMessageCreate, msgs []*messageDetails, 
 			content = content[:maxPerMessageContent] + truncationMarker
 		}
 		contentText := fmt.Sprintf(">>> %s", content)
-		channelText := fmt.Sprintf("-# Channel: <#%s>", m.ChannelID)
+		channelText := fmt.Sprintf("-# Channel: <#%d>", m.ChannelID)
 
 		// Each entry adds 1 container + 2 text displays.
 		const addComponents = 3
@@ -231,7 +232,8 @@ func compareToPreviousMessages(details *messageDetails, info userMessagesInfo) b
 		prevMessage := whitespaceReplacer.Replace(mInfo.Content)
 
 		distance := levenshtein.ComputeDistance(currentMessage, prevMessage)
-		maxLevenshteinDistance := int(float64(len(currentMessage)) * maxLevenshteinDistancePercent / 100)
+		messageLength := float64(len(currentMessage))
+		maxLevenshteinDistance := int(math.Ceil(messageLength * maxLevenshteinDistancePercent / 100))
 		if distance <= maxLevenshteinDistance && details.ChannelID != mInfo.ChannelID {
 			// Return true if these are similar messages across channels
 			slog.Info("Found similar message across channels.", "current_message", details.Content, "previous_message", mInfo.Content, "distance", distance)
