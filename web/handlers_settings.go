@@ -3,11 +3,14 @@ package web
 import (
 	"cmp"
 	"context"
+	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"slices"
 	"strconv"
+	"strings"
 
 	"github.com/a-h/templ"
 	"github.com/disgoorg/disgo/bot"
@@ -424,7 +427,29 @@ func handleSaveGatekeep(client *bot.Client) http.HandlerFunc {
 		settings.GatekeepAddPendingRoleOnJoin = r.FormValue("add_pending_role_on_join") == "true"
 		settings.GatekeepApprovedMessage = r.FormValue("approved_message")
 		settings.GatekeepApprovedMessageV2 = r.FormValue("approved_message_v2") == "true"
-		settings.GatekeepApprovedMessageV2Json = r.FormValue("approved_message_v2_json")
+		approvedV2Raw := r.FormValue("approved_message_v2_json")
+		if settings.GatekeepApprovedMessageV2 {
+			compact, err := validateAndCompactV2JSON(approvedV2Raw)
+			if err != nil {
+				renderSafe(w, r, partials.SettingsGatekeep(partials.GatekeepData{
+					GuildID:               guildIDStr,
+					Enabled:               settings.GatekeepEnabled,
+					PendingRole:           idStr(settings.GatekeepPendingRole),
+					ApprovedRole:          idStr(settings.GatekeepApprovedRole),
+					AddPendingRoleOnJoin:  settings.GatekeepAddPendingRoleOnJoin,
+					ApprovedMessage:       settings.GatekeepApprovedMessage,
+					ApprovedMessageV2:     settings.GatekeepApprovedMessageV2,
+					ApprovedMessageV2Json: approvedV2Raw,
+					Roles:                 guildRoles(client, guildID),
+					Placeholders:          utils.MessageTemplatePlaceholders,
+					SaveError:             "Approved message: " + err.Error() + ".",
+				}))
+				return
+			}
+			settings.GatekeepApprovedMessageV2Json = compact
+		} else {
+			settings.GatekeepApprovedMessageV2Json = approvedV2Raw
+		}
 
 		if err := model.SetGuildSettings(settings); err != nil {
 			slog.Error("failed to save gatekeep settings", "error", err)
@@ -475,12 +500,52 @@ func handleSaveJoinLeave(client *bot.Client) http.HandlerFunc {
 		settings.JoinMessageEnabled = r.FormValue("join_message_enabled") == "true"
 		settings.JoinMessage = r.FormValue("join_message")
 		settings.JoinMessageV2 = r.FormValue("join_message_v2") == "true"
-		settings.JoinMessageV2Json = r.FormValue("join_message_v2_json")
+		joinV2Raw := r.FormValue("join_message_v2_json")
 		settings.LeaveMessageEnabled = r.FormValue("leave_message_enabled") == "true"
 		settings.LeaveMessage = r.FormValue("leave_message")
 		settings.LeaveMessageV2 = r.FormValue("leave_message_v2") == "true"
-		settings.LeaveMessageV2Json = r.FormValue("leave_message_v2_json")
+		leaveV2Raw := r.FormValue("leave_message_v2_json")
 		settings.JoinLeaveChannel = parseSnowflake(r.FormValue("channel"))
+
+		renderJoinLeaveError := func(message string) {
+			renderSafe(w, r, partials.SettingsJoinLeave(partials.JoinLeaveData{
+				GuildID:             guildIDStr,
+				JoinMessageEnabled:  settings.JoinMessageEnabled,
+				JoinMessage:         settings.JoinMessage,
+				JoinMessageV2:       settings.JoinMessageV2,
+				JoinMessageV2Json:   joinV2Raw,
+				LeaveMessageEnabled: settings.LeaveMessageEnabled,
+				LeaveMessage:        settings.LeaveMessage,
+				LeaveMessageV2:      settings.LeaveMessageV2,
+				LeaveMessageV2Json:  leaveV2Raw,
+				Channel:             idStr(settings.JoinLeaveChannel),
+				Channels:            guildChannels(client, guildID),
+				Placeholders:        utils.MessageTemplatePlaceholders,
+				SaveError:           message,
+			}))
+		}
+
+		if settings.JoinMessageV2 {
+			compact, err := validateAndCompactV2JSON(joinV2Raw)
+			if err != nil {
+				renderJoinLeaveError("Join message: " + err.Error() + ".")
+				return
+			}
+			settings.JoinMessageV2Json = compact
+		} else {
+			settings.JoinMessageV2Json = joinV2Raw
+		}
+
+		if settings.LeaveMessageV2 {
+			compact, err := validateAndCompactV2JSON(leaveV2Raw)
+			if err != nil {
+				renderJoinLeaveError("Leave message: " + err.Error() + ".")
+				return
+			}
+			settings.LeaveMessageV2Json = compact
+		} else {
+			settings.LeaveMessageV2Json = leaveV2Raw
+		}
 
 		if err := model.SetGuildSettings(settings); err != nil {
 			slog.Error("failed to save join/leave settings", "error", err)
@@ -523,4 +588,28 @@ func parseInt(s string, defaultVal int) int {
 		return defaultVal
 	}
 	return v
+}
+
+// errInvalidV2JSON is returned by validateAndCompactV2JSON when the supplied
+// payload is missing, malformed, or not a JSON array of components.
+var errInvalidV2JSON = errors.New("V2 components JSON must be a non-empty JSON array")
+
+// validateAndCompactV2JSON validates that s is a JSON array (the shape
+// expected by utils.BuildV2Message) and returns a compact, canonical form
+// safe to embed in HTML attributes. Empty/whitespace input is rejected so
+// callers can surface a clear error before persisting.
+func validateAndCompactV2JSON(s string) (string, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return "", errInvalidV2JSON
+	}
+	var parsed []any
+	if err := json.Unmarshal([]byte(s), &parsed); err != nil {
+		return "", errInvalidV2JSON
+	}
+	out, err := json.Marshal(parsed)
+	if err != nil {
+		return "", err
+	}
+	return string(out), nil
 }
