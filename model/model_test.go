@@ -48,6 +48,8 @@ func (suite *ModelTestSuite) SetupTest() {
 	suite.db.Exec("DELETE FROM guild_settings")
 	suite.db.Exec("DELETE FROM modmail_settings")
 	suite.db.Exec("DELETE FROM temp_bans")
+	suite.db.Exec("DELETE FROM dashboard_login_codes")
+	suite.db.Exec("DELETE FROM dashboard_sessions")
 }
 
 func TestModelSuite(t *testing.T) {
