@@ -65,7 +65,9 @@ func StartServer(addr string, client *bot.Client) error {
 		ticker := time.NewTicker(15 * time.Minute)
 		defer ticker.Stop()
 		for range ticker.C {
-			model.CleanExpiredSessions()
+			if err := model.CleanExpiredSessions(); err != nil {
+				slog.Warn("session cleanup failed", "error", err)
+			}
 			exchangeCodeLimiter.cleanup(rateLimiterTTL)
 		}
 	}()

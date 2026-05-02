@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/disgoorg/snowflake/v2"
@@ -124,8 +125,13 @@ func DeleteSession(token string) error {
 	return DB.Where("token = ?", tokenHash(token)).Delete(&DashboardSession{}).Error
 }
 
-func CleanExpiredSessions() {
+func CleanExpiredSessions() error {
 	now := time.Now()
-	DB.Where("expires_at <= ?", now).Delete(&DashboardLoginCode{})
-	DB.Where("expires_at <= ?", now).Delete(&DashboardSession{})
+	if err := DB.Where("expires_at <= ?", now).Delete(&DashboardLoginCode{}).Error; err != nil {
+		return fmt.Errorf("clean expired login codes: %w", err)
+	}
+	if err := DB.Where("expires_at <= ?", now).Delete(&DashboardSession{}).Error; err != nil {
+		return fmt.Errorf("clean expired sessions: %w", err)
+	}
+	return nil
 }
