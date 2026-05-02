@@ -135,7 +135,7 @@ func (suite *ModelTestSuite) TestCleanExpiredSessions() {
 		Token: tokenHash("fresh"), ExpiresAt: time.Now().Add(time.Minute),
 	}).Error)
 
-	CleanExpiredSessions()
+	require.NoError(suite.T(), CleanExpiredSessions())
 
 	var codeCount, sessionCount int64
 	require.NoError(suite.T(), DB.Model(&DashboardLoginCode{}).Count(&codeCount).Error)
