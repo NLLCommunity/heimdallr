@@ -160,6 +160,20 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		)
 	}
 
+	channel, channelOk := resolveApprovedMessageChannel(guildSettings, guild)
+	if !channelOk {
+		slog.Warn(
+			"No channel configured for approved message; skipping send.",
+			"guild_id", guild.ID,
+			"user_id", member.User.ID,
+		)
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"User approved, but no channel is configured for the welcome message. Set a Join/Leave channel in settings (or a system channel for this server).",
+			),
+		)
+	}
+
 	templateData := utils.NewMessageTemplateData(member.Member, guild)
 
 	data := &gatekeepData{
@@ -169,12 +183,13 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		member:        member,
 		guildSettings: guildSettings,
 		templateData:  templateData,
+		channel:       channel,
 	}
 
 	if hasV2 {
 		_, err = createV2ApprovedMessage(data)
 	} else {
-		_, err = createV1Approvedtmessage(data)
+		_, err = createV1ApprovedMessage(data)
 	}
 	if err != nil {
 		_, err = e.CreateFollowupMessage(
@@ -200,24 +215,39 @@ type gatekeepData struct {
 	member        discord.ResolvedMember
 	guildSettings *model.GuildSettings
 	templateData  utils.MessageTemplateData
+	channel       snowflake.ID
 }
 
-func createV1Approvedtmessage(
+// resolveApprovedMessageChannel picks the channel to send the approval
+// message in: the configured Join/Leave channel, falling back to the guild's
+// system channel. Returns (0, false) if neither is set so callers can surface
+// a clear error instead of failing on CreateMessage with channel ID 0.
+func resolveApprovedMessageChannel(settings *model.GuildSettings, guild discord.Guild) (snowflake.ID, bool) {
+	if settings.JoinLeaveChannel != 0 {
+		return settings.JoinLeaveChannel, true
+	}
+	if guild.SystemChannelID != nil {
+		return *guild.SystemChannelID, true
+	}
+	return 0, false
+}
+
+func createV1ApprovedMessage(
 	data *gatekeepData,
 ) (m *discord.Message, err error) {
 	contents, renderErr := mustache.RenderRaw(data.guildSettings.GatekeepApprovedMessage, true, data.templateData)
 	if renderErr != nil {
-		slog.Warn("Failed to render approved message template.")
+		slog.Warn(
+			"Failed to render approved message template.",
+			"guild_id", data.guild.ID,
+			"user_id", data.member.User.ID,
+			"err", renderErr,
+		)
 		return nil, renderErr
 	}
 
-	channel := data.guildSettings.JoinLeaveChannel
-	if channel == 0 && data.guild.SystemChannelID != nil {
-		channel = *data.guild.SystemChannelID
-	}
-
 	return data.client.Rest.CreateMessage(
-		channel,
+		data.channel,
 		discord.NewMessageCreate().
 			WithContent(
 				contents+
@@ -249,12 +279,7 @@ func createV2ApprovedMessage(
 		fmt.Sprintf("-# Approved by %s", data.approver.Mention()),
 	))
 
-	channel := data.guildSettings.JoinLeaveChannel
-	if channel == 0 && data.guild.SystemChannelID != nil {
-		channel = *data.guild.SystemChannelID
-	}
-
-	return data.client.Rest.CreateMessage(channel, discord.MessageCreate{
+	return data.client.Rest.CreateMessage(data.channel, discord.MessageCreate{
 		Flags:      discord.MessageFlagIsComponentsV2,
 		Components: components,
 		AllowedMentions: &discord.AllowedMentions{

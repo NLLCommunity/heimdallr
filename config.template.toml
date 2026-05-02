@@ -9,7 +9,7 @@ enabled = true # Enable or disable developer mode
 guild_id = 0   # Guild ID to use for developer mode
 
 [web]
-address = "localhost:8484" # RPC server address
+address = "localhost:8484" # Web server listen address:port
 
 [dashboard]
 base_url = "http://localhost:8484" # Web dashboard URL

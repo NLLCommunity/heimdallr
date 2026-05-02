@@ -1,10 +1,12 @@
 package web
 
 import (
+	"cmp"
 	"context"
 	"io"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strconv"
 
 	"github.com/a-h/templ"
@@ -19,7 +21,10 @@ import (
 	"github.com/NLLCommunity/heimdallr/web/templates/partials"
 )
 
-// guildChannels returns a list of channels for the guild from cache.
+// guildChannels returns a list of channels for the guild from cache, sorted
+// by parent category, then channel position, then name. The cache iterator
+// has non-deterministic order, so without sorting the dropdown order would
+// change between page loads.
 func guildChannels(client *bot.Client, guildID snowflake.ID) []components.ChannelInfo {
 	var channels []components.ChannelInfo
 	for ch := range client.Caches.ChannelsForGuild(guildID) {
@@ -35,10 +40,21 @@ func guildChannels(client *bot.Client, guildID snowflake.ID) []components.Channe
 			ParentID: parentID,
 		})
 	}
+	slices.SortStableFunc(channels, func(a, b components.ChannelInfo) int {
+		if c := cmp.Compare(a.ParentID, b.ParentID); c != 0 {
+			return c
+		}
+		if c := cmp.Compare(a.Position, b.Position); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.Name, b.Name)
+	})
 	return channels
 }
 
-// guildRoles returns a list of roles for the guild from cache.
+// guildRoles returns a list of roles for the guild from cache, sorted to
+// match Discord's display order: highest position first, then by name. The
+// cache iterator has non-deterministic order.
 func guildRoles(client *bot.Client, guildID snowflake.ID) []components.RoleInfo {
 	var roles []components.RoleInfo
 	for role := range client.Caches.Roles(guildID) {
@@ -49,6 +65,12 @@ func guildRoles(client *bot.Client, guildID snowflake.ID) []components.RoleInfo 
 			Managed:  role.Managed,
 		})
 	}
+	slices.SortStableFunc(roles, func(a, b components.RoleInfo) int {
+		if c := cmp.Compare(b.Position, a.Position); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.Name, b.Name)
+	})
 	return roles
 }
 

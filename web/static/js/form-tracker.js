@@ -9,6 +9,15 @@ document.addEventListener('alpine:init', () => {
       this._snapshot = this._serialize();
       this.$el.addEventListener('htmx:beforeRequest', () => { this.saving = true; });
 
+      // Reset `saving` when the request completes. After a successful swap
+      // the form is replaced and its new Alpine instance starts with
+      // saving=false, so these only matter when the existing form remains
+      // (network errors, non-HTML 4xx/5xx, beforeSwap cancellations).
+      const stopSaving = () => { this.saving = false; };
+      this.$el.addEventListener('htmx:afterRequest', stopSaving);
+      this.$el.addEventListener('htmx:responseError', stopSaving);
+      this.$el.addEventListener('htmx:sendError', stopSaving);
+
       // Detect server-rendered save success marker
       const marker = this.$el.querySelector('[data-save-success]');
       if (marker) {
