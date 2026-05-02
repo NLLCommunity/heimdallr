@@ -39,6 +39,22 @@ func TestAuthMiddleware_RedirectsWithoutCookie(t *testing.T) {
 	assert.Equal(t, "/login", rec.Header().Get("Location"))
 }
 
+// HTMX swallows 3xx redirects silently and swaps the response body. For
+// auth bounces we want the page to navigate, so emit HX-Redirect instead.
+func TestAuthMiddleware_HTMXRequest_UsesHXRedirect(t *testing.T) {
+	handler := authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("handler should not be called")
+	}))
+
+	req := httptest.NewRequest("GET", "/guilds", nil)
+	req.Header.Set("HX-Request", "true")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code, "HTMX-aware redirect uses 200 + HX-Redirect, not 303")
+	assert.Equal(t, "/login", rec.Header().Get("HX-Redirect"))
+}
+
 func TestBodyLimitMiddleware_LargeBody(t *testing.T) {
 	handler := bodyLimitMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		buf := make([]byte, maxRequestBodyBytes+1)

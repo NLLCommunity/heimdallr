@@ -1,3 +1,8 @@
+// Refuse cross-origin requests outright. Defense-in-depth on top of CORS:
+// blocks a hypothetical server-rendered partial that contains an attacker-
+// controlled hx-* attribute pointing at a foreign origin.
+htmx.config.selfRequestsOnly = true;
+
 // Configure HTMX to swap 4xx/5xx responses when the server provides HTML
 // (e.g. an error partial). Plain-text error bodies are filtered out in
 // htmx:beforeSwap so they don't clobber the form, and surface as a toast

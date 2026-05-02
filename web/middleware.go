@@ -19,6 +19,18 @@ const (
 	maxRequestBodyBytes       int64 = 1 << 20 // 1 MiB
 )
 
+// redirectToLogin issues an HX-Redirect for HTMX requests (HTMX swallows 3xx
+// silently and would swap the login page HTML into a settings panel) and a
+// normal 303 otherwise.
+func redirectToLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("HX-Request") == "true" {
+		w.Header().Set("HX-Redirect", "/login")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
 // authMiddleware checks the session cookie and injects the session into context.
 // Unauthenticated requests to protected paths are redirected to /login.
 func authMiddleware(next http.Handler) http.Handler {
@@ -33,13 +45,13 @@ func authMiddleware(next http.Handler) http.Handler {
 
 		cookie, err := r.Cookie(sessionCookieName)
 		if err != nil || cookie.Value == "" {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			redirectToLogin(w, r)
 			return
 		}
 
 		session, err := model.GetSession(cookie.Value)
 		if err != nil {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			redirectToLogin(w, r)
 			return
 		}
 
