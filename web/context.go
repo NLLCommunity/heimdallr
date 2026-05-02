@@ -87,16 +87,15 @@ func checkGuildAdmin(w http.ResponseWriter, r *http.Request, client *bot.Client,
 	return guildID, true
 }
 
-// parseSnowflake parses a snowflake ID string, returning 0 for empty/invalid strings.
-func parseSnowflake(s string) snowflake.ID {
+// parseSnowflakeOrZero parses a snowflake ID, treating "" as an explicit
+// "unset" (returns 0, nil). Returns an error for non-empty values that are
+// not valid snowflakes — callers must surface this to the user instead of
+// silently clearing the field.
+func parseSnowflakeOrZero(s string) (snowflake.ID, error) {
 	if s == "" {
-		return 0
+		return 0, nil
 	}
-	id, err := snowflake.Parse(s)
-	if err != nil {
-		return 0
-	}
-	return id
+	return snowflake.Parse(s)
 }
 
 // idStr converts a snowflake ID to a string, returning "" for zero.

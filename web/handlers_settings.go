@@ -212,7 +212,15 @@ func handleSaveModChannel(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
-		settings.ModeratorChannel = parseSnowflake(r.FormValue("moderator_channel"))
+		modChannel, err := parseSnowflakeOrZero(r.FormValue("moderator_channel"))
+		if err != nil {
+			renderSafe(w, r, partials.SettingsModChannel(partials.ModChannelData{
+				GuildID: guildIDStr, SaveError: "Invalid channel ID.",
+				Channels: guildChannels(client, guildID),
+			}))
+			return
+		}
+		settings.ModeratorChannel = modChannel
 		if err := model.SetGuildSettings(settings); err != nil {
 			slog.Error("failed to save mod channel settings", "error", err)
 			renderSafe(w, r, partials.SettingsModChannel(partials.ModChannelData{
@@ -375,9 +383,36 @@ func handleSaveModmail(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
-		ms.ReportThreadsChannel = parseSnowflake(r.FormValue("report_threads_channel"))
-		ms.ReportNotificationChannel = parseSnowflake(r.FormValue("report_notification_channel"))
-		ms.ReportPingRole = parseSnowflake(r.FormValue("report_ping_role"))
+		reportThreadsChannel, err := parseSnowflakeOrZero(r.FormValue("report_threads_channel"))
+		if err != nil {
+			renderSafe(w, r, partials.SettingsModmail(partials.ModmailData{
+				GuildID: guildIDStr, SaveError: "Invalid channel ID.",
+				Channels: guildChannels(client, guildID),
+				Roles:    guildRoles(client, guildID),
+			}))
+			return
+		}
+		reportNotificationChannel, err := parseSnowflakeOrZero(r.FormValue("report_notification_channel"))
+		if err != nil {
+			renderSafe(w, r, partials.SettingsModmail(partials.ModmailData{
+				GuildID: guildIDStr, SaveError: "Invalid channel ID.",
+				Channels: guildChannels(client, guildID),
+				Roles:    guildRoles(client, guildID),
+			}))
+			return
+		}
+		reportPingRole, err := parseSnowflakeOrZero(r.FormValue("report_ping_role"))
+		if err != nil {
+			renderSafe(w, r, partials.SettingsModmail(partials.ModmailData{
+				GuildID: guildIDStr, SaveError: "Invalid role ID.",
+				Channels: guildChannels(client, guildID),
+				Roles:    guildRoles(client, guildID),
+			}))
+			return
+		}
+		ms.ReportThreadsChannel = reportThreadsChannel
+		ms.ReportNotificationChannel = reportNotificationChannel
+		ms.ReportPingRole = reportPingRole
 
 		if err := model.SetModmailSettings(ms); err != nil {
 			slog.Error("failed to save modmail settings", "error", err)
@@ -422,8 +457,26 @@ func handleSaveGatekeep(client *bot.Client) http.HandlerFunc {
 		}
 
 		settings.GatekeepEnabled = r.FormValue("enabled") == "true"
-		settings.GatekeepPendingRole = parseSnowflake(r.FormValue("pending_role"))
-		settings.GatekeepApprovedRole = parseSnowflake(r.FormValue("approved_role"))
+		pendingRole, err := parseSnowflakeOrZero(r.FormValue("pending_role"))
+		if err != nil {
+			renderSafe(w, r, partials.SettingsGatekeep(partials.GatekeepData{
+				GuildID: guildIDStr, SaveError: "Invalid role ID.",
+				Roles:        guildRoles(client, guildID),
+				Placeholders: utils.MessageTemplatePlaceholders,
+			}))
+			return
+		}
+		approvedRole, err := parseSnowflakeOrZero(r.FormValue("approved_role"))
+		if err != nil {
+			renderSafe(w, r, partials.SettingsGatekeep(partials.GatekeepData{
+				GuildID: guildIDStr, SaveError: "Invalid role ID.",
+				Roles:        guildRoles(client, guildID),
+				Placeholders: utils.MessageTemplatePlaceholders,
+			}))
+			return
+		}
+		settings.GatekeepPendingRole = pendingRole
+		settings.GatekeepApprovedRole = approvedRole
 		settings.GatekeepAddPendingRoleOnJoin = r.FormValue("add_pending_role_on_join") == "true"
 		settings.GatekeepApprovedMessage = r.FormValue("approved_message")
 		settings.GatekeepApprovedMessageV2 = r.FormValue("approved_message_v2") == "true"
@@ -505,7 +558,6 @@ func handleSaveJoinLeave(client *bot.Client) http.HandlerFunc {
 		settings.LeaveMessage = r.FormValue("leave_message")
 		settings.LeaveMessageV2 = r.FormValue("leave_message_v2") == "true"
 		leaveV2Raw := r.FormValue("leave_message_v2_json")
-		settings.JoinLeaveChannel = parseSnowflake(r.FormValue("channel"))
 
 		renderJoinLeaveError := func(message string) {
 			renderSafe(w, r, partials.SettingsJoinLeave(partials.JoinLeaveData{
@@ -524,6 +576,13 @@ func handleSaveJoinLeave(client *bot.Client) http.HandlerFunc {
 				SaveError:           message,
 			}))
 		}
+
+		channel, err := parseSnowflakeOrZero(r.FormValue("channel"))
+		if err != nil {
+			renderJoinLeaveError("Invalid channel ID.")
+			return
+		}
+		settings.JoinLeaveChannel = channel
 
 		if settings.JoinMessageV2 {
 			compact, err := validateAndCompactV2JSON(joinV2Raw)
