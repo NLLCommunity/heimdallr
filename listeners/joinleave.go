@@ -135,7 +135,7 @@ func createV1Message(
 		channelID, discord.NewMessageCreate().WithContent(contents),
 	)
 	if err != nil {
-		slog.Error("Failed to send V1 join message.", "guild_id", guildID, "channel_id", channelID, "err", err)
+		slog.Error("Failed to send V1 message.", "guild_id", guildID, "channel_id", channelID, "err", err)
 	}
 	return
 }
@@ -151,7 +151,7 @@ func createV2Message(
 
 	components, err := utils.BuildV2Message(messageJson, data, emojiMap)
 	if err != nil {
-		slog.Error("Failed to build V2 join message.", "err", err, "guild_id", guildID)
+		slog.Error("Failed to build V2 message.", "err", err, "guild_id", guildID)
 		return
 	}
 
@@ -160,7 +160,7 @@ func createV2Message(
 		Components: components,
 	})
 	if err != nil {
-		slog.Error("Failed to send V2 join message.", "guild_id", guildID, "channel_id", channelID, "err", err)
+		slog.Error("Failed to send V2 message.", "guild_id", guildID, "channel_id", channelID, "err", err)
 	}
 	return
 }
