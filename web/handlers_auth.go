@@ -3,6 +3,7 @@ package web
 import (
 	"log/slog"
 	"net/http"
+	"net/url"
 
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/web/templates/pages"
@@ -19,23 +20,57 @@ func handleCallbackGET(w http.ResponseWriter, r *http.Request) {
 	renderSafe(w, r, pages.Callback(code))
 }
 
-// handleCallbackPOST exchanges the login code for a session.
-func handleCallbackPOST(w http.ResponseWriter, r *http.Request) {
-	code := r.FormValue("code")
-	if code == "" {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
+// handleCallbackPOST exchanges the login code for a session. The Origin/Referer
+// header is checked against the configured dashboard origin to block login-CSRF
+// (a malicious site auto-submitting an attacker-generated code to log the
+// victim into the attacker's account).
+func handleCallbackPOST(allowedOrigin string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !isSameOriginPost(r, allowedOrigin) {
+			slog.Warn(
+				"rejecting cross-origin POST /callback",
+				"origin", r.Header.Get("Origin"),
+				"referer", r.Header.Get("Referer"),
+			)
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
 
-	session, err := model.ExchangeLoginCode(code)
-	if err != nil {
-		slog.Warn("invalid login code exchange", "error", err)
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-		return
-	}
+		code := r.FormValue("code")
+		if code == "" {
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
 
-	http.SetCookie(w, makeSessionCookie(session.Token, 86400))
-	http.Redirect(w, r, "/guilds", http.StatusSeeOther)
+		session, err := model.ExchangeLoginCode(code)
+		if err != nil {
+			slog.Warn("invalid login code exchange", "error", err)
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			return
+		}
+
+		http.SetCookie(w, makeSessionCookie(session.Token, 86400))
+		http.Redirect(w, r, "/guilds", http.StatusSeeOther)
+	}
+}
+
+// isSameOriginPost reports whether r appears to come from the configured
+// dashboard origin. Modern browsers attach `Origin` to every cross-site or
+// state-changing request, so a missing or mismatched header indicates a
+// cross-origin (or non-browser) submission. `Referer` is used as a fallback
+// for the rare clients that omit Origin. Both missing => reject.
+func isSameOriginPost(r *http.Request, allowedOrigin string) bool {
+	if got := r.Header.Get("Origin"); got != "" {
+		return got == allowedOrigin
+	}
+	if ref := r.Header.Get("Referer"); ref != "" {
+		u, err := url.Parse(ref)
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			return false
+		}
+		return u.Scheme+"://"+u.Host == allowedOrigin
+	}
+	return false
 }
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {

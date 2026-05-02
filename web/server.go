@@ -26,6 +26,7 @@ func StartServer(addr string, client *bot.Client) error {
 	if !devMode && parsedURL.Scheme == "http" {
 		slog.Warn("dashboard.base_url uses http — this is insecure in production", "url", baseURL)
 	}
+	allowedOrigin := parsedURL.Scheme + "://" + parsedURL.Host
 
 	mux := http.NewServeMux()
 
@@ -33,7 +34,7 @@ func StartServer(addr string, client *bot.Client) error {
 	mux.HandleFunc("GET /", handleRoot)
 	mux.HandleFunc("GET /login", handleLogin)
 	mux.HandleFunc("GET /callback", handleCallbackGET)
-	mux.HandleFunc("POST /callback", handleCallbackPOST)
+	mux.HandleFunc("POST /callback", handleCallbackPOST(allowedOrigin))
 	mux.HandleFunc("GET /logout", handleLogout)
 
 	// Guild routes.
@@ -73,7 +74,6 @@ func StartServer(addr string, client *bot.Client) error {
 	withAuth := authMiddleware(mux)
 	withBodyLimit := bodyLimitMiddleware(withAuth)
 	withRateLimit := rateLimitMiddleware(exchangeCodeLimiter, "/callback")(withBodyLimit)
-	allowedOrigin := parsedURL.Scheme + "://" + parsedURL.Host
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins: []string{allowedOrigin},
 		AllowedMethods: []string{"POST", "GET", "OPTIONS"},
