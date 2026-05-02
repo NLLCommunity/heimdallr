@@ -163,6 +163,7 @@ func main() {
 	removeStalePrunesTask := scheduled_tasks.RemoveStalePendingPrunes()
 
 	webCtx, cancelWeb := context.WithCancel(context.Background())
+	defer cancelWeb()
 	webDone := make(chan struct{})
 	go func() {
 		defer close(webDone)
