@@ -125,9 +125,13 @@ func flattenSections(items []any) []any {
 			}
 		}
 
-		// Section without accessory → promote children to text_display
+		// Section without a usable accessory → promote children to text_display.
+		// Discord requires a non-null accessory, and disgo's SectionComponent
+		// unmarshaler panics on nil — so treat both "missing" and "null" as
+		// invalid and flatten.
 		if int(typeNum) == int(discord.ComponentTypeSection) {
-			if _, hasAccessory := obj["accessory"]; !hasAccessory {
+			acc, hasAccessory := obj["accessory"]
+			if !hasAccessory || acc == nil {
 				if children, ok := obj["components"].([]any); ok {
 					result = append(result, children...)
 				}
