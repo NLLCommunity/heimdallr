@@ -6,6 +6,7 @@ import (
 	"math"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/agnivade/levenshtein"
 	"github.com/disgoorg/disgo/discord"
@@ -81,8 +82,9 @@ func OnAntispamMessageCreate(e *events.GuildMessageCreate) {
 
 	messageDetails := createMessageDetails(e.Message)
 
-	// Check if this message is similar to previous messages across channels
-	// matching minimum length and Levenshtein distance thresholds.
+	// Check if this message is similar to any previous message in the user's
+	// recent buffer (same channel or different — the cross-channel guard was
+	// removed deliberately in 5b2170f to broaden detection).
 	matchesPreviousMessage := compareToPreviousMessages(messageDetails, info)
 	if matchesPreviousMessage {
 		info.Score++
@@ -159,10 +161,21 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 const (
 	maxTopLevelComponents = 10
 	maxTotalComponents    = 40
-	maxTotalTextLength    = 4000
-	maxPerMessageContent  = 500
+	maxTotalTextLength    = 4000 // bytes — Discord-side limit
+	maxPerMessageContent  = 500  // runes — see truncateContent
 	truncationMarker      = "…"
 )
+
+// truncateContent returns s truncated to at most maxRunes runes, appending
+// the truncation marker if anything was cut. Cuts on rune boundaries — never
+// in the middle of a multi-byte UTF-8 codepoint.
+func truncateContent(s string, maxRunes int) string {
+	if utf8.RuneCountInString(s) <= maxRunes {
+		return s
+	}
+	runes := []rune(s)
+	return string(runes[:maxRunes]) + truncationMarker
+}
 
 func createTimeoutMessage(e *events.GuildMessageCreate, msgs []*messageDetails, deletedCount int) discord.MessageCreate {
 	summary := fmt.Sprintf("User %s has been timed out for spamming. Deleted %d messages.", e.Message.Author.Username, deletedCount)
@@ -175,10 +188,7 @@ func createTimeoutMessage(e *events.GuildMessageCreate, msgs []*messageDetails, 
 	omitted := 0
 
 	for i, m := range msgs {
-		content := m.Content
-		if len(content) > maxPerMessageContent {
-			content = content[:maxPerMessageContent] + truncationMarker
-		}
+		content := truncateContent(m.Content, maxPerMessageContent)
 		contentText := fmt.Sprintf(">>> %s", content)
 		channelText := fmt.Sprintf("-# Channel: <#%d>", m.ChannelID)
 
