@@ -75,9 +75,22 @@ func StartServer(addr string, client *bot.Client) error {
 	withRateLimit := rateLimitMiddleware(exchangeCodeLimiter, "/callback")(withBodyLimit)
 	allowedOrigin := parsedURL.Scheme + "://" + parsedURL.Host
 	corsHandler := cors.New(cors.Options{
-		AllowedOrigins:   []string{allowedOrigin},
-		AllowedMethods:   []string{"POST", "GET", "OPTIONS"},
-		AllowedHeaders:   []string{"Content-Type", "HX-Request", "HX-Target", "HX-Current-URL"},
+		AllowedOrigins: []string{allowedOrigin},
+		AllowedMethods: []string{"POST", "GET", "OPTIONS"},
+		AllowedHeaders: []string{
+			"Content-Type",
+			// Full set of HTMX 2.x request headers — keep in sync with
+			// https://htmx.org/reference/#request_headers so cross-origin
+			// preflights don't fail when HTMX sends them.
+			"HX-Boosted",
+			"HX-Current-URL",
+			"HX-History-Restore-Request",
+			"HX-Prompt",
+			"HX-Request",
+			"HX-Target",
+			"HX-Trigger",
+			"HX-Trigger-Name",
+		},
 		AllowCredentials: true,
 	}).Handler(withRateLimit)
 
