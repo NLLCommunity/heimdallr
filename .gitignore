@@ -38,6 +38,6 @@ go.work.sum
 /heimdallrbot
 # Heimdallr configuration file
 config.toml
-# Database file
-heimdallr.db
+# Database files (incl. WAL/SHM)
+heimdallr.db*
 pb_data/
