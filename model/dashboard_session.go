@@ -21,7 +21,7 @@ func tokenHash(token string) string {
 
 const (
 	loginCodeExpiry = 5 * time.Minute
-	sessionExpiry   = 24 * time.Hour
+	SessionExpiry   = 24 * time.Hour
 )
 
 type DashboardLoginCode struct {
@@ -90,7 +90,7 @@ func ExchangeLoginCode(code string) (*DashboardSession, error) {
 			UserID:    loginCode.UserID,
 			Username:  loginCode.Username,
 			Avatar:    loginCode.Avatar,
-			ExpiresAt: time.Now().Add(sessionExpiry),
+			ExpiresAt: time.Now().Add(SessionExpiry),
 		}
 		if err := tx.Create(&dbSession).Error; err != nil {
 			return err

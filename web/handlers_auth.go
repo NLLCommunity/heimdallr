@@ -49,7 +49,7 @@ func handleCallbackPOST(allowedOrigin string) http.HandlerFunc {
 			return
 		}
 
-		http.SetCookie(w, makeSessionCookie(session.Token, 86400))
+		http.SetCookie(w, makeSessionCookie(session.Token, int(model.SessionExpiry.Seconds())))
 		http.Redirect(w, r, "/guilds", http.StatusSeeOther)
 	}
 }
