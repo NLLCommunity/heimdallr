@@ -162,17 +162,23 @@ func main() {
 	removeTempBansTask := scheduled_tasks.RemoveTempBansScheduledTask(client)
 	removeStalePrunesTask := scheduled_tasks.RemoveStalePendingPrunes()
 
+	webCtx, cancelWeb := context.WithCancel(context.Background())
+	webDone := make(chan struct{})
 	go func() {
-		if err := web.StartServer(viper.GetString("web.address"), client); err != nil {
-			slog.Error("Failed to start web server", "error", err)
+		defer close(webDone)
+		if err := web.StartServer(webCtx, viper.GetString("web.address"), client); err != nil {
+			slog.Error("Web server stopped with error", "error", err)
 		}
 	}()
 
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	<-s
+	slog.Info("Shutdown signal received")
 	removeTempBansTask.Stop()
 	removeStalePrunesTask.Stop()
+	cancelWeb()
+	<-webDone
 }
 
 func getLogLevel(level string) slog.Level {

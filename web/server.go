@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -15,7 +16,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/model"
 )
 
-func StartServer(addr string, client *bot.Client) error {
+func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	baseURL := viper.GetString("dashboard.base_url")
 	devMode := viper.GetBool("dev_mode.enabled")
 
@@ -56,21 +57,10 @@ func StartServer(addr string, client *bot.Client) error {
 	// Static files.
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(getStaticFS())))
 
-	// Session cleanup ticker.
 	exchangeCodeLimiter := newIPRateLimiter(
 		rate.Every(time.Minute/exchangeCodeRatePerMinute),
 		exchangeCodeBurst,
 	)
-	go func() {
-		ticker := time.NewTicker(15 * time.Minute)
-		defer ticker.Stop()
-		for range ticker.C {
-			if err := model.CleanExpiredSessions(); err != nil {
-				slog.Warn("session cleanup failed", "error", err)
-			}
-			exchangeCodeLimiter.cleanup(rateLimiterTTL)
-		}
-	}()
 
 	// Middleware chain: mux → auth → body limit → rate limit → CORS.
 	withAuth := authMiddleware(mux)
@@ -96,7 +86,24 @@ func StartServer(addr string, client *bot.Client) error {
 		AllowCredentials: true,
 	}).Handler(withRateLimit)
 
-	s := http.Server{
+	// Session cleanup ticker — exits when ctx is cancelled.
+	go func() {
+		ticker := time.NewTicker(15 * time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := model.CleanExpiredSessions(); err != nil {
+					slog.Warn("session cleanup failed", "error", err)
+				}
+				exchangeCodeLimiter.cleanup(rateLimiterTTL)
+			}
+		}
+	}()
+
+	s := &http.Server{
 		Addr:              addr,
 		Handler:           corsHandler,
 		ReadHeaderTimeout: 5 * time.Second,
@@ -105,6 +112,25 @@ func StartServer(addr string, client *bot.Client) error {
 		IdleTimeout:       120 * time.Second,
 	}
 
-	slog.Info("Starting web server", "addr", addr)
-	return s.ListenAndServe()
+	serverErr := make(chan error, 1)
+	go func() {
+		slog.Info("Starting web server", "addr", addr)
+		if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			serverErr <- err
+		}
+		close(serverErr)
+	}()
+
+	select {
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		slog.Info("Shutting down web server")
+		if err := s.Shutdown(shutdownCtx); err != nil {
+			return fmt.Errorf("web server shutdown: %w", err)
+		}
+		return nil
+	case err := <-serverErr:
+		return err
+	}
 }
