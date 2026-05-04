@@ -190,18 +190,28 @@ func clientIP(r *http.Request, trusted []netip.Prefix) string {
 	return remote.String()
 }
 
-// rateLimitMiddleware applies per-IP rate limiting to the given paths. The
-// trusted list controls which proxies' forwarded-IP headers are honored when
-// determining the client IP.
-func rateLimitMiddleware(rl *ipRateLimiter, trusted []netip.Prefix, paths ...string) func(http.Handler) http.Handler {
-	pathSet := make(map[string]bool, len(paths))
-	for _, p := range paths {
-		pathSet[p] = true
+// rateLimitRule selects which (method, path) combinations the limiter applies
+// to. Gating by method matters when GET and POST share a URL but only one is
+// state-changing — e.g. POST /callback exchanges a login code, while GET
+// /callback is a confirmation page that link previewers and refreshes hit and
+// shouldn't drain the limiter budget.
+type rateLimitRule struct {
+	Method string
+	Path   string
+}
+
+// rateLimitMiddleware applies per-IP rate limiting to the given (method, path)
+// rules. The trusted list controls which proxies' forwarded-IP headers are
+// honored when determining the client IP.
+func rateLimitMiddleware(rl *ipRateLimiter, trusted []netip.Prefix, rules ...rateLimitRule) func(http.Handler) http.Handler {
+	ruleSet := make(map[rateLimitRule]bool, len(rules))
+	for _, rule := range rules {
+		ruleSet[rule] = true
 	}
 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if pathSet[r.URL.Path] {
+			if ruleSet[rateLimitRule{Method: r.Method, Path: r.URL.Path}] {
 				ip := clientIP(r, trusted)
 				if !rl.getLimiter(ip).Allow() {
 					http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)

@@ -20,7 +20,7 @@ templ SettingsModChannel(data ModChannelData) {
 			x-data="formTracker()" @input="checkDirty()" @change="checkDirty()"
 		>
 			if data.SaveSuccess {
-				@components.AlertSuccess("Settings saved.")
+				@components.SaveSuccessMarker()
 			}
 			if data.SaveError != "" {
 				@components.AlertError(data.SaveError)

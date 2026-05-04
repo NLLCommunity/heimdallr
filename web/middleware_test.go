@@ -78,7 +78,7 @@ func TestBodyLimitMiddleware_LargeBody(t *testing.T) {
 func TestRateLimiter_BlocksAfterBurst(t *testing.T) {
 	rl := newIPRateLimiter(rate.Every(time.Minute), 2)
 
-	handler := rateLimitMiddleware(rl, nil, "/callback")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := rateLimitMiddleware(rl, nil, rateLimitRule{Method: "GET", Path: "/callback"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -102,7 +102,7 @@ func TestRateLimiter_BlocksAfterBurst(t *testing.T) {
 func TestRateLimiter_IgnoresOtherPaths(t *testing.T) {
 	rl := newIPRateLimiter(rate.Every(time.Minute), 1)
 
-	handler := rateLimitMiddleware(rl, nil, "/callback")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := rateLimitMiddleware(rl, nil, rateLimitRule{Method: "GET", Path: "/callback"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -118,6 +118,39 @@ func TestRateLimiter_IgnoresOtherPaths(t *testing.T) {
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+// GET /callback (link previewers, refreshes) must not drain the limiter
+// budget intended for POST /callback (the actual code exchange).
+func TestRateLimiter_OnlyAppliesToConfiguredMethod(t *testing.T) {
+	rl := newIPRateLimiter(rate.Every(time.Minute), 1)
+
+	handler := rateLimitMiddleware(rl, nil, rateLimitRule{Method: "POST", Path: "/callback"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Many GETs from the same IP — none should consume the bucket.
+	for i := 0; i < 5; i++ {
+		req := httptest.NewRequest("GET", "/callback", nil)
+		req.RemoteAddr = "1.2.3.4:1234"
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code, "GET should not be rate-limited")
+	}
+
+	// First POST is the burst.
+	req := httptest.NewRequest("POST", "/callback", nil)
+	req.RemoteAddr = "1.2.3.4:1234"
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	// Second POST is rate-limited (proves the GETs didn't consume budget).
+	req = httptest.NewRequest("POST", "/callback", nil)
+	req.RemoteAddr = "1.2.3.4:1234"
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
 }
 
 func TestParseTrustedProxies(t *testing.T) {
@@ -136,7 +169,7 @@ func TestRateLimiter_IgnoresSpoofedForwardedHeaders(t *testing.T) {
 	rl := newIPRateLimiter(rate.Every(time.Minute), 1)
 
 	// trustedProxies = nil → forwarded headers are never honored.
-	handler := rateLimitMiddleware(rl, nil, "/callback")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := rateLimitMiddleware(rl, nil, rateLimitRule{Method: "GET", Path: "/callback"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -165,7 +198,7 @@ func TestRateLimiter_HonorsTrustedProxyXRealIP(t *testing.T) {
 	trusted, err := parseTrustedProxies([]string{"127.0.0.1/32"})
 	require.NoError(t, err)
 
-	handler := rateLimitMiddleware(rl, trusted, "/callback")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := rateLimitMiddleware(rl, trusted, rateLimitRule{Method: "GET", Path: "/callback"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 

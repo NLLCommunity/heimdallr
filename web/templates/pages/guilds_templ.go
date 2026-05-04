@@ -8,12 +8,26 @@ package pages
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
-import "github.com/NLLCommunity/heimdallr/web/templates/layouts"
+import (
+	"strings"
+
+	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
+)
 
 type GuildData struct {
 	ID   string
 	Name string
 	Icon string
+}
+
+// initialFor returns the first non-whitespace rune of name as a string, or
+// "?" if name is empty or whitespace-only. Guards against indexing an empty
+// rune slice in the icon fallback.
+func initialFor(name string) string {
+	for _, r := range strings.TrimSpace(name) {
+		return string(r)
+	}
+	return "?"
 }
 
 func Guilds(nav layouts.NavData, guilds []GuildData) templ.Component {
@@ -71,7 +85,7 @@ func Guilds(nav layouts.NavData, guilds []GuildData) templ.Component {
 				var templ_7745c5c3_Var3 templ.SafeURL
 				templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/guild/" + g.ID))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 19, Col: 45}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 33, Col: 45}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 				if templ_7745c5c3_Err != nil {
@@ -89,7 +103,7 @@ func Guilds(nav layouts.NavData, guilds []GuildData) templ.Component {
 					var templ_7745c5c3_Var4 string
 					templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs("https://cdn.discordapp.com/icons/" + g.ID + "/" + g.Icon + ".png?size=128")
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 23, Col: 89}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 37, Col: 89}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 					if templ_7745c5c3_Err != nil {
@@ -102,7 +116,7 @@ func Guilds(nav layouts.NavData, guilds []GuildData) templ.Component {
 					var templ_7745c5c3_Var5 string
 					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(g.Name)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 24, Col: 20}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 38, Col: 20}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 					if templ_7745c5c3_Err != nil {
@@ -118,9 +132,9 @@ func Guilds(nav layouts.NavData, guilds []GuildData) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var6 string
-					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(string([]rune(g.Name)[0]))
+					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(initialFor(g.Name))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 29, Col: 35}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 43, Col: 28}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 					if templ_7745c5c3_Err != nil {
@@ -138,7 +152,7 @@ func Guilds(nav layouts.NavData, guilds []GuildData) templ.Component {
 				var templ_7745c5c3_Var7 string
 				templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(g.Name)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 32, Col: 18}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 46, Col: 18}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 				if templ_7745c5c3_Err != nil {

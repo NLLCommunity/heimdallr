@@ -73,7 +73,10 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	// Middleware chain: mux → auth → body limit → rate limit → CORS.
 	withAuth := authMiddleware(mux)
 	withBodyLimit := bodyLimitMiddleware(withAuth)
-	withRateLimit := rateLimitMiddleware(exchangeCodeLimiter, trustedProxies, "/callback")(withBodyLimit)
+	withRateLimit := rateLimitMiddleware(
+		exchangeCodeLimiter, trustedProxies,
+		rateLimitRule{Method: http.MethodPost, Path: "/callback"},
+	)(withBodyLimit)
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins: []string{allowedOrigin},
 		AllowedMethods: []string{"POST", "GET", "OPTIONS"},

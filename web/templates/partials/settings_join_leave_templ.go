@@ -69,7 +69,7 @@ func SettingsJoinLeave(data JoinLeaveData) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		if data.SaveSuccess {
-			templ_7745c5c3_Err = components.AlertSuccess("Settings saved.").Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = components.SaveSuccessMarker().Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
