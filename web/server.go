@@ -59,8 +59,15 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	mux.HandleFunc("POST /guild/{id}/settings/gatekeep", handleSaveGatekeep(client))
 	mux.HandleFunc("POST /guild/{id}/settings/join-leave", handleSaveJoinLeave(client))
 
+	// Per-session rate limiter for sandbox sends — keyed by user ID rather
+	// than IP, since the threat is admin abuse, not anonymous flooding.
+	sandboxLimiter := newIPRateLimiter(
+		rate.Every(time.Minute/sandboxRatePerMinute),
+		sandboxBurst,
+	)
+
 	mux.HandleFunc("GET /guild/{id}/sandbox", handleSandbox(client))
-	mux.HandleFunc("POST /guild/{id}/sandbox/send", handleSandboxSend(client))
+	mux.HandleFunc("POST /guild/{id}/sandbox/send", handleSandboxSend(client, sandboxLimiter))
 
 	// Static files.
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(getStaticFS())))
@@ -94,6 +101,10 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 			"HX-Trigger",
 			"HX-Trigger-Name",
 		},
+		// Single-origin dashboard, so CORS isn't strictly needed. Keeping the
+		// middleware as defense-in-depth and AllowCredentials=true so any
+		// future cross-origin embed (e.g. an admin tool on a sibling
+		// subdomain) can opt in by matching AllowedOrigins.
 		AllowCredentials: true,
 	}).Handler(withRateLimit)
 
@@ -110,6 +121,7 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 					slog.Warn("session cleanup failed", "error", err)
 				}
 				exchangeCodeLimiter.cleanup(rateLimiterTTL)
+				sandboxLimiter.cleanup(rateLimiterTTL)
 			}
 		}
 	}()

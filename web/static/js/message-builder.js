@@ -142,12 +142,17 @@ function createDefaultNode(type) {
 
 // Alpine.js component
 document.addEventListener('alpine:init', () => {
-  Alpine.data('messageBuilder', (initialJson) => ({
+  Alpine.data('messageBuilder', () => ({
     components: [],
     init() {
-      if (typeof initialJson === 'string' && initialJson) {
+      // Initial JSON arrives via the `data-initial` attribute on the host
+      // element. Templ's built-in HTML-attribute escaping makes that path
+      // safe; we just JSON.parse here. Malformed JSON falls back to an
+      // empty editor — same behavior as before.
+      const raw = this.$el.dataset.initial;
+      if (typeof raw === 'string' && raw) {
         try {
-          const parsed = JSON.parse(initialJson);
+          const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
             this.components = parsed.map(deserializeComponent).filter(Boolean);
           }

@@ -61,7 +61,7 @@ func TestResolveEmojis_ResolvesNamedEmojiWithoutID(t *testing.T) {
 	tree := map[string]any{
 		"emoji": map[string]any{"name": ":thumbsup:"},
 	}
-	ResolveEmojis(tree, emojis)
+	require.NoError(t, ResolveEmojis(tree, emojis))
 	got := tree["emoji"].(map[string]any)
 	assert.Equal(t, "thumbsup", got["name"])
 	assert.Equal(t, "12345", got["id"])
@@ -75,7 +75,7 @@ func TestResolveEmojis_LeavesEmojiWithIDAlone(t *testing.T) {
 	tree := map[string]any{
 		"emoji": map[string]any{"name": "custom", "id": "555"},
 	}
-	ResolveEmojis(tree, emojis)
+	require.NoError(t, ResolveEmojis(tree, emojis))
 	got := tree["emoji"].(map[string]any)
 	assert.Equal(t, "custom", got["name"])
 	assert.Equal(t, "555", got["id"])
@@ -87,7 +87,7 @@ func TestResolveEmojis_UnknownNameUnchanged(t *testing.T) {
 	tree := map[string]any{
 		"emoji": map[string]any{"name": "unknown"},
 	}
-	ResolveEmojis(tree, emojis)
+	require.NoError(t, ResolveEmojis(tree, emojis))
 	got := tree["emoji"].(map[string]any)
 	assert.Equal(t, "unknown", got["name"])
 	_, hasID := got["id"]

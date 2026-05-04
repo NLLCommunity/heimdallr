@@ -16,6 +16,12 @@ import (
 	"github.com/NLLCommunity/heimdallr/web/templates/pages"
 )
 
+// maxSandboxBodyBytes caps the raw component JSON the sandbox accepts. Sized
+// well below the global 1 MiB body limit because legitimate Discord component
+// payloads are kilobytes at most; the gap exists to reject deeply nested
+// adversarial input early.
+const maxSandboxBodyBytes = 64 * 1024
+
 func handleSandbox(client *bot.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := sessionFromContext(r.Context())
@@ -39,11 +45,26 @@ func handleSandbox(client *bot.Client) http.HandlerFunc {
 	}
 }
 
-func handleSandboxSend(client *bot.Client) http.HandlerFunc {
+// handleSandboxSend posts an arbitrary V2-component message to a channel as
+// the bot. Admin-gated, but we still apply a per-user rate limit (rather than
+// per-IP) so that a single hostile or compromised admin can't burn through
+// the bot's Discord quota by spamming sandbox sends.
+func handleSandboxSend(client *bot.Client, limiter *ipRateLimiter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		guildIDStr := r.PathValue("id")
 		guildID, ok := checkGuildAdmin(w, r, client, guildIDStr)
 		if !ok {
+			return
+		}
+
+		session := sessionFromContext(r.Context())
+		if session == nil {
+			// authMiddleware should have caught this; treat as 401-equivalent.
+			renderSafe(w, r, components.AlertError("Not signed in."))
+			return
+		}
+		if !limiter.getLimiter(session.UserID.String()).Allow() {
+			renderSafe(w, r, components.AlertError("Rate limited. Please wait a moment before sending again."))
 			return
 		}
 
@@ -53,6 +74,19 @@ func handleSandboxSend(client *bot.Client) http.HandlerFunc {
 		}
 		channelIDStr := r.FormValue("channel_id")
 		componentsJSON := r.FormValue("components_json")
+
+		if len(componentsJSON) > maxSandboxBodyBytes {
+			renderSafe(w, r, components.AlertError("Components JSON too large."))
+			return
+		}
+
+		// validateAndCompactV2JSON rejects empty input and anything that isn't
+		// a top-level JSON array — same shape requirement as the save flows.
+		compactJSON, err := validateAndCompactV2JSON(componentsJSON)
+		if err != nil {
+			renderSafe(w, r, components.AlertError("Invalid components JSON."))
+			return
+		}
 
 		channelID, err := snowflake.Parse(channelIDStr)
 		if err != nil {
@@ -66,15 +100,19 @@ func handleSandboxSend(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
-		// Parse and resolve emojis.
+		// Re-parse for emoji resolution. The recursion-capped ResolveEmojis
+		// returns an error on hostile input nested past maxComponentDepth.
 		var parsed any
-		if err := json.Unmarshal([]byte(componentsJSON), &parsed); err != nil {
+		if err := json.Unmarshal([]byte(compactJSON), &parsed); err != nil {
 			renderSafe(w, r, components.AlertError("Invalid components JSON."))
 			return
 		}
 
 		emojiMap := buildEmojiMap(client, guildID)
-		utils.ResolveEmojis(parsed, emojiMap)
+		if err := utils.ResolveEmojis(parsed, emojiMap); err != nil {
+			renderSafe(w, r, components.AlertError("Components nested too deeply."))
+			return
+		}
 
 		resolvedJSON, err := json.Marshal(parsed)
 		if err != nil {

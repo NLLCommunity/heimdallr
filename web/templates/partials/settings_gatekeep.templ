@@ -1,8 +1,6 @@
 package partials
 
 import (
-	"strings"
-
 	"github.com/NLLCommunity/heimdallr/web/templates/components"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
@@ -80,7 +78,7 @@ templ V2MessageToggle(prefix string, plainText string, v2Enabled bool, v2Json st
 			@components.TextareaField(prefix, "Message", plainText, "")
 		</div>
 		<div x-show="v2" x-cloak>
-			<div x-data={ "messageBuilder(" + escapeJsonAttr(v2Json) + ")" }>
+			<div x-data="messageBuilder()" data-initial={ initialV2Json(v2Json) }>
 				@components.MessageEditor()
 				<input type="hidden" name={ prefix + "_v2_json" } x-bind:value="JSON.stringify(serialize())"/>
 			</div>
@@ -95,15 +93,13 @@ func boolStr(b bool) string {
 	return "false"
 }
 
-func escapeJsonAttr(s string) string {
+// initialV2Json normalizes the stored V2 JSON for embedding in a data
+// attribute. Empty input becomes "[]" so the JS init can JSON.parse without
+// a special case. Templ HTML-escapes the attribute value automatically, so
+// no custom escaping is needed.
+func initialV2Json(s string) string {
 	if s == "" {
-		return "'[]'"
+		return "[]"
 	}
-	// Escape for safe embedding in an HTML attribute inside single quotes.
-	// JSON should not contain single quotes, but be safe anyway.
-	escaped := strings.ReplaceAll(s, `\`, `\\`)
-	escaped = strings.ReplaceAll(escaped, `'`, `\'`)
-	escaped = strings.ReplaceAll(escaped, "<", `\x3c`)
-	escaped = strings.ReplaceAll(escaped, ">", `\x3e`)
-	return "'" + escaped + "'"
+	return s
 }

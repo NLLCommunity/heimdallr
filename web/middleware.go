@@ -15,10 +15,16 @@ import (
 )
 
 const (
-	exchangeCodeRatePerMinute       = 1
-	exchangeCodeBurst               = 5
-	rateLimiterTTL                  = 10 * time.Minute
-	maxRequestBodyBytes       int64 = 1 << 20 // 1 MiB
+	exchangeCodeRatePerMinute = 1
+	exchangeCodeBurst         = 5
+	// Sandbox sends are admin-only but still rate-limited per session user
+	// so a single admin can't drain the bot's Discord quota by spamming the
+	// sandbox. ~10/min steady, burst 5 is generous for testing message
+	// previews while clamping abuse.
+	sandboxRatePerMinute       = 10
+	sandboxBurst               = 5
+	rateLimiterTTL             = 10 * time.Minute
+	maxRequestBodyBytes  int64 = 1 << 20 // 1 MiB
 )
 
 // redirectToLogin issues an HX-Redirect for HTMX requests (HTMX swallows 3xx

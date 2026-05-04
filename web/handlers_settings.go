@@ -259,9 +259,25 @@ func handleSaveInfractions(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
-		settings.InfractionHalfLifeDays = parseFloat(r.FormValue("half_life_days"))
+		halfLife, err := parseFloat(r.FormValue("half_life_days"))
+		if err != nil || halfLife < minInfractionHalfLifeDays || halfLife > maxInfractionHalfLifeDays {
+			renderSafe(w, r, partials.SettingsInfractions(partials.InfractionsData{
+				GuildID:   guildIDStr,
+				SaveError: "Half-life must be between 0 and 365 days.",
+			}))
+			return
+		}
+		threshold, err := parseFloat(r.FormValue("notify_warn_severity_threshold"))
+		if err != nil || threshold < minNotifyWarnSeverityThreshold || threshold > maxNotifyWarnSeverityThreshold {
+			renderSafe(w, r, partials.SettingsInfractions(partials.InfractionsData{
+				GuildID:   guildIDStr,
+				SaveError: "Severity threshold must be between 0 and 100.",
+			}))
+			return
+		}
+		settings.InfractionHalfLifeDays = halfLife
 		settings.NotifyOnWarnedUserJoin = r.FormValue("notify_on_warned_user_join") == "true"
-		settings.NotifyWarnSeverityThreshold = parseFloat(r.FormValue("notify_warn_severity_threshold"))
+		settings.NotifyWarnSeverityThreshold = threshold
 
 		if err := model.SetGuildSettings(settings); err != nil {
 			slog.Error("failed to save infraction settings", "error", err)
@@ -301,9 +317,25 @@ func handleSaveAntiSpam(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
+		count := parseInt(r.FormValue("count"), 5)
+		if count < minAntiSpamCount || count > maxAntiSpamCount {
+			renderSafe(w, r, partials.SettingsAntiSpam(partials.AntiSpamData{
+				GuildID:   guildIDStr,
+				SaveError: "Message count must be between 2 and 10.",
+			}))
+			return
+		}
+		cooldown := parseInt(r.FormValue("cooldown_seconds"), 20)
+		if cooldown < minAntiSpamCooldownSeconds || cooldown > maxAntiSpamCooldownSeconds {
+			renderSafe(w, r, partials.SettingsAntiSpam(partials.AntiSpamData{
+				GuildID:   guildIDStr,
+				SaveError: "Cooldown must be between 1 and 60 seconds.",
+			}))
+			return
+		}
 		settings.AntiSpamEnabled = r.FormValue("enabled") == "true"
-		settings.AntiSpamCount = parseInt(r.FormValue("count"), 5)
-		settings.AntiSpamCooldownSeconds = parseInt(r.FormValue("cooldown_seconds"), 20)
+		settings.AntiSpamCount = count
+		settings.AntiSpamCooldownSeconds = cooldown
 
 		if err := model.SetGuildSettings(settings); err != nil {
 			slog.Error("failed to save anti-spam settings", "error", err)
@@ -501,7 +533,7 @@ func handleSaveGatekeep(client *bot.Client) http.HandlerFunc {
 			}
 			settings.GatekeepApprovedMessageV2Json = compact
 		} else {
-			settings.GatekeepApprovedMessageV2Json = approvedV2Raw
+			settings.GatekeepApprovedMessageV2Json = preserveV2Json(approvedV2Raw)
 		}
 
 		if err := model.SetGuildSettings(settings); err != nil {
@@ -592,7 +624,7 @@ func handleSaveJoinLeave(client *bot.Client) http.HandlerFunc {
 			}
 			settings.JoinMessageV2Json = compact
 		} else {
-			settings.JoinMessageV2Json = joinV2Raw
+			settings.JoinMessageV2Json = preserveV2Json(joinV2Raw)
 		}
 
 		if settings.LeaveMessageV2 {
@@ -603,7 +635,7 @@ func handleSaveJoinLeave(client *bot.Client) http.HandlerFunc {
 			}
 			settings.LeaveMessageV2Json = compact
 		} else {
-			settings.LeaveMessageV2Json = leaveV2Raw
+			settings.LeaveMessageV2Json = preserveV2Json(leaveV2Raw)
 		}
 
 		if err := model.SetGuildSettings(settings); err != nil {
@@ -636,17 +668,50 @@ func handleSaveJoinLeave(client *bot.Client) http.HandlerFunc {
 
 // --- Helpers ---
 
-func parseFloat(s string) float64 {
-	v, _ := strconv.ParseFloat(s, 64)
-	return v
+// Numeric setting bounds. Mirror the min/max passed to NumberField in the
+// templ partials — keep them in sync so client-side HTML5 validation and
+// server-side validation agree.
+const (
+	minAntiSpamCount               = 2
+	maxAntiSpamCount               = 10
+	minAntiSpamCooldownSeconds     = 1
+	maxAntiSpamCooldownSeconds     = 60
+	minInfractionHalfLifeDays      = 0.0
+	maxInfractionHalfLifeDays      = 365.0
+	minNotifyWarnSeverityThreshold = 0.0
+	maxNotifyWarnSeverityThreshold = 100.0
+	// Cap on raw V2 JSON kept in the DB when the V2 toggle is off (the
+	// user's in-flight draft). Real Discord component payloads are
+	// kilobytes; 32 KiB leaves headroom without letting unbounded garbage
+	// accumulate per-guild.
+	maxV2JsonStored = 32 * 1024
+)
+
+func parseFloat(s string) (float64, error) {
+	return strconv.ParseFloat(strings.TrimSpace(s), 64)
 }
 
 func parseInt(s string, defaultVal int) int {
-	v, err := strconv.Atoi(s)
+	v, err := strconv.Atoi(strings.TrimSpace(s))
 	if err != nil {
 		return defaultVal
 	}
 	return v
+}
+
+// preserveV2Json returns a compacted form of raw if it parses as a JSON
+// array and is within size limits, else "". Used when the V2 toggle is off
+// to keep the user's in-flight draft across visits without persisting
+// malformed or oversized payloads.
+func preserveV2Json(raw string) string {
+	if raw == "" || len(raw) > maxV2JsonStored {
+		return ""
+	}
+	compact, err := validateAndCompactV2JSON(raw)
+	if err != nil {
+		return ""
+	}
+	return compact
 }
 
 // errInvalidV2JSON is returned by validateAndCompactV2JSON when the supplied

@@ -68,7 +68,9 @@ var MessageTemplatePlaceholders = []MessageTemplatePlaceholder{
 	{"{{Server.ID}}", "The server ID"},
 }
 
-var MessageTemplateInfo = func() string {
+var MessageTemplateInfo = buildMessageTemplateInfo()
+
+func buildMessageTemplateInfo() string {
 	var b strings.Builder
 	b.WriteString("The following placeholders can be used in join/leave/approval messages " +
 		"and will be replaced with the appropriate values.\n\n")
@@ -76,4 +78,4 @@ var MessageTemplateInfo = func() string {
 		fmt.Fprintf(&b, "`%s` — %s\n", p.Placeholder, p.Description)
 	}
 	return b.String()
-}()
+}

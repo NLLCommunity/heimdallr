@@ -72,9 +72,14 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 	}()
 
 	slog.InfoContext(e.Ctx, "Entered approvedInnerHandler")
+	// If the deferred ack fails, every subsequent CreateFollowupMessage
+	// call will also fail — Discord only accepts followups after an
+	// acknowledged interaction. Bail early instead of silently performing
+	// role changes the admin can never confirm via the bot's response.
 	err := e.DeferCreateMessage(true)
 	if err != nil {
-		slog.Error("Failed to defer message.", "err", err)
+		slog.Error("Failed to defer message; aborting approval.", "err", err)
+		return err
 	}
 
 	guildSettings, err := model.GetGuildSettings(guild.ID)

@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/web/templates/pages"
@@ -49,7 +50,14 @@ func handleCallbackPOST(allowedOrigin string) http.HandlerFunc {
 			return
 		}
 
-		http.SetCookie(w, makeSessionCookie(session.Token, int(model.SessionExpiry.Seconds())))
+		// MaxAge (relative) over Expires (absolute) so a skewed client clock
+		// can't drop the cookie early or keep it past the server-side expiry.
+		// The server validates session.ExpiresAt on every request, so this is
+		// only a hint to the browser — but anchoring it to the row's exact
+		// ExpiresAt keeps cookie and DB lifetime in lockstep if SessionExpiry
+		// ever becomes per-session.
+		maxAge := int(time.Until(session.ExpiresAt).Seconds())
+		http.SetCookie(w, makeSessionCookie(session.Token, maxAge))
 		http.Redirect(w, r, "/guilds", http.StatusSeeOther)
 	}
 }

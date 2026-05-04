@@ -2,6 +2,7 @@ package utils
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -9,10 +10,27 @@ import (
 	"github.com/disgoorg/disgo/discord"
 )
 
+// maxComponentDepth caps recursion through parsed-JSON component trees. The
+// 1 MiB body limit on web routes already bounds nesting in practice, but a
+// hard cap means hostile or pathological input can't pin a CPU walking it.
+// Discord's own component nesting tops out far below this.
+const maxComponentDepth = 32
+
+// errComponentTooDeep is returned when a JSON component tree exceeds
+// maxComponentDepth during traversal.
+var errComponentTooDeep = errors.New("components nested too deeply")
+
 // ResolveEmojis walks a JSON value tree looking for "emoji" keys whose value
 // is an object with "name" but no "id", and resolves the name against the
 // provided emoji map.
-func ResolveEmojis(v any, emojiMap map[string]discord.Emoji) {
+func ResolveEmojis(v any, emojiMap map[string]discord.Emoji) error {
+	return resolveEmojis(v, emojiMap, 0)
+}
+
+func resolveEmojis(v any, emojiMap map[string]discord.Emoji, depth int) error {
+	if depth > maxComponentDepth {
+		return errComponentTooDeep
+	}
 	switch val := v.(type) {
 	case map[string]any:
 		if emojiObj, ok := val["emoji"].(map[string]any); ok {
@@ -28,13 +46,18 @@ func ResolveEmojis(v any, emojiMap map[string]discord.Emoji) {
 			}
 		}
 		for _, child := range val {
-			ResolveEmojis(child, emojiMap)
+			if err := resolveEmojis(child, emojiMap, depth+1); err != nil {
+				return err
+			}
 		}
 	case []any:
 		for _, item := range val {
-			ResolveEmojis(item, emojiMap)
+			if err := resolveEmojis(item, emojiMap, depth+1); err != nil {
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 // RenderComponentTemplates applies mustache template rendering to all string
@@ -45,7 +68,7 @@ func RenderComponentTemplates(componentsJson string, data MessageTemplateData) (
 		return "", err
 	}
 
-	if err := renderTemplatesInTree(parsed, data); err != nil {
+	if err := renderTemplatesInTree(parsed, data, 0); err != nil {
 		return "", err
 	}
 
@@ -56,7 +79,10 @@ func RenderComponentTemplates(componentsJson string, data MessageTemplateData) (
 	return string(result), nil
 }
 
-func renderTemplatesInTree(v any, data MessageTemplateData) error {
+func renderTemplatesInTree(v any, data MessageTemplateData, depth int) error {
+	if depth > maxComponentDepth {
+		return errComponentTooDeep
+	}
 	switch val := v.(type) {
 	case map[string]any:
 		if content, ok := val["content"].(string); ok {
@@ -67,13 +93,13 @@ func renderTemplatesInTree(v any, data MessageTemplateData) error {
 			val["content"] = rendered
 		}
 		for _, child := range val {
-			if err := renderTemplatesInTree(child, data); err != nil {
+			if err := renderTemplatesInTree(child, data, depth+1); err != nil {
 				return err
 			}
 		}
 	case []any:
 		for _, item := range val {
-			if err := renderTemplatesInTree(item, data); err != nil {
+			if err := renderTemplatesInTree(item, data, depth+1); err != nil {
 				return err
 			}
 		}
@@ -93,7 +119,9 @@ func BuildV2Message(componentsJson string, data MessageTemplateData, emojiMap ma
 	if err := json.Unmarshal([]byte(rendered), &parsed); err != nil {
 		return nil, err
 	}
-	ResolveEmojis(parsed, emojiMap)
+	if err := ResolveEmojis(parsed, emojiMap); err != nil {
+		return nil, err
+	}
 
 	resolvedJSON, err := json.Marshal(parsed)
 	if err != nil {
@@ -107,7 +135,10 @@ func BuildV2Message(componentsJson string, data MessageTemplateData, emojiMap ma
 // accessory are invalid (Discord requires one), so they are flattened into
 // their child text_display components. This also prevents a panic in disgo's
 // SectionComponent.UnmarshalJSON which assumes a non-nil accessory.
-func flattenSections(items []any) []any {
+func flattenSections(items []any, depth int) ([]any, error) {
+	if depth > maxComponentDepth {
+		return nil, errComponentTooDeep
+	}
 	result := make([]any, 0, len(items))
 	for _, item := range items {
 		obj, ok := item.(map[string]any)
@@ -121,7 +152,11 @@ func flattenSections(items []any) []any {
 		// Recurse into containers
 		if int(typeNum) == int(discord.ComponentTypeContainer) {
 			if children, ok := obj["components"].([]any); ok {
-				obj["components"] = flattenSections(children)
+				flattened, err := flattenSections(children, depth+1)
+				if err != nil {
+					return nil, err
+				}
+				obj["components"] = flattened
 			}
 		}
 
@@ -141,7 +176,7 @@ func flattenSections(items []any) []any {
 
 		result = append(result, obj)
 	}
-	return result
+	return result, nil
 }
 
 // ParseComponents unmarshals a JSON string into Discord layout components.
@@ -159,7 +194,11 @@ func ParseComponents(jsonStr string) (components []discord.LayoutComponent, err 
 		return nil, err
 	}
 
-	patched, err := json.Marshal(flattenSections(parsed))
+	flattened, err := flattenSections(parsed, 0)
+	if err != nil {
+		return nil, err
+	}
+	patched, err := json.Marshal(flattened)
 	if err != nil {
 		return nil, err
 	}

@@ -169,12 +169,16 @@ const (
 // truncateContent returns s truncated to at most maxRunes runes, appending
 // the truncation marker (counted within the budget) if anything was cut.
 // Cuts on rune boundaries — never in the middle of a multi-byte UTF-8
-// codepoint. Assumes maxRunes is at least the rune length of truncationMarker.
+// codepoint. If maxRunes is smaller than the marker, returns s unchanged
+// rather than slicing out of bounds.
 func truncateContent(s string, maxRunes int) string {
 	if utf8.RuneCountInString(s) <= maxRunes {
 		return s
 	}
 	markerLen := utf8.RuneCountInString(truncationMarker)
+	if maxRunes < markerLen {
+		return s
+	}
 	runes := []rune(s)
 	return string(runes[:maxRunes-markerLen]) + truncationMarker
 }
