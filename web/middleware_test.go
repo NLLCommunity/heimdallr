@@ -20,13 +20,32 @@ func TestAuthMiddleware_SkipsPublicPaths(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	for _, path := range []string{"/login", "/callback", "/", "/static/css/custom.css"} {
+	// `/` is intentionally not public — handleRoot relies on the session
+	// being injected by this middleware to decide /guilds vs /login.
+	for _, path := range []string{"/login", "/callback", "/static/css/custom.css"} {
 		called = false
 		req := httptest.NewRequest("GET", path, nil)
 		rec := httptest.NewRecorder()
 		handler.ServeHTTP(rec, req)
 		assert.True(t, called, "handler should be called for %s", path)
 	}
+}
+
+// Regression for the bug where `/` was in the public skip list, so
+// handleRoot always saw a nil session and redirected logged-in users back to
+// /login. With `/` enforced by middleware, unauthenticated requests are
+// bounced from middleware (here) and authenticated ones land in handleRoot
+// with a real session.
+func TestAuthMiddleware_RootRequiresAuth(t *testing.T) {
+	handler := authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatal("handler should not be called without a session")
+	}))
+
+	req := httptest.NewRequest("GET", "/", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusSeeOther, rec.Code)
+	assert.Equal(t, "/login", rec.Header().Get("Location"))
 }
 
 func TestAuthMiddleware_RedirectsWithoutCookie(t *testing.T) {

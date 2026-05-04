@@ -105,9 +105,8 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	if session := sessionFromContext(r.Context()); session != nil {
-		http.Redirect(w, r, "/guilds", http.StatusSeeOther)
-	} else {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
-	}
+	// authMiddleware enforces auth on `/`, so by the time we get here the
+	// session is guaranteed to be present — unauthenticated requests were
+	// already redirected to /login by the middleware.
+	http.Redirect(w, r, "/guilds", http.StatusSeeOther)
 }

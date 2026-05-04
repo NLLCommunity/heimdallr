@@ -37,9 +37,12 @@ func redirectToLogin(w http.ResponseWriter, r *http.Request) {
 // Unauthenticated requests to protected paths are redirected to /login.
 func authMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip auth for public paths.
+		// Skip auth for public paths. `/` is intentionally NOT public — it's
+		// the post-login landing handler that decides /guilds vs /login based
+		// on the session, which means it needs the session injected by this
+		// middleware first.
 		path := r.URL.Path
-		if path == "/login" || path == "/callback" || path == "/" ||
+		if path == "/login" || path == "/callback" ||
 			strings.HasPrefix(path, "/static/") {
 			next.ServeHTTP(w, r)
 			return
