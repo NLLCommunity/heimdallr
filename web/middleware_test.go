@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"golang.org/x/time/rate"
 )
 
@@ -76,7 +78,7 @@ func TestBodyLimitMiddleware_LargeBody(t *testing.T) {
 func TestRateLimiter_BlocksAfterBurst(t *testing.T) {
 	rl := newIPRateLimiter(rate.Every(time.Minute), 2)
 
-	handler := rateLimitMiddleware(rl, "/callback")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := rateLimitMiddleware(rl, nil, "/callback")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -100,7 +102,7 @@ func TestRateLimiter_BlocksAfterBurst(t *testing.T) {
 func TestRateLimiter_IgnoresOtherPaths(t *testing.T) {
 	rl := newIPRateLimiter(rate.Every(time.Minute), 1)
 
-	handler := rateLimitMiddleware(rl, "/callback")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := rateLimitMiddleware(rl, nil, "/callback")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
@@ -116,4 +118,112 @@ func TestRateLimiter_IgnoresOtherPaths(t *testing.T) {
 	rec = httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
+func TestParseTrustedProxies(t *testing.T) {
+	prefixes, err := parseTrustedProxies([]string{"127.0.0.1/32", " 10.0.0.0/8 ", "::1", ""})
+	require.NoError(t, err)
+	require.Len(t, prefixes, 3)
+
+	_, err = parseTrustedProxies([]string{"not-a-cidr"})
+	assert.Error(t, err)
+}
+
+// Untrusted clients must not be able to spoof X-Real-IP / X-Forwarded-For;
+// otherwise each forged header value gets its own rate-limit bucket and the
+// limiter is bypassed.
+func TestRateLimiter_IgnoresSpoofedForwardedHeaders(t *testing.T) {
+	rl := newIPRateLimiter(rate.Every(time.Minute), 1)
+
+	// trustedProxies = nil → forwarded headers are never honored.
+	handler := rateLimitMiddleware(rl, nil, "/callback")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// First request from real client succeeds (burst = 1).
+	req := httptest.NewRequest("GET", "/callback", nil)
+	req.RemoteAddr = "203.0.113.7:1234"
+	req.Header.Set("X-Real-IP", "9.9.9.1")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	// Same RemoteAddr, attacker rotates X-Real-IP to dodge the bucket.
+	// Limiter must still see the same RemoteAddr-keyed bucket.
+	req = httptest.NewRequest("GET", "/callback", nil)
+	req.RemoteAddr = "203.0.113.7:1234"
+	req.Header.Set("X-Real-IP", "9.9.9.2")
+	rec = httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
+}
+
+// When a trusted proxy connects, the rate limiter must key off the forwarded
+// client IP — otherwise every request through the proxy shares one bucket.
+func TestRateLimiter_HonorsTrustedProxyXRealIP(t *testing.T) {
+	rl := newIPRateLimiter(rate.Every(time.Minute), 1)
+	trusted, err := parseTrustedProxies([]string{"127.0.0.1/32"})
+	require.NoError(t, err)
+
+	handler := rateLimitMiddleware(rl, trusted, "/callback")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	for _, ip := range []string{"9.9.9.1", "9.9.9.2"} {
+		req := httptest.NewRequest("GET", "/callback", nil)
+		req.RemoteAddr = "127.0.0.1:1234"
+		req.Header.Set("X-Real-IP", ip)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusOK, rec.Code, "IP %s should have its own bucket", ip)
+	}
+
+	// Reusing the first forwarded IP exhausts that bucket.
+	req := httptest.NewRequest("GET", "/callback", nil)
+	req.RemoteAddr = "127.0.0.1:1234"
+	req.Header.Set("X-Real-IP", "9.9.9.1")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusTooManyRequests, rec.Code)
+}
+
+func TestClientIP_XForwardedForRightmostUntrusted(t *testing.T) {
+	trusted, err := parseTrustedProxies([]string{"127.0.0.1/32", "10.0.0.0/8"})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.RemoteAddr = "127.0.0.1:1234"
+	// Chain: client → external proxy 198.51.100.5 → internal proxy 10.0.0.2 → us.
+	req.Header.Set("X-Forwarded-For", "203.0.113.9, 198.51.100.5, 10.0.0.2")
+
+	got := clientIP(req, trusted)
+	assert.Equal(t, "198.51.100.5", got, "rightmost untrusted hop is the closest known client")
+}
+
+func TestClientIP_MalformedXRealIPIgnored(t *testing.T) {
+	trusted, err := parseTrustedProxies([]string{"127.0.0.1/32"})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.RemoteAddr = "127.0.0.1:1234"
+	req.Header.Set("X-Real-IP", "not-an-ip")
+
+	assert.Equal(t, "127.0.0.1", clientIP(req, trusted))
+}
+
+// Sanity check that prefix-membership works for both v4 and v6.
+func TestIsTrusted(t *testing.T) {
+	trusted, err := parseTrustedProxies([]string{"10.0.0.0/8", "::1"})
+	require.NoError(t, err)
+
+	cases := map[string]bool{
+		"10.1.2.3":  true,
+		"11.0.0.1":  false,
+		"::1":       true,
+		"127.0.0.1": false,
+	}
+	for s, want := range cases {
+		got := isTrusted(netip.MustParseAddr(s), trusted)
+		assert.Equal(t, want, got, "isTrusted(%s)", s)
+	}
 }

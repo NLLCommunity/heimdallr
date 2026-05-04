@@ -1,8 +1,10 @@
 package web
 
 import (
+	"fmt"
 	"net"
 	"net/http"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -115,19 +117,83 @@ func (l *ipRateLimiter) cleanup(ttl time.Duration) {
 	}
 }
 
-func clientIP(r *http.Request) string {
-	if ip := r.Header.Get("X-Real-IP"); ip != "" {
-		return ip
+// parseTrustedProxies converts a list of CIDR or bare-IP strings into prefixes.
+// Bare IPs are widened to a host prefix (/32 or /128).
+func parseTrustedProxies(cidrs []string) ([]netip.Prefix, error) {
+	prefixes := make([]netip.Prefix, 0, len(cidrs))
+	for _, raw := range cidrs {
+		s := strings.TrimSpace(raw)
+		if s == "" {
+			continue
+		}
+		if p, err := netip.ParsePrefix(s); err == nil {
+			prefixes = append(prefixes, p.Masked())
+			continue
+		}
+		if a, err := netip.ParseAddr(s); err == nil {
+			prefixes = append(prefixes, netip.PrefixFrom(a, a.BitLen()))
+			continue
+		}
+		return nil, fmt.Errorf("invalid trusted_proxies entry %q", raw)
 	}
-	ip, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return r.RemoteAddr
-	}
-	return ip
+	return prefixes, nil
 }
 
-// rateLimitMiddleware applies per-IP rate limiting to the given paths.
-func rateLimitMiddleware(rl *ipRateLimiter, paths ...string) func(http.Handler) http.Handler {
+func isTrusted(addr netip.Addr, trusted []netip.Prefix) bool {
+	addr = addr.Unmap()
+	for _, p := range trusted {
+		if p.Contains(addr) {
+			return true
+		}
+	}
+	return false
+}
+
+// clientIP extracts the client IP. Forwarded-IP headers (X-Real-IP and
+// X-Forwarded-For) are honored only when the immediate connection comes from a
+// proxy in the trusted list; otherwise they're ignored to prevent spoofing of
+// the per-IP rate limiter.
+func clientIP(r *http.Request, trusted []netip.Prefix) string {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	remote, err := netip.ParseAddr(host)
+	if err != nil {
+		return host
+	}
+	remote = remote.Unmap()
+	if !isTrusted(remote, trusted) {
+		return remote.String()
+	}
+	if h := strings.TrimSpace(r.Header.Get("X-Real-IP")); h != "" {
+		if a, err := netip.ParseAddr(h); err == nil {
+			return a.Unmap().String()
+		}
+	}
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// Walk right-to-left, skipping known-trusted hops; the rightmost
+		// untrusted address is the closest the proxy chain got to the client.
+		parts := strings.Split(xff, ",")
+		for i := len(parts) - 1; i >= 0; i-- {
+			s := strings.TrimSpace(parts[i])
+			a, err := netip.ParseAddr(s)
+			if err != nil {
+				continue
+			}
+			a = a.Unmap()
+			if !isTrusted(a, trusted) {
+				return a.String()
+			}
+		}
+	}
+	return remote.String()
+}
+
+// rateLimitMiddleware applies per-IP rate limiting to the given paths. The
+// trusted list controls which proxies' forwarded-IP headers are honored when
+// determining the client IP.
+func rateLimitMiddleware(rl *ipRateLimiter, trusted []netip.Prefix, paths ...string) func(http.Handler) http.Handler {
 	pathSet := make(map[string]bool, len(paths))
 	for _, p := range paths {
 		pathSet[p] = true
@@ -136,7 +202,7 @@ func rateLimitMiddleware(rl *ipRateLimiter, paths ...string) func(http.Handler) 
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if pathSet[r.URL.Path] {
-				ip := clientIP(r)
+				ip := clientIP(r, trusted)
 				if !rl.getLimiter(ip).Allow() {
 					http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 					return

@@ -29,6 +29,14 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	}
 	allowedOrigin := parsedURL.Scheme + "://" + parsedURL.Host
 
+	trustedProxies, err := parseTrustedProxies(viper.GetStringSlice("web.trusted_proxies"))
+	if err != nil {
+		return fmt.Errorf("web.trusted_proxies: %w", err)
+	}
+	if len(trustedProxies) == 0 {
+		slog.Info("web.trusted_proxies is empty — forwarded-IP headers (X-Real-IP / X-Forwarded-For) will be ignored")
+	}
+
 	mux := http.NewServeMux()
 
 	// Auth routes.
@@ -65,7 +73,7 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	// Middleware chain: mux → auth → body limit → rate limit → CORS.
 	withAuth := authMiddleware(mux)
 	withBodyLimit := bodyLimitMiddleware(withAuth)
-	withRateLimit := rateLimitMiddleware(exchangeCodeLimiter, "/callback")(withBodyLimit)
+	withRateLimit := rateLimitMiddleware(exchangeCodeLimiter, trustedProxies, "/callback")(withBodyLimit)
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins: []string{allowedOrigin},
 		AllowedMethods: []string{"POST", "GET", "OPTIONS"},

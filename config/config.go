@@ -32,6 +32,7 @@ func init() {
 	viper.SetDefault("dev_mode.guild_id", 0)
 
 	viper.SetDefault("web.address", ":8484")
+	viper.SetDefault("web.trusted_proxies", []string{})
 
 	viper.SetDefault("dashboard.base_url", "http://localhost:8484")
 
