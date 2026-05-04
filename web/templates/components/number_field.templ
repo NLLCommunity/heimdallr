@@ -1,0 +1,16 @@
+package components
+
+import "fmt"
+
+templ NumberField(name string, label string, value float64, min float64, max float64, step float64) {
+	<label for={ name }>{ label }</label>
+	<input
+		type="number"
+		id={ name }
+		name={ name }
+		value={ fmt.Sprintf("%g", value) }
+		min={ fmt.Sprintf("%g", min) }
+		max={ fmt.Sprintf("%g", max) }
+		step={ fmt.Sprintf("%g", step) }
+	/>
+}

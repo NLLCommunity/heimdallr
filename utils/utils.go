@@ -127,11 +127,8 @@ func GetMembersIter(r rest.Rest, guildID snowflake.ID) iter.Seq[IterResult[disco
 		for {
 			members, err := r.GetMembers(guildID, LIMIT, memberOffset)
 			if err != nil {
-				yield(
-					IterResult[discord.Member]{
-						Error: err,
-					},
-				)
+				yield(IterResult[discord.Member]{Error: err})
+				return
 			}
 
 			count := len(members)

@@ -1,0 +1,22 @@
+package components
+
+type RoleInfo struct {
+	ID       string
+	Name     string
+	Position int
+	Managed  bool
+}
+
+templ RoleSelect(name string, label string, roles []RoleInfo, selected string) {
+	<label for={ name }>{ label }</label>
+	<select id={ name } name={ name }>
+		<option value="">— None —</option>
+		for _, role := range roles {
+			if !role.Managed {
+				<option value={ role.ID } selected?={ role.ID == selected }>
+					{ role.Name }
+				</option>
+			}
+		}
+	</select>
+}

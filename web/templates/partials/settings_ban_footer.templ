@@ -1,0 +1,33 @@
+package partials
+
+import "github.com/NLLCommunity/heimdallr/web/templates/components"
+
+type BanFooterData struct {
+	GuildID     string
+	Footer      string
+	AlwaysSend  bool
+	SaveSuccess bool
+	SaveError   string
+}
+
+templ SettingsBanFooter(data BanFooterData) {
+	<section id="ban-footer">
+		<h3>Ban Footer</h3>
+		<form
+			hx-post={ "/guild/" + data.GuildID + "/settings/ban-footer" }
+			hx-target="#ban-footer"
+			hx-swap="outerHTML"
+			x-data="formTracker()" @input="checkDirty()" @change="checkDirty()"
+		>
+			if data.SaveSuccess {
+				@components.SaveSuccessMarker()
+			}
+			if data.SaveError != "" {
+				@components.AlertError(data.SaveError)
+			}
+			@components.TextareaField("footer", "Footer text", data.Footer, "Appended to ban DMs sent to users.")
+			@components.ToggleField("always_send", "Always send footer", "", data.AlwaysSend)
+			@components.SaveButton()
+		</form>
+	</section>
+}

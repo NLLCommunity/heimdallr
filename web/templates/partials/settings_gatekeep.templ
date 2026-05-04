@@ -1,0 +1,105 @@
+package partials
+
+import (
+	"github.com/NLLCommunity/heimdallr/web/templates/components"
+	"github.com/NLLCommunity/heimdallr/utils"
+)
+
+type GatekeepData struct {
+	GuildID               string
+	Enabled               bool
+	PendingRole           string
+	ApprovedRole          string
+	AddPendingRoleOnJoin  bool
+	ApprovedMessage       string
+	ApprovedMessageV2     bool
+	ApprovedMessageV2Json string
+	Roles                 []components.RoleInfo
+	Placeholders          []utils.MessageTemplatePlaceholder
+	SaveSuccess           bool
+	SaveError             string
+}
+
+templ SettingsGatekeep(data GatekeepData) {
+	<section id="gatekeep">
+		<h3>Gatekeep</h3>
+		<form
+			hx-post={ "/guild/" + data.GuildID + "/settings/gatekeep" }
+			hx-target="#gatekeep"
+			hx-swap="outerHTML"
+			x-data="formTracker()" @input="checkDirty()" @change="checkDirty()"
+		>
+			if data.SaveSuccess {
+				@components.SaveSuccessMarker()
+			}
+			if data.SaveError != "" {
+				@components.AlertError(data.SaveError)
+			}
+			@components.ToggleField("enabled", "Enable gatekeep", "", data.Enabled)
+			@components.RoleSelect("pending_role", "Pending role", data.Roles, data.PendingRole)
+			@components.RoleSelect("approved_role", "Approved role", data.Roles, data.ApprovedRole)
+			@components.ToggleField("add_pending_role_on_join", "Auto-assign pending role on join", "", data.AddPendingRoleOnJoin)
+			<hr/>
+			<h4>Approved Message</h4>
+			@PlaceholderHelp(data.Placeholders)
+			@V2MessageToggle("approved_message", data.ApprovedMessage, data.ApprovedMessageV2, data.ApprovedMessageV2Json)
+			@components.SaveButton()
+		</form>
+	</section>
+}
+
+templ PlaceholderHelp(placeholders []utils.MessageTemplatePlaceholder) {
+	<details>
+		<summary>Available template placeholders</summary>
+		<table>
+			<thead>
+				<tr><th>Placeholder</th><th>Description</th></tr>
+			</thead>
+			<tbody>
+				for _, p := range placeholders {
+					<tr>
+						<td><code>{ p.Placeholder }</code></td>
+						<td>{ p.Description }</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	</details>
+}
+
+templ V2MessageToggle(prefix string, plainText string, v2Enabled bool, v2Json string) {
+	<div x-data={ "{ v2: " + boolStr(v2Enabled) + " }" }>
+		<label>
+			<input type="checkbox" role="switch" x-model="v2" name={ prefix + "_v2" } value="true"/>
+			Use V2 components
+		</label>
+		<input type="hidden" name={ prefix + "_v2" } value="false" x-bind:disabled="v2"/>
+		<div x-show="!v2">
+			@components.TextareaField(prefix, "Message", plainText, "")
+		</div>
+		<div x-show="v2" x-cloak>
+			<div x-data="messageBuilder()" data-initial={ initialV2Json(v2Json) }>
+				@components.MessageEditor()
+				<input type="hidden" name={ prefix + "_v2_json" } x-bind:value="JSON.stringify(serialize())"/>
+			</div>
+		</div>
+	</div>
+}
+
+func boolStr(b bool) string {
+	if b {
+		return "true"
+	}
+	return "false"
+}
+
+// initialV2Json normalizes the stored V2 JSON for embedding in a data
+// attribute. Empty input becomes "[]" so the JS init can JSON.parse without
+// a special case. Templ HTML-escapes the attribute value automatically, so
+// no custom escaping is needed.
+func initialV2Json(s string) string {
+	if s == "" {
+		return "[]"
+	}
+	return s
+}

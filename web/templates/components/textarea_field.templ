@@ -1,0 +1,9 @@
+package components
+
+templ TextareaField(name string, label string, value string, helpText string) {
+	<label for={ name }>{ label }</label>
+	<textarea id={ name } name={ name } rows="4">{ value }</textarea>
+	if helpText != "" {
+		<small>{ helpText }</small>
+	}
+}

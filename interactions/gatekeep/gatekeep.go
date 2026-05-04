@@ -3,9 +3,11 @@ package gatekeep
 import (
 	"fmt"
 	"log/slog"
+	"strings"
 	"sync"
 
 	"github.com/cbroglie/mustache"
+	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/disgo/rest"
@@ -70,9 +72,14 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 	}()
 
 	slog.InfoContext(e.Ctx, "Entered approvedInnerHandler")
+	// If the deferred ack fails, every subsequent CreateFollowupMessage
+	// call will also fail — Discord only accepts followups after an
+	// acknowledged interaction. Bail early instead of silently performing
+	// role changes the admin can never confirm via the bot's response.
 	err := e.DeferCreateMessage(true)
 	if err != nil {
-		slog.Error("Failed to defer message.", "err", err)
+		slog.Error("Failed to defer message; aborting approval.", "err", err)
+		return err
 	}
 
 	guildSettings, err := model.GetGuildSettings(guild.ID)
@@ -82,11 +89,13 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 			"guild_id", guild.ID,
 			"err", err,
 		)
-		return e.CreateMessage(interactions.EphemeralMessageContent("Failed to get guild information."))
+		_, err = e.CreateFollowupMessage(interactions.EphemeralMessageContent("Failed to get guild information."))
+		return err
 	}
 
 	if !guildSettings.GatekeepEnabled {
-		return e.CreateMessage(interactions.EphemeralMessageContent("Gatekeep is not enabled in this server."))
+		_, err = e.CreateFollowupMessage(interactions.EphemeralMessageContent("Gatekeep is not enabled in this server."))
+		return err
 	}
 
 	hasApprovedRole := false
@@ -101,11 +110,12 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 	}
 
 	if hasApprovedRole && (!hasPendingRole || !guildSettings.GatekeepAddPendingRoleOnJoin) {
-		return e.CreateMessage(
+		_, err = e.CreateFollowupMessage(
 			interactions.EphemeralMessageContentf(
 				"User %s is already approved.", member.Mention(),
 			),
 		)
+		return err
 	}
 
 	if guildSettings.GatekeepApprovedRole != 0 {
@@ -146,47 +156,58 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		"guild_id", guild.ID,
 	)
 
-	if guildSettings.GatekeepApprovedMessage == "" {
+	hasV2 := guildSettings.GatekeepApprovedMessageV2 && guildSettings.GatekeepApprovedMessageV2Json != ""
+	hasPlain := guildSettings.GatekeepApprovedMessage != ""
+
+	if !hasV2 && !hasPlain {
 		slog.Info("No approved message set; not sending message.")
-		return e.CreateMessage(
+		_, err = e.CreateFollowupMessage(
 			interactions.EphemeralMessageContent(
 				"No approved message set; not sending message. Roles have been set.",
 			),
 		)
+		return err
 	}
 
-	channel := guildSettings.JoinLeaveChannel
-	if channel == 0 {
-		if guild.SystemChannelID != nil {
-			channel = *guild.SystemChannelID
-		}
+	channel, channelOk := resolveApprovedMessageChannel(guildSettings, guild)
+	if !channelOk {
+		slog.Warn(
+			"No channel configured for approved message; skipping send.",
+			"guild_id", guild.ID,
+			"user_id", member.User.ID,
+		)
+		_, err = e.CreateFollowupMessage(
+			interactions.EphemeralMessageContent(
+				"User approved, but no channel is configured for the welcome message. Set a Join/Leave channel in settings (or a system channel for this server).",
+			),
+		)
+		return err
 	}
 
 	templateData := utils.NewMessageTemplateData(member.Member, guild)
-	contents, err := mustache.RenderRaw(guildSettings.GatekeepApprovedMessage, true, templateData)
-	if err != nil {
-		slog.Warn("Failed to render approved message template.")
-		return err
+
+	data := &gatekeepData{
+		approver:      e.User(),
+		client:        e.Client(),
+		guild:         guild,
+		member:        member,
+		guildSettings: guildSettings,
+		templateData:  templateData,
+		channel:       channel,
 	}
-	_, err = e.Client().Rest.CreateMessage(
-		channel,
-		discord.NewMessageCreate().
-			WithContent(
-				contents+
-					fmt.Sprintf("\n\n-# Approved by %s", e.User().Mention()),
-			).
-			WithAllowedMentions(
-				&discord.AllowedMentions{
-					Users: []snowflake.ID{member.User.ID},
-				},
-			),
-	)
+
+	if hasV2 {
+		_, err = createV2ApprovedMessage(data)
+	} else {
+		_, err = createV1ApprovedMessage(data)
+	}
 	if err != nil {
-		return e.CreateMessage(
+		_, err = e.CreateFollowupMessage(
 			interactions.EphemeralMessageContent(
 				"Failed to send message to approved user.",
 			),
 		)
+		return err
 	}
 
 	_, err = e.CreateFollowupMessage(
@@ -195,4 +216,84 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 		),
 	)
 	return err
+}
+
+type gatekeepData struct {
+	approver      discord.User
+	client        *bot.Client
+	guild         discord.Guild
+	member        discord.ResolvedMember
+	guildSettings *model.GuildSettings
+	templateData  utils.MessageTemplateData
+	channel       snowflake.ID
+}
+
+// resolveApprovedMessageChannel picks the channel to send the approval
+// message in: the configured Join/Leave channel, falling back to the guild's
+// system channel. Returns (0, false) if neither is set so callers can surface
+// a clear error instead of failing on CreateMessage with channel ID 0.
+func resolveApprovedMessageChannel(settings *model.GuildSettings, guild discord.Guild) (snowflake.ID, bool) {
+	if settings.JoinLeaveChannel != 0 {
+		return settings.JoinLeaveChannel, true
+	}
+	if guild.SystemChannelID != nil {
+		return *guild.SystemChannelID, true
+	}
+	return 0, false
+}
+
+func createV1ApprovedMessage(
+	data *gatekeepData,
+) (m *discord.Message, err error) {
+	contents, renderErr := mustache.RenderRaw(data.guildSettings.GatekeepApprovedMessage, true, data.templateData)
+	if renderErr != nil {
+		slog.Warn(
+			"Failed to render approved message template.",
+			"guild_id", data.guild.ID,
+			"user_id", data.member.User.ID,
+			"err", renderErr,
+		)
+		return nil, renderErr
+	}
+
+	return data.client.Rest.CreateMessage(
+		data.channel,
+		discord.NewMessageCreate().
+			WithContent(
+				contents+
+					fmt.Sprintf("\n\n-# Approved by %s", data.approver.Mention()),
+			).
+			WithAllowedMentions(
+				&discord.AllowedMentions{
+					Users: []snowflake.ID{data.member.User.ID},
+				},
+			),
+	)
+}
+
+func createV2ApprovedMessage(
+	data *gatekeepData,
+) (m *discord.Message, err error) {
+	emojiMap := make(map[string]discord.Emoji)
+	for emoji := range data.client.Caches.Emojis(data.guild.ID) {
+		emojiMap[strings.ToLower(emoji.Name)] = emoji
+	}
+
+	components, compErr := utils.BuildV2Message(data.guildSettings.GatekeepApprovedMessageV2Json, data.templateData, emojiMap)
+	if compErr != nil {
+		slog.Warn("Failed to build V2 approved message.", "err", compErr)
+		return nil, compErr
+	}
+
+	components = append(components, discord.NewTextDisplay(
+		fmt.Sprintf("-# Approved by %s", data.approver.Mention()),
+	))
+
+	return data.client.Rest.CreateMessage(data.channel, discord.MessageCreate{
+		Flags:      discord.MessageFlagIsComponentsV2,
+		Components: components,
+		AllowedMentions: &discord.AllowedMentions{
+			Users: []snowflake.ID{data.member.User.ID},
+		},
+	})
 }

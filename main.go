@@ -24,6 +24,7 @@ import (
 	_ "github.com/NLLCommunity/heimdallr/config"
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/interactions/admin"
+	"github.com/NLLCommunity/heimdallr/interactions/admin_dashboard"
 	"github.com/NLLCommunity/heimdallr/interactions/ban"
 	"github.com/NLLCommunity/heimdallr/interactions/gatekeep"
 	"github.com/NLLCommunity/heimdallr/interactions/infractions"
@@ -36,6 +37,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/listeners"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/scheduled_tasks"
+	"github.com/NLLCommunity/heimdallr/web"
 )
 
 var rmGlobalCommands = flag.Bool("rm-global-commands", false, "Remove global commands")
@@ -83,6 +85,7 @@ func main() {
 
 	commandInteractions := []interactions.ApplicationCommandRegisterFunc{
 		admin.Register,
+		admin_dashboard.Register,
 		ban.Register,
 		gatekeep.Register,
 		infractions.Register,
@@ -159,11 +162,24 @@ func main() {
 	removeTempBansTask := scheduled_tasks.RemoveTempBansScheduledTask(client)
 	removeStalePrunesTask := scheduled_tasks.RemoveStalePendingPrunes()
 
+	webCtx, cancelWeb := context.WithCancel(context.Background())
+	defer cancelWeb()
+	webDone := make(chan struct{})
+	go func() {
+		defer close(webDone)
+		if err := web.StartServer(webCtx, viper.GetString("web.address"), client); err != nil {
+			slog.Error("Web server stopped with error", "error", err)
+		}
+	}()
+
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	<-s
+	slog.Info("Shutdown signal received")
 	removeTempBansTask.Stop()
 	removeStalePrunesTask.Stop()
+	cancelWeb()
+	<-webDone
 }
 
 func getLogLevel(level string) slog.Level {

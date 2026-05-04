@@ -7,3 +7,18 @@ token = "INSERT_YOUR_TOKEN_HERE" # Discord bot token
 [dev_mode]
 enabled = true # Enable or disable developer mode
 guild_id = 0   # Guild ID to use for developer mode
+
+[web]
+address = "localhost:8484" # Web server listen address:port
+# CIDRs (or bare IPs) of reverse proxies allowed to set X-Real-IP /
+# X-Forwarded-For. The dashboard uses these headers to identify the client
+# for per-IP rate limiting; if the connecting peer isn't in this list, the
+# headers are ignored and the direct RemoteAddr is used. Leave empty when
+# the dashboard is exposed directly. Example: ["127.0.0.1/32", "::1/128"]
+# for a reverse proxy on the same host.
+trusted_proxies = []
+
+[dashboard]
+base_url = "http://localhost:8484" # Web dashboard URL
+# In production, terminate TLS at a reverse proxy (e.g. nginx, Caddy)
+# in front of the web dashboard and set base_url to an https:// URL.

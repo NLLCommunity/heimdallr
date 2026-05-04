@@ -1,0 +1,35 @@
+package partials
+
+import "github.com/NLLCommunity/heimdallr/web/templates/components"
+
+type AntiSpamData struct {
+	GuildID         string
+	Enabled         bool
+	Count           int
+	CooldownSeconds int
+	SaveSuccess     bool
+	SaveError       string
+}
+
+templ SettingsAntiSpam(data AntiSpamData) {
+	<section id="anti-spam">
+		<h3>Anti-Spam</h3>
+		<form
+			hx-post={ "/guild/" + data.GuildID + "/settings/anti-spam" }
+			hx-target="#anti-spam"
+			hx-swap="outerHTML"
+			x-data="formTracker()" @input="checkDirty()" @change="checkDirty()"
+		>
+			if data.SaveSuccess {
+				@components.SaveSuccessMarker()
+			}
+			if data.SaveError != "" {
+				@components.AlertError(data.SaveError)
+			}
+			@components.ToggleField("enabled", "Enable anti-spam", "", data.Enabled)
+			@components.NumberField("count", "Message count threshold", float64(data.Count), 2, 10, 1)
+			@components.NumberField("cooldown_seconds", "Cooldown (seconds)", float64(data.CooldownSeconds), 1, 60, 1)
+			@components.SaveButton()
+		</form>
+	</section>
+}

@@ -1,0 +1,20 @@
+package components
+
+// AlertSuccess renders a visible success banner. Use this anywhere the user
+// should see "the thing worked" feedback (e.g. /sandbox/send response swap).
+// Form sections use SaveSuccessMarker instead — formTracker.js catches the
+// marker on swap and surfaces feedback via the form's own UI.
+templ AlertSuccess(message string) {
+	<div class="alert alert-success" role="alert">{ message }</div>
+}
+
+// SaveSuccessMarker is an invisible marker rendered after a successful form
+// save. formTracker.js detects [data-save-success], removes it, and toggles
+// the form's `saved` state so the visible "Saved" indicator can fade in.
+templ SaveSuccessMarker() {
+	<span data-save-success class="hidden"></span>
+}
+
+templ AlertError(message string) {
+	<div class="alert alert-error" role="alert">{ message }</div>
+}
