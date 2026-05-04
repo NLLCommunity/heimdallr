@@ -84,12 +84,13 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 			"guild_id", guild.ID,
 			"err", err,
 		)
-		_, err =e.CreateFollowupMessage(interactions.EphemeralMessageContent("Failed to get guild information."))
+		_, err = e.CreateFollowupMessage(interactions.EphemeralMessageContent("Failed to get guild information."))
 		return err
 	}
 
 	if !guildSettings.GatekeepEnabled {
-		_, err =  e.CreateFollowupMessage(interactions.EphemeralMessageContent("Gatekeep is not enabled in this server."))
+		_, err = e.CreateFollowupMessage(interactions.EphemeralMessageContent("Gatekeep is not enabled in this server."))
+		return err
 	}
 
 	hasApprovedRole := false
@@ -175,6 +176,7 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 				"User approved, but no channel is configured for the welcome message. Set a Join/Leave channel in settings (or a system channel for this server).",
 			),
 		)
+		return err
 	}
 
 	templateData := utils.NewMessageTemplateData(member.Member, guild)
