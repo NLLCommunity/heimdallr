@@ -3,10 +3,10 @@ document.addEventListener('alpine:init', () => {
     dirty: false,
     saving: false,
     saved: false,
-    _snapshot: {},
+    _snapshot: [],
 
     init() {
-      this._snapshot = this._serialize();
+      this._snapshot = this._capture();
       this.$el.addEventListener('htmx:beforeRequest', () => { this.saving = true; });
 
       // Reset `saving` when the request completes. After a successful swap
@@ -27,19 +27,41 @@ document.addEventListener('alpine:init', () => {
       }
     },
 
-    _serialize() {
-      const data = {};
+    // Capture per-element state. Indexed by element rather than name so that
+    // duplicate names (e.g. a checkbox paired with a hidden fallback) don't
+    // overwrite each other's state.
+    _capture() {
+      const entries = [];
       for (const el of this.$el.elements) {
-        if (!el.name || el.disabled) continue;
-        if (el.type === 'radio' && !el.checked) continue;
-        data[el.name] = el.type === 'checkbox' ? el.checked : el.value;
+        if (!el.name) continue;
+        const checkable = el.type === 'checkbox' || el.type === 'radio';
+        entries.push({
+          el,
+          checkable,
+          disabled: el.disabled,
+          checked: checkable ? el.checked : false,
+          value: el.value,
+        });
+      }
+      return entries;
+    },
+
+    // Project captured state into the [name, value] pairs the browser would
+    // submit. Used for dirty comparison so checkbox/hidden duplicates produce
+    // the same shape on both sides.
+    _toFormData(entries) {
+      const data = [];
+      for (const e of entries) {
+        if (e.disabled) continue;
+        if (e.checkable && !e.checked) continue;
+        data.push([e.el.name, e.value]);
       }
       return data;
     },
 
     checkDirty() {
-      const current = this._serialize();
-      this.dirty = JSON.stringify(current) !== JSON.stringify(this._snapshot);
+      this.dirty = JSON.stringify(this._toFormData(this._capture()))
+                !== JSON.stringify(this._toFormData(this._snapshot));
     },
 
     cancel() {
@@ -53,16 +75,15 @@ document.addEventListener('alpine:init', () => {
         }
       }
 
-      // Simple forms: restore from snapshot
-      for (const el of this.$el.elements) {
-        if (!el.name || el.disabled || !(el.name in this._snapshot)) continue;
-        if (el.type === 'checkbox') {
-          el.checked = this._snapshot[el.name];
+      // Simple forms: restore each element from its captured state.
+      for (const e of this._snapshot) {
+        if (e.checkable) {
+          e.el.checked = e.checked;
         } else {
-          el.value = this._snapshot[el.name];
+          e.el.value = e.value;
         }
-        el.dispatchEvent(new Event('input', { bubbles: true }));
-        el.dispatchEvent(new Event('change', { bubbles: true }));
+        e.el.dispatchEvent(new Event('input', { bubbles: true }));
+        e.el.dispatchEvent(new Event('change', { bubbles: true }));
       }
       this.dirty = false;
     }
