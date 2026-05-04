@@ -83,9 +83,12 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleLogout(w http.ResponseWriter, r *http.Request) {
-	session := sessionFromContext(r.Context())
-	if session != nil {
-		if err := model.DeleteSession(session.Token); err != nil {
+	// DeleteSession expects the raw cookie token (it hashes internally to look
+	// up the row). The session in context comes from GetSession, whose Token
+	// field holds the DB-stored hash — passing that here would hash twice and
+	// silently fail to delete the row.
+	if cookie, err := r.Cookie(sessionCookieName); err == nil && cookie.Value != "" {
+		if err := model.DeleteSession(cookie.Value); err != nil {
 			slog.Error("failed to delete session", "error", err)
 		}
 	}

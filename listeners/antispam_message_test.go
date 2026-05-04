@@ -14,7 +14,9 @@ func TestTruncateContent_AsciiUnderLimit(t *testing.T) {
 
 func TestTruncateContent_AsciiOverLimit(t *testing.T) {
 	got := truncateContent("abcdefghij", 5)
-	assert.Equal(t, "abcde"+truncationMarker, got)
+	// Marker counts toward the 5-rune budget: 4 content runes + "…" = 5 runes.
+	assert.Equal(t, "abcd"+truncationMarker, got)
+	assert.Equal(t, 5, utf8.RuneCountInString(got))
 }
 
 // A long string of 4-byte runes (𝓐 = U+1D4D0) — byte-slicing at an arbitrary
@@ -27,6 +29,6 @@ func TestTruncateContent_MultiByteRune_CutsOnBoundary(t *testing.T) {
 		in += r
 	}
 	got := truncateContent(in, 5)
-	assert.Equal(t, 5+utf8.RuneCountInString(truncationMarker), utf8.RuneCountInString(got))
+	assert.Equal(t, 5, utf8.RuneCountInString(got), "result must not exceed maxRunes")
 	assert.True(t, utf8.ValidString(got), "result must be valid UTF-8")
 }
