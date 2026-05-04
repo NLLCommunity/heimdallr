@@ -42,7 +42,7 @@ func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
 	}
 
 	if hasReset && resetOption == "reset" {
-		settings.GatekeepApprovedMessage = "Welcome to the server, {{user}}!"
+		settings.GatekeepApprovedMessage = "Welcome to the server, {{User.Mention}}!"
 		settings.GatekeepApprovedMessageV2 = false
 		settings.GatekeepApprovedMessageV2Json = ""
 		err = model.SetGuildSettings(settings)

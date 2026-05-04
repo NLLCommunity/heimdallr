@@ -56,7 +56,7 @@ func AdminJoinMessageHandler(e *handler.CommandEvent) error {
 	}
 
 	if hasReset && resetOption == "reset" {
-		settings.JoinMessage = "Welcome to the server, {{user}}!"
+		settings.JoinMessage = "Welcome to the server, {{User.Mention}}!"
 		settings.JoinMessageV2 = false
 		settings.JoinMessageV2Json = ""
 		err = model.SetGuildSettings(settings)
@@ -173,7 +173,7 @@ func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
 	}
 
 	if hasReset && resetOption == "reset" {
-		settings.LeaveMessage = "{{user}} has left the server."
+		settings.LeaveMessage = "{{User.Mention}} has left the server."
 		settings.LeaveMessageV2 = false
 		settings.LeaveMessageV2Json = ""
 		err = model.SetGuildSettings(settings)

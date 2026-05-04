@@ -44,6 +44,32 @@ func TestIsSameOriginPost(t *testing.T) {
 	}
 }
 
+// MaxAge=0 in the cookie struct omits the attribute on the wire and leaves
+// the cookie as a session cookie that some browsers persist across
+// tab-restore. handleLogout must emit `Max-Age=0` so the browser deletes it.
+func TestHandleLogout_ClearsCookieWithMaxAgeZero(t *testing.T) {
+	req := httptest.NewRequest("GET", "/logout", nil)
+	rec := httptest.NewRecorder()
+
+	handleLogout(rec, req)
+
+	assert.Equal(t, http.StatusSeeOther, rec.Code)
+
+	var setCookie string
+	for _, h := range rec.Header().Values("Set-Cookie") {
+		if strings.HasPrefix(h, sessionCookieName+"=") {
+			setCookie = h
+			break
+		}
+	}
+	if assert.NotEmpty(t, setCookie, "logout must emit a Set-Cookie for the session cookie") {
+		assert.Contains(t, setCookie, sessionCookieName+"=;",
+			"cookie value must be empty")
+		assert.Contains(t, setCookie, "Max-Age=0",
+			"Max-Age=0 is required for the browser to delete the cookie")
+	}
+}
+
 // TestHandleCallbackPOST_RejectsCrossOrigin verifies the handler short-circuits
 // before reaching ExchangeLoginCode when the Origin doesn't match. The DB is
 // never touched (no model.DB set up in this test), so a cookie-bearing

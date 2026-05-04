@@ -93,7 +93,10 @@ func handleLogout(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	http.SetCookie(w, makeSessionCookie("", 0))
+	// MaxAge=-1 emits `Max-Age: 0`, instructing the browser to delete the
+	// cookie immediately. MaxAge=0 omits the attribute, leaving the cookie as
+	// a session cookie that some browsers persist via tab restore.
+	http.SetCookie(w, makeSessionCookie("", -1))
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
 }
 
