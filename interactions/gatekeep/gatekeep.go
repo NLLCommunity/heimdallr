@@ -84,11 +84,12 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 			"guild_id", guild.ID,
 			"err", err,
 		)
-		return e.CreateMessage(interactions.EphemeralMessageContent("Failed to get guild information."))
+		_, err =e.CreateFollowupMessage(interactions.EphemeralMessageContent("Failed to get guild information."))
+		return err
 	}
 
 	if !guildSettings.GatekeepEnabled {
-		return e.CreateMessage(interactions.EphemeralMessageContent("Gatekeep is not enabled in this server."))
+		_, err =  e.CreateFollowupMessage(interactions.EphemeralMessageContent("Gatekeep is not enabled in this server."))
 	}
 
 	hasApprovedRole := false
@@ -103,11 +104,12 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 	}
 
 	if hasApprovedRole && (!hasPendingRole || !guildSettings.GatekeepAddPendingRoleOnJoin) {
-		return e.CreateMessage(
+		_, err = e.CreateFollowupMessage(
 			interactions.EphemeralMessageContentf(
 				"User %s is already approved.", member.Mention(),
 			),
 		)
+		return err
 	}
 
 	if guildSettings.GatekeepApprovedRole != 0 {
@@ -153,11 +155,12 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 
 	if !hasV2 && !hasPlain {
 		slog.Info("No approved message set; not sending message.")
-		return e.CreateMessage(
+		_, err = e.CreateFollowupMessage(
 			interactions.EphemeralMessageContent(
 				"No approved message set; not sending message. Roles have been set.",
 			),
 		)
+		return err
 	}
 
 	channel, channelOk := resolveApprovedMessageChannel(guildSettings, guild)
@@ -167,7 +170,7 @@ func approvedInnerHandler(e *handler.CommandEvent, guild discord.Guild, member d
 			"guild_id", guild.ID,
 			"user_id", member.User.ID,
 		)
-		return e.CreateMessage(
+		_, err = e.CreateFollowupMessage(
 			interactions.EphemeralMessageContent(
 				"User approved, but no channel is configured for the welcome message. Set a Join/Leave channel in settings (or a system channel for this server).",
 			),
