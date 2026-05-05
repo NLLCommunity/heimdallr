@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 
 	"golang.org/x/time/rate"
 
@@ -128,23 +129,26 @@ func (l *ipRateLimiter) cleanup(ttl time.Duration) {
 }
 
 // parseTrustedProxies converts a list of CIDR or bare-IP strings into prefixes.
-// Bare IPs are widened to a host prefix (/32 or /128).
+// Bare IPs are widened to a host prefix (/32 or /128). Each input element may
+// itself contain multiple values separated by whitespace or commas, so the
+// same setting works whether it arrives as a TOML list, a single env var like
+// HEIMDALLR_WEB_TRUSTED_PROXIES="0.0.0.0/0 ::/0", or a comma-separated string.
 func parseTrustedProxies(cidrs []string) ([]netip.Prefix, error) {
+	splitDelim := func(r rune) bool { return r == ',' || unicode.IsSpace(r) }
+
 	prefixes := make([]netip.Prefix, 0, len(cidrs))
 	for _, raw := range cidrs {
-		s := strings.TrimSpace(raw)
-		if s == "" {
-			continue
+		for _, s := range strings.FieldsFunc(raw, splitDelim) {
+			if p, err := netip.ParsePrefix(s); err == nil {
+				prefixes = append(prefixes, p.Masked())
+				continue
+			}
+			if a, err := netip.ParseAddr(s); err == nil {
+				prefixes = append(prefixes, netip.PrefixFrom(a, a.BitLen()))
+				continue
+			}
+			return nil, fmt.Errorf("invalid trusted_proxies entry %q", s)
 		}
-		if p, err := netip.ParsePrefix(s); err == nil {
-			prefixes = append(prefixes, p.Masked())
-			continue
-		}
-		if a, err := netip.ParseAddr(s); err == nil {
-			prefixes = append(prefixes, netip.PrefixFrom(a, a.BitLen()))
-			continue
-		}
-		return nil, fmt.Errorf("invalid trusted_proxies entry %q", raw)
 	}
 	return prefixes, nil
 }

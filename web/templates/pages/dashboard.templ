@@ -32,7 +32,7 @@ templ Dashboard(nav layouts.NavData, guildID string, settingsContent templ.Compo
 				</nav>
 				<a href={ templ.SafeURL("/guild/" + guildID + "/sandbox") }>Message Sandbox</a>
 			</aside>
-			<div style="flex: 1; min-width: 0;">
+			<div class="dashboard-content">
 				@settingsContent
 			</div>
 		</div>

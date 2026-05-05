@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"strings"
 
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
@@ -108,7 +107,7 @@ func handleSandboxSend(client *bot.Client, limiter *ipRateLimiter) http.HandlerF
 			return
 		}
 
-		emojiMap := buildEmojiMap(client, guildID)
+		emojiMap := utils.BuildEmojiMap(client, guildID)
 		if err := utils.ResolveEmojis(parsed, emojiMap); err != nil {
 			renderSafe(w, r, components.AlertError("Components nested too deeply."))
 			return
@@ -139,13 +138,4 @@ func handleSandboxSend(client *bot.Client, limiter *ipRateLimiter) http.HandlerF
 
 		renderSafe(w, r, components.AlertSuccess("Message sent!"))
 	}
-}
-
-// buildEmojiMap builds a lowercase emoji name → Emoji lookup from the guild cache.
-func buildEmojiMap(client *bot.Client, guildID snowflake.ID) map[string]discord.Emoji {
-	emojiMap := make(map[string]discord.Emoji)
-	for emoji := range client.Caches.Emojis(guildID) {
-		emojiMap[strings.ToLower(emoji.Name)] = emoji
-	}
-	return emojiMap
 }

@@ -181,6 +181,30 @@ func TestParseTrustedProxies(t *testing.T) {
 	assert.Error(t, err)
 }
 
+// Env-var paths often arrive as a single string holding multiple CIDRs
+// separated by whitespace or commas (Viper's slice-from-env conversion is
+// finicky and operators tend to use commas regardless). Each input element
+// must be split on those delimiters so the same setting works whether it
+// comes from TOML or HEIMDALLR_WEB_TRUSTED_PROXIES="0.0.0.0/0 ::/0".
+func TestParseTrustedProxies_SplitsWhitespaceAndCommas(t *testing.T) {
+	prefixes, err := parseTrustedProxies([]string{"0.0.0.0/0 ::/0"})
+	require.NoError(t, err)
+	require.Len(t, prefixes, 2)
+
+	prefixes, err = parseTrustedProxies([]string{"127.0.0.1/32,10.0.0.0/8, 192.168.0.0/16"})
+	require.NoError(t, err)
+	require.Len(t, prefixes, 3)
+
+	// Mixed: a list whose entries are themselves multi-valued.
+	prefixes, err = parseTrustedProxies([]string{"127.0.0.1/32", "10.0.0.0/8 ::1"})
+	require.NoError(t, err)
+	require.Len(t, prefixes, 3)
+
+	// One bad token in the middle of a multi-valued entry still fails.
+	_, err = parseTrustedProxies([]string{"127.0.0.1/32 not-a-cidr"})
+	assert.Error(t, err)
+}
+
 // Untrusted clients must not be able to spoof X-Real-IP / X-Forwarded-For;
 // otherwise each forged header value gets its own rate-limit bucket and the
 // limiter is bypassed.

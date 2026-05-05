@@ -3,7 +3,6 @@ package gatekeep
 import (
 	"fmt"
 	"log/slog"
-	"strings"
 	"sync"
 
 	"github.com/cbroglie/mustache"
@@ -274,10 +273,7 @@ func createV1ApprovedMessage(
 func createV2ApprovedMessage(
 	data *gatekeepData,
 ) (m *discord.Message, err error) {
-	emojiMap := make(map[string]discord.Emoji)
-	for emoji := range data.client.Caches.Emojis(data.guild.ID) {
-		emojiMap[strings.ToLower(emoji.Name)] = emoji
-	}
+	emojiMap := utils.BuildEmojiMap(data.client, data.guild.ID)
 
 	components, compErr := utils.BuildV2Message(data.guildSettings.GatekeepApprovedMessageV2Json, data.templateData, emojiMap)
 	if compErr != nil {

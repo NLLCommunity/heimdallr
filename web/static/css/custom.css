@@ -10,7 +10,7 @@
   width: 220px;
   flex-shrink: 0;
 }
-.dashboard-layout main {
+.dashboard-layout .dashboard-content {
   flex: 1;
   min-width: 0;
 }

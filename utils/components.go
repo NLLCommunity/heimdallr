@@ -7,8 +7,22 @@ import (
 	"strings"
 
 	"github.com/cbroglie/mustache"
+	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/snowflake/v2"
 )
+
+// BuildEmojiMap returns a lowercase emoji-name → Emoji lookup over the guild's
+// cached custom emojis. Used by every V2-message sender so emoji name→ID
+// resolution stays consistent across join/leave, gatekeep approvals, and the
+// dashboard sandbox.
+func BuildEmojiMap(client *bot.Client, guildID snowflake.ID) map[string]discord.Emoji {
+	emojiMap := make(map[string]discord.Emoji)
+	for emoji := range client.Caches.Emojis(guildID) {
+		emojiMap[strings.ToLower(emoji.Name)] = emoji
+	}
+	return emojiMap
+}
 
 // maxComponentDepth caps recursion through parsed-JSON component trees. The
 // 1 MiB body limit on web routes already bounds nesting in practice, but a

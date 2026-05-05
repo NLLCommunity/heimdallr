@@ -68,8 +68,16 @@ document.addEventListener('alpine:init', () => {
       // Forms with V2 message builder have complex nested Alpine state
       // that can't be restored from hidden input values. Re-fetch from server.
       // The dashboard route returns the full page, so `select` extracts just
-      // this section before swapping.
-      if (this.$el.querySelector('[x-data*="messageBuilder"]')) {
+      // this section before swapping. The messageBuilder DOM is always
+      // present (it's just `x-show`-hidden when V2 is off), so we can't key
+      // off its presence — fall back only when a *_v2 toggle is currently
+      // checked or was checked in the snapshot. Pure plain-text edits with
+      // V2 off the entire time restore locally without a network round-trip.
+      const v2Checked = (el) =>
+        el && el.type === 'checkbox' && el.name && el.name.endsWith('_v2') && el.checked;
+      const v2NowOn = Array.from(this.$el.elements).some(v2Checked);
+      const v2WasOn = this._snapshot.some(e => e.checkable && e.el.name.endsWith('_v2') && e.checked);
+      if (v2NowOn || v2WasOn) {
         const section = this.$el.closest('section');
         if (section && section.id) {
           const sel = '#' + section.id;

@@ -2,7 +2,6 @@ package listeners
 
 import (
 	"log/slog"
-	"strings"
 
 	"github.com/cbroglie/mustache"
 	"github.com/disgoorg/disgo/bot"
@@ -43,11 +42,7 @@ func OnUserJoin(e *events.GuildMemberJoin) {
 	hasV2 := guildSettings.JoinMessageV2 && guildSettings.JoinMessageV2Json != ""
 
 	if hasV2 {
-		emojiMap := make(map[string]discord.Emoji)
-		for emoji := range e.Client().Caches.Emojis(guildID) {
-			emojiMap[strings.ToLower(emoji.Name)] = emoji
-		}
-
+		emojiMap := utils.BuildEmojiMap(e.Client(), guildID)
 		_, err = createV2Message(joinleaveInfo, emojiMap, guildSettings.JoinMessageV2Json, guildID, joinLeaveChannel, e.Client())
 	} else {
 		_, err = createV1Message(joinleaveInfo, guildSettings.JoinMessage, guildID, joinLeaveChannel, e.Client())
@@ -97,11 +92,7 @@ func OnUserLeave(e *events.GuildMemberLeave) {
 	hasV2 := guildSettings.LeaveMessageV2 && guildSettings.LeaveMessageV2Json != ""
 
 	if hasV2 {
-		emojiMap := make(map[string]discord.Emoji)
-		for emoji := range e.Client().Caches.Emojis(guildID) {
-			emojiMap[strings.ToLower(emoji.Name)] = emoji
-		}
-
+		emojiMap := utils.BuildEmojiMap(e.Client(), guildID)
 		_, err = createV2Message(joinleaveInfo, emojiMap, guildSettings.LeaveMessageV2Json, guildID, joinLeaveChannel, e.Client())
 	} else {
 		_, err = createV1Message(joinleaveInfo, guildSettings.LeaveMessage, guildID, joinLeaveChannel, e.Client())
