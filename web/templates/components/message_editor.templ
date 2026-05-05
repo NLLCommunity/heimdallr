@@ -1,7 +1,9 @@
 package components
 
 // MessageEditor renders the full Alpine.js component editor UI.
-// It must be placed inside a `<div x-data="messageBuilder(...)">` context.
+// It must be placed inside a `<div x-data="messageBuilder()" data-initial="...">`
+// context — the host element's `data-initial` attribute provides the
+// starting JSON (or `"[]"` for an empty editor).
 templ MessageEditor() {
 	<template x-for="(comp, i) in components" :key="i">
 		<article>
