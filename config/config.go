@@ -2,11 +2,33 @@ package config
 
 import (
 	"errors"
+	"fmt"
 	"log/slog"
+	"net/url"
 	"strings"
 
 	"github.com/spf13/viper"
 )
+
+// ParsedDashboardBaseURL returns dashboard.base_url parsed and validated. The
+// scheme must be http or https and the host must be non-empty — url.Parse
+// alone accepts inputs like "" or "example.com" (no scheme), which would
+// otherwise produce broken relative login links and a CORS allow-list that
+// matches no browser-sent Origin.
+func ParsedDashboardBaseURL() (*url.URL, error) {
+	raw := viper.GetString("dashboard.base_url")
+	u, err := url.Parse(raw)
+	if err != nil {
+		return nil, fmt.Errorf("invalid dashboard.base_url %q: %w", raw, err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return nil, fmt.Errorf("dashboard.base_url %q: scheme must be http or https", raw)
+	}
+	if u.Host == "" {
+		return nil, fmt.Errorf("dashboard.base_url %q: host is empty", raw)
+	}
+	return u, nil
+}
 
 func init() {
 	viper.SetConfigName("config")

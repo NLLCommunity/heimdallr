@@ -2,13 +2,13 @@ package admin_dashboard
 
 import (
 	"fmt"
-	"net/url"
+	"log/slog"
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/omit"
-	"github.com/spf13/viper"
 
+	"github.com/NLLCommunity/heimdallr/config"
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
@@ -38,6 +38,18 @@ func AdminDashboardHandler(e *handler.CommandEvent) error {
 		avatar = *user.Avatar
 	}
 
+	// Validate the dashboard URL before consuming a login code, so a misconfig
+	// doesn't waste codes and so the operator gets a clear log line. The
+	// helper rejects empty/relative values that url.Parse would otherwise
+	// accept, which would render as a broken Discord link.
+	u, err := config.ParsedDashboardBaseURL()
+	if err != nil {
+		slog.Error("admin-dashboard: dashboard.base_url is misconfigured", "err", err)
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent("Dashboard URL is misconfigured. Contact the bot operator."),
+		)
+	}
+
 	code, err := model.CreateLoginCode(user.ID, user.Username, avatar)
 	if err != nil {
 		return e.CreateMessage(
@@ -45,13 +57,6 @@ func AdminDashboardHandler(e *handler.CommandEvent) error {
 		)
 	}
 
-	baseURL := viper.GetString("dashboard.base_url")
-	u, err := url.Parse(baseURL)
-	if err != nil {
-		return e.CreateMessage(
-			interactions.EphemeralMessageContent("Failed to generate login link. Please try again."),
-		)
-	}
 	u = u.JoinPath("callback")
 	q := u.Query()
 	q.Set("code", code)

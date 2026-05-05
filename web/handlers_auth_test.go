@@ -44,6 +44,55 @@ func TestIsSameOriginPost(t *testing.T) {
 	}
 }
 
+// canonicalOrigin must strip default ports for the scheme so a base_url like
+// "https://example.com:443" matches what browsers actually send in Origin
+// (which omits the default port). Non-default ports must be preserved.
+func TestCanonicalOrigin(t *testing.T) {
+	cases := []struct {
+		raw  string
+		want string
+	}{
+		{"https://example.com", "https://example.com"},
+		{"https://example.com:443", "https://example.com"},
+		{"http://example.com:80", "http://example.com"},
+		{"http://example.com:443", "http://example.com:443"},     // non-default port for http
+		{"https://example.com:8443", "https://example.com:8443"}, // non-default port preserved
+		{"http://localhost:8484", "http://localhost:8484"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.raw, func(t *testing.T) {
+			u, err := url.Parse(tc.raw)
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			assert.Equal(t, tc.want, canonicalOrigin(u))
+		})
+	}
+}
+
+// Regression for the default-port bug: a base_url of "https://example.com:443"
+// must match a browser-sent Referer of "https://example.com/..." (no port).
+func TestIsSameOriginPost_DefaultPortInBaseURL(t *testing.T) {
+	allowed := canonicalOrigin(mustParseURL(t, "https://example.com:443"))
+
+	req := httptest.NewRequest("POST", "/callback", strings.NewReader("code=x"))
+	req.Header.Set("Referer", "https://example.com/callback?code=x")
+	assert.True(t, isSameOriginPost(req, allowed))
+
+	req = httptest.NewRequest("POST", "/callback", strings.NewReader("code=x"))
+	req.Header.Set("Origin", "https://example.com")
+	assert.True(t, isSameOriginPost(req, allowed))
+}
+
+func mustParseURL(t *testing.T, s string) *url.URL {
+	t.Helper()
+	u, err := url.Parse(s)
+	if err != nil {
+		t.Fatalf("parse %q: %v", s, err)
+	}
+	return u
+}
+
 // MaxAge=0 in the cookie struct omits the attribute on the wire and leaves
 // the cookie as a session cookie that some browsers persist across
 // tab-restore. handleLogout must emit `Max-Age=0` so the browser deletes it.

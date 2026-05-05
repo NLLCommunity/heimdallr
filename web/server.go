@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/disgoorg/disgo/bot"
@@ -13,21 +12,21 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/time/rate"
 
+	"github.com/NLLCommunity/heimdallr/config"
 	"github.com/NLLCommunity/heimdallr/model"
 )
 
 func StartServer(ctx context.Context, addr string, client *bot.Client) error {
-	baseURL := viper.GetString("dashboard.base_url")
 	devMode := viper.GetBool("dev_mode.enabled")
 
-	parsedURL, err := url.Parse(baseURL)
-	if err != nil || parsedURL.Host == "" {
-		return fmt.Errorf("invalid dashboard.base_url %q: %w", baseURL, err)
+	parsedURL, err := config.ParsedDashboardBaseURL()
+	if err != nil {
+		return err
 	}
 	if !devMode && parsedURL.Scheme == "http" {
-		slog.Warn("dashboard.base_url uses http — this is insecure in production", "url", baseURL)
+		slog.Warn("dashboard.base_url uses http — this is insecure in production", "url", parsedURL.String())
 	}
-	allowedOrigin := parsedURL.Scheme + "://" + parsedURL.Host
+	allowedOrigin := canonicalOrigin(parsedURL)
 
 	trustedProxies, err := parseTrustedProxies(viper.GetStringSlice("web.trusted_proxies"))
 	if err != nil {

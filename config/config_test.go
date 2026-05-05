@@ -104,6 +104,43 @@ func TestConfigPaths(t *testing.T) {
 	})
 }
 
+func TestParsedDashboardBaseURL(t *testing.T) {
+	originalConfig := viper.AllSettings()
+	t.Cleanup(func() {
+		viper.Reset()
+		for k, v := range originalConfig {
+			viper.Set(k, v)
+		}
+	})
+
+	cases := []struct {
+		name    string
+		raw     string
+		wantErr bool
+	}{
+		{"valid https", "https://dashboard.example.com", false},
+		{"valid https with port", "https://dashboard.example.com:8484", false},
+		{"valid http", "http://localhost:8484", false},
+		{"empty", "", true},
+		{"missing scheme", "example.com", true},
+		{"non-http scheme", "ftp://example.com", true},
+		{"scheme only", "https://", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			viper.Set("dashboard.base_url", tc.raw)
+			u, err := ParsedDashboardBaseURL()
+			if tc.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, u)
+				return
+			}
+			assert.NoError(t, err)
+			assert.NotNil(t, u)
+		})
+	}
+}
+
 func TestConfigFileType(t *testing.T) {
 	// Save original config
 	originalConfig := viper.AllSettings()

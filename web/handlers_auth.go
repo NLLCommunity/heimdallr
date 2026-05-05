@@ -4,11 +4,29 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/web/templates/pages"
 )
+
+// canonicalOrigin returns scheme://host with the default port for the scheme
+// stripped, matching how browsers serialize the Origin header. Both the
+// configured dashboard origin and any incoming Referer must be passed through
+// this before string comparison; otherwise a base_url like
+// "https://example.com:443" would never match the browser-sent
+// "https://example.com".
+func canonicalOrigin(u *url.URL) string {
+	host := u.Host
+	switch {
+	case u.Scheme == "https" && strings.HasSuffix(host, ":443"):
+		host = strings.TrimSuffix(host, ":443")
+	case u.Scheme == "http" && strings.HasSuffix(host, ":80"):
+		host = strings.TrimSuffix(host, ":80")
+	}
+	return u.Scheme + "://" + host
+}
 
 // handleCallbackGET renders a confirmation page without consuming the login code.
 // This prevents Discord link previews and crawlers from exchanging the code.
@@ -76,7 +94,7 @@ func isSameOriginPost(r *http.Request, allowedOrigin string) bool {
 		if err != nil || u.Scheme == "" || u.Host == "" {
 			return false
 		}
-		return u.Scheme+"://"+u.Host == allowedOrigin
+		return canonicalOrigin(u) == allowedOrigin
 	}
 	return false
 }
