@@ -10,9 +10,9 @@ templ MessageEditor() {
 			<header style="display: flex; justify-content: space-between; align-items: center;">
 				<strong x-text="comp.type.replace('_', ' ')"></strong>
 				<div>
-					<button type="button" @click="moveUp(i)" :disabled="i === 0">&#8593;</button>
-					<button type="button" @click="moveDown(i)" :disabled="i === components.length - 1">&#8595;</button>
-					<button type="button" class="btn-danger" @click="removeComponent(i)">&#10005;</button>
+					<button type="button" aria-label="Move component up" @click="moveUp(i)" :disabled="i === 0">&#8593;</button>
+					<button type="button" aria-label="Move component down" @click="moveDown(i)" :disabled="i === components.length - 1">&#8595;</button>
+					<button type="button" class="btn-danger" aria-label="Remove component" @click="removeComponent(i)">&#10005;</button>
 				</div>
 			</header>
 			<!-- Text Display -->
@@ -38,7 +38,7 @@ templ MessageEditor() {
 					<template x-for="(text, ti) in comp.texts" :key="ti">
 						<div style="display: flex; gap: 0.5rem; align-items: start; margin-bottom: 0.5rem;">
 							<textarea x-model="comp.texts[ti]" rows="2" placeholder="Text field" style="flex: 1;"></textarea>
-							<button type="button" class="btn-danger outline" @click="removeSectionText(comp, ti)" :disabled="comp.texts.length <= 1">&#10005;</button>
+							<button type="button" class="btn-danger outline" aria-label="Remove text field" @click="removeSectionText(comp, ti)" :disabled="comp.texts.length <= 1">&#10005;</button>
 						</div>
 					</template>
 					<button type="button" @click="addSectionText(comp)" class="outline" :disabled="comp.texts.length >= 3">+ Text field</button>
@@ -103,9 +103,9 @@ templ MessageEditor() {
 							<header style="display: flex; justify-content: space-between; align-items: center;">
 								<strong x-text="child.type.replace('_', ' ')"></strong>
 								<div>
-									<button type="button" @click="moveChildUp(i, ci)" :disabled="ci === 0">&#8593;</button>
-									<button type="button" @click="moveChildDown(i, ci)" :disabled="ci === comp.children.length - 1">&#8595;</button>
-									<button type="button" class="btn-danger outline" @click="removeChild(i, ci)">&#10005;</button>
+									<button type="button" aria-label="Move child up" @click="moveChildUp(i, ci)" :disabled="ci === 0">&#8593;</button>
+									<button type="button" aria-label="Move child down" @click="moveChildDown(i, ci)" :disabled="ci === comp.children.length - 1">&#8595;</button>
+									<button type="button" class="btn-danger outline" aria-label="Remove child" @click="removeChild(i, ci)">&#10005;</button>
 								</div>
 							</header>
 							<!-- Child: Text Display -->
@@ -131,7 +131,7 @@ templ MessageEditor() {
 									<template x-for="(text, ti) in child.texts" :key="ti">
 										<div style="display: flex; gap: 0.5rem; align-items: start; margin-bottom: 0.5rem;">
 											<textarea x-model="child.texts[ti]" rows="2" placeholder="Text field" style="flex: 1;"></textarea>
-											<button type="button" class="btn-danger outline" @click="removeSectionText(child, ti)" :disabled="child.texts.length <= 1">&#10005;</button>
+											<button type="button" class="btn-danger outline" aria-label="Remove text field" @click="removeSectionText(child, ti)" :disabled="child.texts.length <= 1">&#10005;</button>
 										</div>
 									</template>
 									<button type="button" @click="addSectionText(child)" class="outline" :disabled="child.texts.length >= 3">+ Text field</button>

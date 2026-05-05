@@ -26,6 +26,8 @@ templ SettingsJoinLeave(data JoinLeaveData) {
 	<section id="join-leave">
 		<h3>Join/Leave Messages</h3>
 		<form
+			method="POST"
+			action={ templ.SafeURL("/guild/" + data.GuildID + "/settings/join-leave") }
 			hx-post={ "/guild/" + data.GuildID + "/settings/join-leave" }
 			hx-target="#join-leave"
 			hx-swap="outerHTML"

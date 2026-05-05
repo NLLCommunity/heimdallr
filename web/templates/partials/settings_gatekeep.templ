@@ -24,6 +24,8 @@ templ SettingsGatekeep(data GatekeepData) {
 	<section id="gatekeep">
 		<h3>Gatekeep</h3>
 		<form
+			method="POST"
+			action={ templ.SafeURL("/guild/" + data.GuildID + "/settings/gatekeep") }
 			hx-post={ "/guild/" + data.GuildID + "/settings/gatekeep" }
 			hx-target="#gatekeep"
 			hx-swap="outerHTML"

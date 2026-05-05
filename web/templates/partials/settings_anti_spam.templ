@@ -15,6 +15,8 @@ templ SettingsAntiSpam(data AntiSpamData) {
 	<section id="anti-spam">
 		<h3>Anti-Spam</h3>
 		<form
+			method="POST"
+			action={ templ.SafeURL("/guild/" + data.GuildID + "/settings/anti-spam") }
 			hx-post={ "/guild/" + data.GuildID + "/settings/anti-spam" }
 			hx-target="#anti-spam"
 			hx-swap="outerHTML"

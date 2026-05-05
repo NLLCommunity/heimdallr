@@ -17,6 +17,8 @@ templ SettingsModmail(data ModmailData) {
 	<section id="modmail">
 		<h3>Modmail</h3>
 		<form
+			method="POST"
+			action={ templ.SafeURL("/guild/" + data.GuildID + "/settings/modmail") }
 			hx-post={ "/guild/" + data.GuildID + "/settings/modmail" }
 			hx-target="#modmail"
 			hx-swap="outerHTML"

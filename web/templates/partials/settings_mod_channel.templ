@@ -14,6 +14,8 @@ templ SettingsModChannel(data ModChannelData) {
 	<section id="mod-channel">
 		<h3>Moderator Channel</h3>
 		<form
+			method="POST"
+			action={ templ.SafeURL("/guild/" + data.GuildID + "/settings/mod-channel") }
 			hx-post={ "/guild/" + data.GuildID + "/settings/mod-channel" }
 			hx-target="#mod-channel"
 			hx-swap="outerHTML"

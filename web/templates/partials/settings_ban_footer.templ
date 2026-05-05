@@ -14,6 +14,8 @@ templ SettingsBanFooter(data BanFooterData) {
 	<section id="ban-footer">
 		<h3>Ban Footer</h3>
 		<form
+			method="POST"
+			action={ templ.SafeURL("/guild/" + data.GuildID + "/settings/ban-footer") }
 			hx-post={ "/guild/" + data.GuildID + "/settings/ban-footer" }
 			hx-target="#ban-footer"
 			hx-swap="outerHTML"
