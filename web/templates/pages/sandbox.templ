@@ -14,7 +14,7 @@ templ Sandbox(nav layouts.NavData, data SandboxData) {
 	@layouts.Base("Message Sandbox", nav) {
 		<h2>Message Sandbox</h2>
 		<p><a href={ templ.SafeURL("/guild/" + data.GuildID) }>← Back to settings</a></p>
-		<div x-data="messageBuilder('[]')">
+		<div x-data="messageBuilder()" data-initial="[]">
 			<div class="grid" style="grid-template-columns: 1fr 1fr;">
 				<div>
 					<h3>Editor</h3>
