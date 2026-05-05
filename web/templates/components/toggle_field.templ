@@ -1,11 +1,18 @@
 package components
 
+// ToggleField renders a checkbox plus a sibling hidden "false" fallback under
+// the same name. An unchecked checkbox doesn't submit, so the hidden ensures
+// the field always reaches the server. Order matters: the checkbox must come
+// first so r.FormValue (which returns the first value for duplicate names)
+// resolves to "true" when checked. formTracker.js indexes form state by
+// element rather than by name to handle the duplicate cleanly.
 templ ToggleField(name string, label string, description string, checked bool) {
 	<fieldset>
 		<label>
 			<input type="checkbox" name={ name } role="switch" checked?={ checked } value="true"/>
 			{ label }
 		</label>
+		<input type="hidden" name={ name } value="false"/>
 		if description != "" {
 			<small>{ description }</small>
 		}

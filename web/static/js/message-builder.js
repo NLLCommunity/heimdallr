@@ -14,13 +14,13 @@ const BUTTON_STYLE = { primary: 1, secondary: 2, success: 3, danger: 4, link: 5 
 const BUTTON_STYLE_REVERSE = { 1: 'primary', 2: 'secondary', 3: 'success', 4: 'danger', 5: 'link' };
 
 function hexToDecimal(hex) {
-  if (!hex || hex === '#000000' || hex === '') return undefined;
+  if (!hex) return undefined;
   const num = parseInt(hex.replace('#', ''), 16);
   return isNaN(num) ? undefined : num;
 }
 
 function decimalToHex(num) {
-  if (num === undefined || num === 0) return '';
+  if (num === undefined) return '';
   return '#' + num.toString(16).padStart(6, '0');
 }
 

@@ -161,7 +161,7 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 const (
 	maxTopLevelComponents = 10
 	maxTotalComponents    = 40
-	maxTotalTextLength    = 4000 // bytes — Discord-side limit
+	maxTotalTextLength    = 4000 // characters (runes) — Discord-side limit
 	maxPerMessageContent  = 500  // runes — see truncateContent
 	truncationMarker      = "…"
 )
@@ -188,7 +188,7 @@ func createTimeoutMessage(e *events.GuildMessageCreate, msgs []*messageDetails, 
 
 	components := []discord.LayoutComponent{discord.NewTextDisplay(summary)}
 	totalComponents := 1
-	totalText := len(summary)
+	totalText := utf8.RuneCountInString(summary)
 
 	const omissionReserveText = 64
 	omitted := 0
@@ -200,7 +200,7 @@ func createTimeoutMessage(e *events.GuildMessageCreate, msgs []*messageDetails, 
 
 		// Each entry adds 1 container + 2 text displays.
 		const addComponents = 3
-		addText := len(contentText) + len(channelText)
+		addText := utf8.RuneCountInString(contentText) + utf8.RuneCountInString(channelText)
 
 		// Reserve budget for a possible "N omitted" notice if there are more entries after this one.
 		reserveComponents := 0
@@ -242,14 +242,14 @@ func compareToPreviousMessages(details *messageDetails, info userMessagesInfo) b
 	for _, mInfo := range info.Messages {
 		// Remove all whitespace from the message content
 		currentMessage := whitespaceReplacer.Replace(details.Content)
-		if len(currentMessage) < minMessageLength {
+		if utf8.RuneCountInString(currentMessage) < minMessageLength {
 			return false
 		}
 
 		prevMessage := whitespaceReplacer.Replace(mInfo.Content)
 
 		distance := levenshtein.ComputeDistance(currentMessage, prevMessage)
-		messageLength := float64(len(currentMessage))
+		messageLength := float64(utf8.RuneCountInString(currentMessage))
 		maxLevenshteinDistance := int(math.Ceil(messageLength * maxLevenshteinDistancePercent / 100))
 		if distance <= maxLevenshteinDistance {
 			// Return true if these are similar messages

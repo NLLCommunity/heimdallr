@@ -60,10 +60,18 @@ func isGuildAdmin(client *bot.Client, guild discord.Guild, userID snowflake.ID) 
 
 // checkGuildAdmin verifies the session user is an admin in the given guild.
 // Returns the parsed guild ID and true on success, or writes an error response and returns false.
+//
+// Non-session error branches use http.Error (text/plain). HTMX's beforeSwap
+// handler in htmx-config.js suppresses the swap for non-HTML responses and
+// surfaces the body as a toast — so the form section stays usable and the
+// user sees the actual reason. A text/html error partial would let HTMX
+// replace the targeted section with just an alert div, which is worse UX.
 func checkGuildAdmin(w http.ResponseWriter, r *http.Request, client *bot.Client, guildIDStr string) (snowflake.ID, bool) {
 	session := sessionFromContext(r.Context())
 	if session == nil {
-		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		// HTMX silently swallows 3xx; redirectToLogin emits HX-Redirect for
+		// HTMX requests so the browser actually navigates to /login.
+		redirectToLogin(w, r)
 		return 0, false
 	}
 

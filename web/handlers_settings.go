@@ -640,11 +640,7 @@ func handleSaveJoinLeave(client *bot.Client) http.HandlerFunc {
 
 		if err := model.SetGuildSettings(settings); err != nil {
 			slog.Error("failed to save join/leave settings", "error", err)
-			renderSafe(w, r, partials.SettingsJoinLeave(partials.JoinLeaveData{
-				GuildID: guildIDStr, SaveError: "Failed to save settings.",
-				Channels:     guildChannels(client, guildID),
-				Placeholders: utils.MessageTemplatePlaceholders,
-			}))
+			renderJoinLeaveError("Failed to save settings.")
 			return
 		}
 
@@ -718,17 +714,24 @@ func preserveV2Json(raw string) string {
 // payload is missing, malformed, or not a JSON array of components.
 var errInvalidV2JSON = errors.New("V2 components JSON must be a non-empty JSON array")
 
-// validateAndCompactV2JSON validates that s is a JSON array (the shape
-// expected by utils.BuildV2Message) and returns a compact, canonical form
-// safe to embed in HTML attributes. Empty/whitespace input is rejected so
-// callers can surface a clear error before persisting.
+// validateAndCompactV2JSON validates that s is a non-empty JSON array (the
+// shape expected by utils.BuildV2Message) and returns a compact, canonical
+// form safe to embed in HTML attributes. Empty/whitespace input is rejected
+// so callers can surface a clear error before persisting.
+//
+// Decoding into []json.RawMessage rather than []any preserves any large
+// integer values verbatim — decoding into []any would coerce JSON numbers
+// to float64 and silently truncate 64-bit precision (e.g. snowflakes).
 func validateAndCompactV2JSON(s string) (string, error) {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return "", errInvalidV2JSON
 	}
-	var parsed []any
+	var parsed []json.RawMessage
 	if err := json.Unmarshal([]byte(s), &parsed); err != nil {
+		return "", errInvalidV2JSON
+	}
+	if len(parsed) == 0 {
 		return "", errInvalidV2JSON
 	}
 	out, err := json.Marshal(parsed)
