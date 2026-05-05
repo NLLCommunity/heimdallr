@@ -68,9 +68,10 @@ var MessageTemplatePlaceholders = []MessageTemplatePlaceholder{
 	{"{{Server.ID}}", "The server ID"},
 }
 
-var MessageTemplateInfo = buildMessageTemplateInfo()
-
-func buildMessageTemplateInfo() string {
+// MessageTemplateInfo returns a formatted listing of available join/leave/
+// approval message placeholders. Used as the description body for the
+// "Placeholder values" embed shown by the admin commands.
+func MessageTemplateInfo() string {
 	var b strings.Builder
 	b.WriteString("The following placeholders can be used in join/leave/approval messages " +
 		"and will be replaced with the appropriate values.\n\n")

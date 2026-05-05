@@ -81,7 +81,7 @@ func AdminJoinMessageHandler(e *handler.CommandEvent) error {
 
 	templateInfoEmbed := discord.NewEmbedBuilder().
 		SetTitle("Placeholder values").
-		SetDescription(utils.MessageTemplateInfo).
+		SetDescription(utils.MessageTemplateInfo()).
 		Build()
 
 	return e.CreateMessage(
@@ -198,7 +198,7 @@ func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
 
 	templateInfoEmbed := discord.NewEmbedBuilder().
 		SetTitle("Placeholder values").
-		SetDescription(utils.MessageTemplateInfo).
+		SetDescription(utils.MessageTemplateInfo()).
 		Build()
 
 	return e.CreateMessage(

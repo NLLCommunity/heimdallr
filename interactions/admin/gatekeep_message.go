@@ -67,7 +67,7 @@ func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
 
 	templateInfoEmbed := discord.NewEmbedBuilder().
 		SetTitle("Placeholder values").
-		SetDescription(utils.MessageTemplateInfo).
+		SetDescription(utils.MessageTemplateInfo()).
 		Build()
 
 	return e.CreateMessage(
