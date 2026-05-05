@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -190,8 +191,8 @@ func clientIP(r *http.Request, trusted []netip.Prefix) string {
 		// client-spoofed values are correctly ignored.
 		parts := strings.Split(xff, ",")
 		var rightmost string
-		for i := len(parts) - 1; i >= 0; i-- {
-			s := strings.TrimSpace(parts[i])
+		for _, v := range slices.Backward(parts) {
+			s := strings.TrimSpace(v)
 			a, err := netip.ParseAddr(s)
 			if err != nil {
 				continue

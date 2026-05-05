@@ -16,7 +16,7 @@ func TestMentionRoleOrDefault(t *testing.T) {
 	}{
 		{
 			name:     "valid role ID",
-			id:       Ref(snowflake.ID(123456789)),
+			id:       new(snowflake.ID(123456789)),
 			def:      "everyone",
 			expected: "<@&123456789>",
 		},
@@ -28,7 +28,7 @@ func TestMentionRoleOrDefault(t *testing.T) {
 		},
 		{
 			name:     "zero role ID",
-			id:       Ref(snowflake.ID(0)),
+			id:       new(snowflake.ID(0)),
 			def:      "default role",
 			expected: "default role",
 		},
@@ -51,7 +51,7 @@ func TestMentionChannelOrDefault(t *testing.T) {
 	}{
 		{
 			name:     "valid channel ID",
-			id:       Ref(snowflake.ID(987654321)),
+			id:       new(snowflake.ID(987654321)),
 			def:      "#general",
 			expected: "<#987654321>",
 		},
@@ -63,7 +63,7 @@ func TestMentionChannelOrDefault(t *testing.T) {
 		},
 		{
 			name:     "zero channel ID",
-			id:       Ref(snowflake.ID(0)),
+			id:       new(snowflake.ID(0)),
 			def:      "#default-channel",
 			expected: "#default-channel",
 		},

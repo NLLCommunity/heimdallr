@@ -120,7 +120,7 @@ func (suite *ModelTestSuite) TestGetUserInfractions() {
 	moderator := snowflake.ID(555666777)
 
 	// Create multiple infractions
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_, err := CreateInfraction(guildID, userID, moderator, "Test infraction", 1.0, false)
 		require.NoError(suite.T(), err)
 		time.Sleep(time.Millisecond) // Ensure different timestamps.

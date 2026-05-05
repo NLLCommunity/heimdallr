@@ -21,7 +21,7 @@ var createSubcommand = discord.ApplicationCommandOptionSubCommand{
 			Name:        "label",
 			Description: "The label to display on the button.",
 			Required:    true,
-			MinLength:   utils.Ref(3),
+			MinLength:   new(3),
 		},
 		discord.ApplicationCommandOptionString{
 			Name:        "button-color",
@@ -51,8 +51,8 @@ var createSubcommand = discord.ApplicationCommandOptionSubCommand{
 			Name:        "max-active-reports",
 			Description: "The maximum number of active reports that a user can have in the channel.",
 			Required:    false,
-			MinValue:    utils.Ref(0),
-			MaxValue:    utils.Ref(100),
+			MinValue:    new(0),
+			MaxValue:    new(100),
 		},
 		discord.ApplicationCommandOptionString{
 			Name:        "slow-mode-time",

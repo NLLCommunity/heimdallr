@@ -19,8 +19,8 @@ var infractionsSubCommand = discord.ApplicationCommandOptionSubCommand{
 			Name:        "half-life",
 			Description: "The half-life of infractions in days (0 = no half-life)",
 			Required:    false,
-			MinValue:    utils.Ref(0.0),
-			MaxValue:    utils.Ref(365.0),
+			MinValue:    new(0.0),
+			MaxValue:    new(365.0),
 		},
 		discord.ApplicationCommandOptionBool{
 			Name:        "notify-warned-user-join",
@@ -31,8 +31,8 @@ var infractionsSubCommand = discord.ApplicationCommandOptionSubCommand{
 			Name:        "notify-threshold",
 			Description: "The minimum severity of infractions to notify on (0 = always)",
 			Required:    false,
-			MinValue:    utils.Ref(0.0),
-			MaxValue:    utils.Ref(100.0),
+			MinValue:    new(0.0),
+			MaxValue:    new(100.0),
 		},
 		discord.ApplicationCommandOptionString{
 			Name:        "reset",

@@ -15,10 +15,6 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 )
 
-func Ref[T any](v T) *T {
-	return &v
-}
-
 func CalcHalfLife(timeSince time.Duration, halfLifeTimeDays, weight float64) float64 {
 	if halfLifeTimeDays == 0.0 {
 		return weight

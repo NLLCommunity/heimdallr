@@ -102,7 +102,7 @@ func TestRateLimiter_BlocksAfterBurst(t *testing.T) {
 	}))
 
 	// First 2 requests should succeed (burst = 2).
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		req := httptest.NewRequest("GET", "/callback", nil)
 		req.RemoteAddr = "1.2.3.4:1234"
 		rec := httptest.NewRecorder()
@@ -149,7 +149,7 @@ func TestRateLimiter_OnlyAppliesToConfiguredMethod(t *testing.T) {
 	}))
 
 	// Many GETs from the same IP — none should consume the bucket.
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		req := httptest.NewRequest("GET", "/callback", nil)
 		req.RemoteAddr = "1.2.3.4:1234"
 		rec := httptest.NewRecorder()

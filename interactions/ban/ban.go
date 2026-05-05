@@ -217,9 +217,9 @@ func BanHandlerDataFromString(s string) (data BanHandlerData) {
 		return
 	}
 
-	trailers := strings.Split(reasonSplit[1], "\n")
+	trailers := strings.SplitSeq(reasonSplit[1], "\n")
 
-	for _, trailer := range trailers {
+	for trailer := range trailers {
 		parts := strings.SplitN(trailer, ":", 2)
 
 		if len(parts) != 2 {

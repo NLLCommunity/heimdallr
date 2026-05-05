@@ -1,6 +1,7 @@
 package listeners
 
 import (
+	"strings"
 	"testing"
 	"unicode/utf8"
 
@@ -24,11 +25,11 @@ func TestTruncateContent_AsciiOverLimit(t *testing.T) {
 // boundary.
 func TestTruncateContent_MultiByteRune_CutsOnBoundary(t *testing.T) {
 	const r = "𝓐" // 4 bytes
-	in := ""
-	for i := 0; i < 10; i++ {
-		in += r
+	var in strings.Builder
+	for range 10 {
+		in.WriteString(r)
 	}
-	got := truncateContent(in, 5)
+	got := truncateContent(in.String(), 5)
 	assert.Equal(t, 5, utf8.RuneCountInString(got), "result must not exceed maxRunes")
 	assert.True(t, utf8.ValidString(got), "result must be valid UTF-8")
 }

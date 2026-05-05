@@ -1,18 +1,14 @@
 package utils
 
 import (
+	"slices"
+
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/snowflake/v2"
 )
 
 func HasRole(member discord.Member, roleID snowflake.ID) bool {
-	for _, role := range member.RoleIDs {
-		if role == roleID {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(member.RoleIDs, roleID)
 }
 
 func HasRolesAll(member discord.Member, roleIDs ...snowflake.ID) bool {
@@ -36,10 +32,8 @@ func HasRolesAll(member discord.Member, roleIDs ...snowflake.ID) bool {
 
 func HasRolesAny(member discord.Member, roleIDs ...snowflake.ID) bool {
 	for _, role := range member.RoleIDs {
-		for _, roleID := range roleIDs {
-			if role == roleID {
-				return true
-			}
+		if slices.Contains(roleIDs, role) {
+			return true
 		}
 	}
 
