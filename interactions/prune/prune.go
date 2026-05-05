@@ -128,11 +128,9 @@ func removeKickedMembersAndNotify(e *handler.ComponentEvent, guildID snowflake.I
 		if err == nil {
 			joinleaveText.WriteString(text + "\n")
 		} else {
-			joinleaveText.WriteString(fmt.Sprintf(
-				"-# `%s` (ID: `%s`) left the server.\n",
+			fmt.Fprintf(&joinleaveText, "-# `%s` (ID: `%s`) left the server.\n",
 				getUsernameOrID(e.Client(), guildID, member.UserID),
-				member.UserID,
-			))
+				member.UserID)
 		}
 	}
 
@@ -353,9 +351,9 @@ func preparePruneMembers(pruneID uuid.UUID, members []discord.Member) (
 	}
 
 	var content strings.Builder
-	content.WriteString(fmt.Sprintf("## The following %d members will be pruned and kicked from the server\n", len(members)))
+	fmt.Fprintf(&content, "## The following %d members will be pruned and kicked from the server\n", len(members))
 	for _, member := range members {
-		content.WriteString(fmt.Sprintf("- `%s` (`%s`)\n", member.User.Username, member.User.ID))
+		fmt.Fprintf(&content, "- `%s` (`%s`)\n", member.User.Username, member.User.ID)
 	}
 
 	message := ix.EphemeralMessageContent(content.String()).
