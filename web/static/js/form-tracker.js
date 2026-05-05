@@ -67,10 +67,13 @@ document.addEventListener('alpine:init', () => {
     cancel() {
       // Forms with V2 message builder have complex nested Alpine state
       // that can't be restored from hidden input values. Re-fetch from server.
+      // The dashboard route returns the full page, so `select` extracts just
+      // this section before swapping.
       if (this.$el.querySelector('[x-data*="messageBuilder"]')) {
         const section = this.$el.closest('section');
         if (section && section.id) {
-          htmx.ajax('GET', window.location.pathname, { target: '#' + section.id, swap: 'outerHTML' });
+          const sel = '#' + section.id;
+          htmx.ajax('GET', window.location.pathname, { target: sel, swap: 'outerHTML', select: sel });
           return;
         }
       }
