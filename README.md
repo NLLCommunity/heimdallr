@@ -72,6 +72,29 @@ As a [Go](https://golang.org) project, you'll need to have Go installed on your 
     git push origin my-changes
     ```
 
+## Deploying to Heroku
+
+Heimdallr ships with a `Procfile`, `Aptfile`, and `app.json` that target the
+`heroku-24` stack. The web dyno serves both the Discord gateway connection
+and the admin dashboard.
+
+```bash
+heroku create your-heimdallr-app
+heroku buildpacks:add heroku-community/apt
+heroku buildpacks:add heroku/go
+heroku config:set \
+  HEIMDALLR_BOT_TOKEN=... \
+  HEIMDALLR_DASHBOARD_BASE_URL=https://your-heimdallr-app.herokuapp.com \
+  "HEIMDALLR_WEB_TRUSTED_PROXIES=0.0.0.0/0 ::/0"
+git push heroku main
+```
+
+The Apt buildpack installs Litestream from `Aptfile` so the SQLite database
+can be replicated to S3-compatible storage. Heroku's filesystem is ephemeral
+— without `DB_REPLICA_URL` (and the matching `LITESTREAM_*` credentials),
+state is lost on every restart. See `litestream.yml` for the replica config
+and `app.json` for the full list of supported env vars.
+
 ## License
 
 [GPL-3.0](LICENSE)

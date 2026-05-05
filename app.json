@@ -1,0 +1,55 @@
+{
+  "name": "heimdallr",
+  "description": "Discord moderation bot for the Norwegian Language Learning server.",
+  "repository": "https://github.com/NLLCommunity/heimdallr",
+  "keywords": ["go", "discord", "bot", "moderation"],
+  "stack": "heroku-24",
+  "buildpacks": [
+    { "url": "heroku-community/apt" },
+    { "url": "heroku/go" }
+  ],
+  "formation": {
+    "web": { "quantity": 1, "size": "basic" }
+  },
+  "env": {
+    "HEIMDALLR_BOT_TOKEN": {
+      "description": "Discord bot token from the Developer Portal.",
+      "required": true
+    },
+    "HEIMDALLR_BOT_DB": {
+      "description": "Path to the SQLite database file. Heroku's filesystem is ephemeral; pair with Litestream (DB_REPLICA_URL) to persist across restarts.",
+      "value": "heimdallr.db?_journal_mode=WAL",
+      "required": false
+    },
+    "HEIMDALLR_DASHBOARD_BASE_URL": {
+      "description": "Public https URL of the dashboard (e.g. https://your-app.herokuapp.com). Used for OAuth redirects and the CORS allowed origin.",
+      "required": true
+    },
+    "HEIMDALLR_WEB_TRUSTED_PROXIES": {
+      "description": "Space-separated CIDRs trusted to set X-Forwarded-For. On Heroku, set to \"0.0.0.0/0 ::/0\" — Heroku's router always appends the real client IP to XFF (and its own IPs aren't stable), so trusting the entire address space is the documented pattern. clientIP() returns the rightmost XFF entry in this case, so client-spoofed leading values are still ignored.",
+      "value": "0.0.0.0/0 ::/0",
+      "required": false
+    },
+    "HEIMDALLR_LOGLEVEL": {
+      "description": "Log level: debug, info, warn, error.",
+      "value": "info",
+      "required": false
+    },
+    "DB_REPLICA_URL": {
+      "description": "Litestream replica URL (e.g. s3://bucket/path). Required for SQLite persistence across dyno restarts.",
+      "required": false
+    },
+    "LITESTREAM_ACCESS_KEY_ID": {
+      "description": "Access key for the Litestream replica destination.",
+      "required": false
+    },
+    "LITESTREAM_SECRET_ACCESS_KEY": {
+      "description": "Secret key for the Litestream replica destination.",
+      "required": false
+    },
+    "LITESTREAM_REGION": {
+      "description": "Region for the Litestream replica destination.",
+      "required": false
+    }
+  }
+}

@@ -5,6 +5,10 @@ START_COMMAND=./bin/heimdallr
 set -e
 set -u
 
+# Heroku injects $PORT and requires the web dyno to bind to it within 60s.
+# Always honor it so the dashboard is reachable regardless of replication.
+export HEIMDALLR_WEB_ADDRESS=":${PORT:-8484}"
+
 # If DB_REPLICA_URL is not set, start without replication
 if [ -z "${DB_REPLICA_URL:-}" ]; then
   echo "Starting without replication"
@@ -16,7 +20,6 @@ echo "DB_REPLICA_URL=${DB_REPLICA_URL:-}"
 
 readonly DB_PATH="${HEIMDALLR_BOT_DB:-heimdallr.db}"
 export DB_PATH
-export HEIMDALLR_WEB_ADDRESS=":${PORT:-8484}"
 
 if [ -f "$DB_PATH" ]; then
   echo "Existing database is $(stat -c %s "${DB_PATH}") bytes"

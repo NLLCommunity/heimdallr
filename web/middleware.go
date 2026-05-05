@@ -183,7 +183,13 @@ func clientIP(r *http.Request, trusted []netip.Prefix) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		// Walk right-to-left, skipping known-trusted hops; the rightmost
 		// untrusted address is the closest the proxy chain got to the client.
+		// If the entire chain is trusted (e.g. trusted_proxies covers
+		// 0.0.0.0/0, ::/0 because we know we sit behind a single appending
+		// proxy like Heroku's router), fall back to the rightmost parseable
+		// entry — that's the IP the trusted edge appended, so any leading
+		// client-spoofed values are correctly ignored.
 		parts := strings.Split(xff, ",")
+		var rightmost string
 		for i := len(parts) - 1; i >= 0; i-- {
 			s := strings.TrimSpace(parts[i])
 			a, err := netip.ParseAddr(s)
@@ -191,9 +197,15 @@ func clientIP(r *http.Request, trusted []netip.Prefix) string {
 				continue
 			}
 			a = a.Unmap()
+			if rightmost == "" {
+				rightmost = a.String()
+			}
 			if !isTrusted(a, trusted) {
 				return a.String()
 			}
+		}
+		if rightmost != "" {
+			return rightmost
 		}
 	}
 	return remote.String()

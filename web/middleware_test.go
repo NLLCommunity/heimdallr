@@ -252,6 +252,30 @@ func TestClientIP_XForwardedForRightmostUntrusted(t *testing.T) {
 	assert.Equal(t, "198.51.100.5", got, "rightmost untrusted hop is the closest known client")
 }
 
+// When the operator trusts the entire address space — the recommended setup
+// for Heroku, where the router appends to X-Forwarded-For but its IPs aren't
+// stable — clientIP must return the rightmost XFF entry (the IP the trusted
+// edge appended) rather than collapsing to the immediate proxy's RemoteAddr.
+// Any leading client-supplied values must still be ignored.
+func TestClientIP_TrustAllReturnsRightmostXFF(t *testing.T) {
+	trusted, err := parseTrustedProxies([]string{"0.0.0.0/0", "::/0"})
+	require.NoError(t, err)
+
+	t.Run("single hop appended by trusted edge", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.RemoteAddr = "10.1.2.3:1234"
+		req.Header.Set("X-Forwarded-For", "203.0.113.9")
+		assert.Equal(t, "203.0.113.9", clientIP(req, trusted))
+	})
+
+	t.Run("client-spoofed leading entries ignored", func(t *testing.T) {
+		req := httptest.NewRequest("GET", "/", nil)
+		req.RemoteAddr = "10.1.2.3:1234"
+		req.Header.Set("X-Forwarded-For", "1.2.3.4, 5.6.7.8, 203.0.113.9")
+		assert.Equal(t, "203.0.113.9", clientIP(req, trusted))
+	})
+}
+
 func TestClientIP_MalformedXRealIPIgnored(t *testing.T) {
 	trusted, err := parseTrustedProxies([]string{"127.0.0.1/32"})
 	require.NoError(t, err)
