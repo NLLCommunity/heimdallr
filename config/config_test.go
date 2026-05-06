@@ -105,13 +105,11 @@ func TestConfigPaths(t *testing.T) {
 }
 
 func TestParsedDashboardBaseURL(t *testing.T) {
-	originalConfig := viper.AllSettings()
-	t.Cleanup(func() {
-		viper.Reset()
-		for k, v := range originalConfig {
-			viper.Set(k, v)
-		}
-	})
+	// Save/restore only the key this test mutates. viper.Reset() would also
+	// drop the defaults, env-key replacer, and AutomaticEnv wiring registered
+	// in config.init(), making later tests depend on this one running first.
+	original := viper.Get("dashboard.base_url")
+	t.Cleanup(func() { viper.Set("dashboard.base_url", original) })
 
 	cases := []struct {
 		name    string
