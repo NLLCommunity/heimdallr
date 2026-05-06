@@ -59,7 +59,15 @@ func resolveEmojis(v any, emojiMap map[string]discord.Emoji, depth int) error {
 				}
 			}
 		}
-		for _, child := range val {
+		for k, child := range val {
+			// The emoji sub-tree was handled inline above; recursing into it
+			// would walk the just-mutated object for no benefit. Discord
+			// emoji objects are terminal ({name, id, animated}), so skipping
+			// is also semantically correct — there are no nested components
+			// to find inside one.
+			if k == "emoji" {
+				continue
+			}
 			if err := resolveEmojis(child, emojiMap, depth+1); err != nil {
 				return err
 			}
