@@ -16,6 +16,15 @@ import (
 // rejects non-HTML error bodies) can rely on the header instead of MIME
 // sniffing.
 func renderSafe(w http.ResponseWriter, r *http.Request, c templ.Component) {
+	renderSafeStatus(w, r, http.StatusOK, c)
+}
+
+// renderSafeStatus is renderSafe with an explicit HTTP status code. Use for
+// HTML error responses (e.g. AlertError partials) where a 4xx/5xx code lets
+// callers distinguish failures and prevents intermediaries from caching the
+// error as a successful response. Status must be set before WriteHeader, so
+// this helper buffers, sets headers, then commits — the order matters.
+func renderSafeStatus(w http.ResponseWriter, r *http.Request, status int, c templ.Component) {
 	var buf bytes.Buffer
 	if err := c.Render(r.Context(), &buf); err != nil {
 		slog.Error("failed to render template", "error", err, "path", r.URL.Path)
@@ -23,6 +32,7 @@ func renderSafe(w http.ResponseWriter, r *http.Request, c templ.Component) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(status)
 	if _, err := buf.WriteTo(w); err != nil {
 		slog.Error("failed to write response", "error", err, "path", r.URL.Path)
 	}

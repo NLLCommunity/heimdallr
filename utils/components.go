@@ -34,6 +34,12 @@ const maxComponentDepth = 32
 // maxComponentDepth during traversal.
 var errComponentTooDeep = errors.New("components nested too deeply")
 
+// errEmptyComponents is returned when a component JSON array is parseable but
+// contains zero elements. Discord rejects empty messages, and the save flow
+// already guards against this via validateAndCompactV2JSON; this is the same
+// guard for paths (sandbox) that bypass the save-flow validator.
+var errEmptyComponents = errors.New("components JSON must contain at least one element")
+
 // ResolveEmojis walks a JSON value tree looking for "emoji" keys whose value
 // is an object with "name" but no "id", and resolves the name against the
 // provided emoji map.
@@ -222,6 +228,10 @@ func parseComponentsFromAny(parsed []any) (components []discord.LayoutComponent,
 			err = fmt.Errorf("failed to parse components: %v", r)
 		}
 	}()
+
+	if len(parsed) == 0 {
+		return nil, errEmptyComponents
+	}
 
 	flattened, err := flattenSections(parsed, 0)
 	if err != nil {

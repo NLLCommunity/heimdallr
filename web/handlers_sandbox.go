@@ -48,8 +48,19 @@ func handleSandbox(client *bot.Client) http.HandlerFunc {
 // the bot. Admin-gated, but we still apply a per-user rate limit (rather than
 // per-IP) so that a single hostile or compromised admin can't burn through
 // the bot's Discord quota by spamming sandbox sends.
+//
+// Errors render as text/html AlertError partials with appropriate 4xx/5xx
+// status codes. The HTMX swap config (htmx-config.js) treats 4xx/5xx as errors
+// AND swaps when Content-Type is text/html, so the alert lands inline in
+// #send-result while htmx:responseError suppresses its toast for HTML bodies.
+// Status codes also let logs and intermediaries distinguish failures from the
+// 200 success.
 func handleSandboxSend(client *bot.Client, limiter *keyedRateLimiter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		renderError := func(status int, message string) {
+			renderSafeStatus(w, r, status, components.AlertError(message))
+		}
+
 		guildIDStr := r.PathValue("id")
 		guildID, ok := checkGuildAdmin(w, r, client, guildIDStr)
 		if !ok {
@@ -59,39 +70,39 @@ func handleSandboxSend(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 		session := sessionFromContext(r.Context())
 		if session == nil {
 			// authMiddleware should have caught this; treat as 401-equivalent.
-			renderSafe(w, r, components.AlertError("Not signed in."))
+			renderError(http.StatusUnauthorized, "Not signed in.")
 			return
 		}
 		if !limiter.getLimiter(session.UserID.String()).Allow() {
-			renderSafe(w, r, components.AlertError("Rate limited. Please wait a moment before sending again."))
+			renderError(http.StatusTooManyRequests, "Rate limited. Please wait a moment before sending again.")
 			return
 		}
 
 		if err := r.ParseForm(); err != nil {
-			http.Error(w, "invalid form data", http.StatusBadRequest)
+			renderError(http.StatusBadRequest, "Invalid form data.")
 			return
 		}
 		channelIDStr := r.FormValue("channel_id")
 		componentsJSON := r.FormValue("components_json")
 
 		if len(componentsJSON) > maxSandboxBodyBytes {
-			renderSafe(w, r, components.AlertError("Components JSON too large."))
+			renderError(http.StatusRequestEntityTooLarge, "Components JSON too large.")
 			return
 		}
 		if strings.TrimSpace(componentsJSON) == "" {
-			renderSafe(w, r, components.AlertError("Invalid components JSON."))
+			renderError(http.StatusBadRequest, "Invalid components JSON.")
 			return
 		}
 
 		channelID, err := snowflake.Parse(channelIDStr)
 		if err != nil {
-			renderSafe(w, r, components.AlertError("Invalid channel."))
+			renderError(http.StatusBadRequest, "Invalid channel.")
 			return
 		}
 
 		ch, chOk := client.Caches.GuildMessageChannel(channelID)
 		if !chOk || ch.GuildID() != guildID {
-			renderSafe(w, r, components.AlertError("Channel not found in this guild."))
+			renderError(http.StatusBadRequest, "Channel not found in this guild.")
 			return
 		}
 
@@ -99,7 +110,7 @@ func handleSandboxSend(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 		discordComponents, err := utils.BuildV2MessageNoTemplate(componentsJSON, emojiMap)
 		if err != nil {
 			slog.Error("failed to build sandbox components", "error", err)
-			renderSafe(w, r, components.AlertError("Invalid components JSON."))
+			renderError(http.StatusBadRequest, "Invalid components JSON.")
 			return
 		}
 
@@ -109,7 +120,7 @@ func handleSandboxSend(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 		})
 		if err != nil {
 			slog.Error("failed to send Discord message", "error", err, "channel_id", channelID)
-			renderSafe(w, r, components.AlertError("Failed to send message."))
+			renderError(http.StatusBadGateway, "Failed to send message.")
 			return
 		}
 
