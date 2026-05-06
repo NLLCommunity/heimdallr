@@ -1,9 +1,9 @@
 package web
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
@@ -78,11 +78,7 @@ func handleSandboxSend(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 			renderSafe(w, r, components.AlertError("Components JSON too large."))
 			return
 		}
-
-		// validateAndCompactV2JSON rejects empty input and anything that isn't
-		// a top-level JSON array — same shape requirement as the save flows.
-		compactJSON, err := validateAndCompactV2JSON(componentsJSON)
-		if err != nil {
+		if strings.TrimSpace(componentsJSON) == "" {
 			renderSafe(w, r, components.AlertError("Invalid components JSON."))
 			return
 		}
@@ -99,30 +95,11 @@ func handleSandboxSend(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 			return
 		}
 
-		// Re-parse for emoji resolution. The recursion-capped ResolveEmojis
-		// returns an error on hostile input nested past maxComponentDepth.
-		var parsed any
-		if err := json.Unmarshal([]byte(compactJSON), &parsed); err != nil {
-			renderSafe(w, r, components.AlertError("Invalid components JSON."))
-			return
-		}
-
 		emojiMap := utils.BuildEmojiMap(client, guildID)
-		if err := utils.ResolveEmojis(parsed, emojiMap); err != nil {
-			renderSafe(w, r, components.AlertError("Components nested too deeply."))
-			return
-		}
-
-		resolvedJSON, err := json.Marshal(parsed)
+		discordComponents, err := utils.BuildV2MessageNoTemplate(componentsJSON, emojiMap)
 		if err != nil {
-			renderSafe(w, r, components.AlertError("Failed to process components."))
-			return
-		}
-
-		discordComponents, err := utils.ParseComponents(string(resolvedJSON))
-		if err != nil {
-			slog.Error("failed to parse resolved components", "error", err)
-			renderSafe(w, r, components.AlertError("Invalid components format."))
+			slog.Error("failed to build sandbox components", "error", err)
+			renderSafe(w, r, components.AlertError("Invalid components JSON."))
 			return
 		}
 

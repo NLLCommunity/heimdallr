@@ -82,25 +82,6 @@ func resolveEmojis(v any, emojiMap map[string]discord.Emoji, depth int) error {
 	return nil
 }
 
-// RenderComponentTemplates applies mustache template rendering to all string
-// values in the "content" fields of a parsed component JSON tree.
-func RenderComponentTemplates(componentsJson string, data MessageTemplateData) (string, error) {
-	var parsed any
-	if err := json.Unmarshal([]byte(componentsJson), &parsed); err != nil {
-		return "", err
-	}
-
-	if err := renderTemplatesInTree(parsed, data, 0); err != nil {
-		return "", err
-	}
-
-	result, err := json.Marshal(parsed)
-	if err != nil {
-		return "", err
-	}
-	return string(result), nil
-}
-
 func renderTemplatesInTree(v any, data MessageTemplateData, depth int) error {
 	if depth > maxComponentDepth {
 		return errComponentTooDeep
@@ -129,28 +110,47 @@ func renderTemplatesInTree(v any, data MessageTemplateData, depth int) error {
 	return nil
 }
 
+// errNotTopLevelArray is returned when component JSON parses but isn't a
+// top-level array. The sandbox surfaces this to admins; save-flow callers
+// have already validated shape via validateAndCompactV2JSON.
+var errNotTopLevelArray = errors.New("components JSON must be a top-level array")
+
 // BuildV2Message renders mustache templates in the component JSON, resolves
 // emoji names, and parses the result into layout components ready for sending.
 func BuildV2Message(componentsJson string, data MessageTemplateData, emojiMap map[string]discord.Emoji) ([]discord.LayoutComponent, error) {
-	rendered, err := RenderComponentTemplates(componentsJson, data)
-	if err != nil {
+	var parsed any
+	if err := json.Unmarshal([]byte(componentsJson), &parsed); err != nil {
 		return nil, err
 	}
-
-	var parsed any
-	if err := json.Unmarshal([]byte(rendered), &parsed); err != nil {
+	if err := renderTemplatesInTree(parsed, data, 0); err != nil {
 		return nil, err
 	}
 	if err := ResolveEmojis(parsed, emojiMap); err != nil {
 		return nil, err
 	}
+	arr, ok := parsed.([]any)
+	if !ok {
+		return nil, errNotTopLevelArray
+	}
+	return parseComponentsFromAny(arr)
+}
 
-	resolvedJSON, err := json.Marshal(parsed)
-	if err != nil {
+// BuildV2MessageNoTemplate is BuildV2Message minus mustache rendering — the
+// sandbox sends the admin's literal component JSON, not a template, so it
+// shouldn't pay the parse-render-marshal round-trip.
+func BuildV2MessageNoTemplate(componentsJson string, emojiMap map[string]discord.Emoji) ([]discord.LayoutComponent, error) {
+	var parsed any
+	if err := json.Unmarshal([]byte(componentsJson), &parsed); err != nil {
 		return nil, err
 	}
-
-	return ParseComponents(string(resolvedJSON))
+	if err := ResolveEmojis(parsed, emojiMap); err != nil {
+		return nil, err
+	}
+	arr, ok := parsed.([]any)
+	if !ok {
+		return nil, errNotTopLevelArray
+	}
+	return parseComponentsFromAny(arr)
 }
 
 // flattenSections pre-processes the JSON component tree. Sections without an
@@ -204,17 +204,24 @@ func flattenSections(items []any, depth int) ([]any, error) {
 // ParseComponents unmarshals a JSON string into Discord layout components.
 // Sections without an accessory are flattened into text displays to satisfy
 // both Discord's API requirements and disgo's unmarshaler.
-func ParseComponents(jsonStr string) (components []discord.LayoutComponent, err error) {
+func ParseComponents(jsonStr string) ([]discord.LayoutComponent, error) {
+	var parsed []any
+	if err := json.Unmarshal([]byte(jsonStr), &parsed); err != nil {
+		return nil, err
+	}
+	return parseComponentsFromAny(parsed)
+}
+
+// parseComponentsFromAny is the shared core for ParseComponents and the
+// BuildV2Message variants: it operates on an already-decoded JSON array,
+// avoiding a redundant unmarshal cycle when the caller has parsed the JSON
+// for prior in-place mutation (template rendering, emoji resolution).
+func parseComponentsFromAny(parsed []any) (components []discord.LayoutComponent, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("failed to parse components: %v", r)
 		}
 	}()
-
-	var parsed []any
-	if err := json.Unmarshal([]byte(jsonStr), &parsed); err != nil {
-		return nil, err
-	}
 
 	flattened, err := flattenSections(parsed, 0)
 	if err != nil {
