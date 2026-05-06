@@ -60,7 +60,7 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 
 	// Per-session rate limiter for sandbox sends — keyed by user ID rather
 	// than IP, since the threat is admin abuse, not anonymous flooding.
-	sandboxLimiter := newIPRateLimiter(
+	sandboxLimiter := newKeyedRateLimiter(
 		rate.Every(time.Minute/sandboxRatePerMinute),
 		sandboxBurst,
 	)
@@ -71,7 +71,7 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	// Static files.
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(getStaticFS())))
 
-	exchangeCodeLimiter := newIPRateLimiter(
+	exchangeCodeLimiter := newKeyedRateLimiter(
 		rate.Every(time.Minute/exchangeCodeRatePerMinute),
 		exchangeCodeBurst,
 	)

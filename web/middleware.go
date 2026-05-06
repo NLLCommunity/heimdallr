@@ -88,22 +88,22 @@ type rateLimiterEntry struct {
 	lastSeen time.Time
 }
 
-type ipRateLimiter struct {
+type keyedRateLimiter struct {
 	mu       sync.Mutex
 	limiters map[string]*rateLimiterEntry
 	limit    rate.Limit
 	burst    int
 }
 
-func newIPRateLimiter(r rate.Limit, burst int) *ipRateLimiter {
-	return &ipRateLimiter{
+func newKeyedRateLimiter(r rate.Limit, burst int) *keyedRateLimiter {
+	return &keyedRateLimiter{
 		limiters: make(map[string]*rateLimiterEntry),
 		limit:    r,
 		burst:    burst,
 	}
 }
 
-func (l *ipRateLimiter) getLimiter(ip string) *rate.Limiter {
+func (l *keyedRateLimiter) getLimiter(ip string) *rate.Limiter {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -116,7 +116,7 @@ func (l *ipRateLimiter) getLimiter(ip string) *rate.Limiter {
 	return entry.limiter
 }
 
-func (l *ipRateLimiter) cleanup(ttl time.Duration) {
+func (l *keyedRateLimiter) cleanup(ttl time.Duration) {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
@@ -229,7 +229,7 @@ type rateLimitRule struct {
 // rateLimitMiddleware applies per-IP rate limiting to the given (method, path)
 // rules. The trusted list controls which proxies' forwarded-IP headers are
 // honored when determining the client IP.
-func rateLimitMiddleware(rl *ipRateLimiter, trusted []netip.Prefix, rules ...rateLimitRule) func(http.Handler) http.Handler {
+func rateLimitMiddleware(rl *keyedRateLimiter, trusted []netip.Prefix, rules ...rateLimitRule) func(http.Handler) http.Handler {
 	ruleSet := make(map[rateLimitRule]bool, len(rules))
 	for _, rule := range rules {
 		ruleSet[rule] = true

@@ -95,7 +95,7 @@ func TestBodyLimitMiddleware_LargeBody(t *testing.T) {
 }
 
 func TestRateLimiter_BlocksAfterBurst(t *testing.T) {
-	rl := newIPRateLimiter(rate.Every(time.Minute), 2)
+	rl := newKeyedRateLimiter(rate.Every(time.Minute), 2)
 
 	handler := rateLimitMiddleware(rl, nil, rateLimitRule{Method: "GET", Path: "/callback"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -119,7 +119,7 @@ func TestRateLimiter_BlocksAfterBurst(t *testing.T) {
 }
 
 func TestRateLimiter_IgnoresOtherPaths(t *testing.T) {
-	rl := newIPRateLimiter(rate.Every(time.Minute), 1)
+	rl := newKeyedRateLimiter(rate.Every(time.Minute), 1)
 
 	handler := rateLimitMiddleware(rl, nil, rateLimitRule{Method: "GET", Path: "/callback"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -142,7 +142,7 @@ func TestRateLimiter_IgnoresOtherPaths(t *testing.T) {
 // GET /callback (link previewers, refreshes) must not drain the limiter
 // budget intended for POST /callback (the actual code exchange).
 func TestRateLimiter_OnlyAppliesToConfiguredMethod(t *testing.T) {
-	rl := newIPRateLimiter(rate.Every(time.Minute), 1)
+	rl := newKeyedRateLimiter(rate.Every(time.Minute), 1)
 
 	handler := rateLimitMiddleware(rl, nil, rateLimitRule{Method: "POST", Path: "/callback"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -209,7 +209,7 @@ func TestParseTrustedProxies_SplitsWhitespaceAndCommas(t *testing.T) {
 // otherwise each forged header value gets its own rate-limit bucket and the
 // limiter is bypassed.
 func TestRateLimiter_IgnoresSpoofedForwardedHeaders(t *testing.T) {
-	rl := newIPRateLimiter(rate.Every(time.Minute), 1)
+	rl := newKeyedRateLimiter(rate.Every(time.Minute), 1)
 
 	// trustedProxies = nil → forwarded headers are never honored.
 	handler := rateLimitMiddleware(rl, nil, rateLimitRule{Method: "GET", Path: "/callback"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -237,7 +237,7 @@ func TestRateLimiter_IgnoresSpoofedForwardedHeaders(t *testing.T) {
 // When a trusted proxy connects, the rate limiter must key off the forwarded
 // client IP — otherwise every request through the proxy shares one bucket.
 func TestRateLimiter_HonorsTrustedProxyXRealIP(t *testing.T) {
-	rl := newIPRateLimiter(rate.Every(time.Minute), 1)
+	rl := newKeyedRateLimiter(rate.Every(time.Minute), 1)
 	trusted, err := parseTrustedProxies([]string{"127.0.0.1/32"})
 	require.NoError(t, err)
 

@@ -48,7 +48,7 @@ func handleSandbox(client *bot.Client) http.HandlerFunc {
 // the bot. Admin-gated, but we still apply a per-user rate limit (rather than
 // per-IP) so that a single hostile or compromised admin can't burn through
 // the bot's Discord quota by spamming sandbox sends.
-func handleSandboxSend(client *bot.Client, limiter *ipRateLimiter) http.HandlerFunc {
+func handleSandboxSend(client *bot.Client, limiter *keyedRateLimiter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		guildIDStr := r.PathValue("id")
 		guildID, ok := checkGuildAdmin(w, r, client, guildIDStr)

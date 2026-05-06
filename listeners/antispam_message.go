@@ -25,13 +25,10 @@ const maxMessages = 20
 
 var whitespaceReplacer = strings.NewReplacer(
 	" ", "",
-	" ", "",
-	" ", "",
+	"\u00A0", "",
+	"\u202F", "",
 	"\t", "",
 	"\u200b", "",
-	" ", "",
-	" ", "",
-	" ", "",
 )
 
 var userMessages = ttlcache.New[string, userMessagesInfo](
