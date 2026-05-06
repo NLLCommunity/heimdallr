@@ -239,9 +239,10 @@ func compareToPreviousMessages(details *messageDetails, info userMessagesInfo) b
 
 	slog.Debug("Comparing message to previous messages.", "current_message", details.Content, "previous_messages_count", len(info.Messages))
 
+	// Remove all whitespace from the message content
+	currentMessage := whitespaceReplacer.Replace(details.Content)
+
 	for _, mInfo := range info.Messages {
-		// Remove all whitespace from the message content
-		currentMessage := whitespaceReplacer.Replace(details.Content)
 		if utf8.RuneCountInString(currentMessage) < minMessageLength {
 			return false
 		}
