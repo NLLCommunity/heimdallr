@@ -43,7 +43,7 @@ func handleCallbackGET(w http.ResponseWriter, r *http.Request) {
 // header is checked against the configured dashboard origin to block login-CSRF
 // (a malicious site auto-submitting an attacker-generated code to log the
 // victim into the attacker's account).
-func handleCallbackPOST(allowedOrigin string) http.HandlerFunc {
+func handleCallbackPOST(allowedOrigin string, secureCookie bool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if !isSameOriginPost(r, allowedOrigin) {
 			slog.Warn(
@@ -75,7 +75,7 @@ func handleCallbackPOST(allowedOrigin string) http.HandlerFunc {
 		// ExpiresAt keeps cookie and DB lifetime in lockstep if SessionExpiry
 		// ever becomes per-session.
 		maxAge := int(time.Until(session.ExpiresAt).Seconds())
-		http.SetCookie(w, makeSessionCookie(session.Token, maxAge))
+		http.SetCookie(w, makeSessionCookie(session.Token, maxAge, secureCookie))
 		http.Redirect(w, r, "/guilds", http.StatusSeeOther)
 	}
 }
@@ -108,22 +108,24 @@ func handleLogin(w http.ResponseWriter, r *http.Request) {
 	renderSafe(w, r, pages.Login())
 }
 
-func handleLogout(w http.ResponseWriter, r *http.Request) {
-	// DeleteSession expects the raw cookie token (it hashes internally to look
-	// up the row). The session in context comes from GetSession, whose Token
-	// field holds the DB-stored hash — passing that here would hash twice and
-	// silently fail to delete the row.
-	if cookie, err := r.Cookie(sessionCookieName); err == nil && cookie.Value != "" {
-		if err := model.DeleteSession(cookie.Value); err != nil {
-			slog.Error("failed to delete session", "error", err)
+func handleLogout(secureCookie bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// DeleteSession expects the raw cookie token (it hashes internally to
+		// look up the row). The session in context comes from GetSession, whose
+		// Token field holds the DB-stored hash — passing that here would hash
+		// twice and silently fail to delete the row.
+		if cookie, err := r.Cookie(sessionCookieName); err == nil && cookie.Value != "" {
+			if err := model.DeleteSession(cookie.Value); err != nil {
+				slog.Error("failed to delete session", "error", err)
+			}
 		}
-	}
 
-	// MaxAge=-1 emits `Max-Age: 0`, instructing the browser to delete the
-	// cookie immediately. MaxAge=0 omits the attribute, leaving the cookie as
-	// a session cookie that some browsers persist via tab restore.
-	http.SetCookie(w, makeSessionCookie("", -1))
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
+		// MaxAge=-1 emits `Max-Age: 0`, instructing the browser to delete the
+		// cookie immediately. MaxAge=0 omits the attribute, leaving the cookie
+		// as a session cookie that some browsers persist via tab restore.
+		http.SetCookie(w, makeSessionCookie("", -1, secureCookie))
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+	}
 }
 
 func handleRoot(w http.ResponseWriter, r *http.Request) {

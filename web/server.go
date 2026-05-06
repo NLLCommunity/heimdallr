@@ -2,6 +2,7 @@ package web
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -27,6 +28,7 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 		slog.Warn("dashboard.base_url uses http — this is insecure in production", "url", parsedURL.String())
 	}
 	allowedOrigin := canonicalOrigin(parsedURL)
+	secureCookie := parsedURL.Scheme == "https"
 
 	trustedProxies, err := parseTrustedProxies(viper.GetStringSlice("web.trusted_proxies"))
 	if err != nil {
@@ -42,8 +44,8 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	mux.HandleFunc("GET /", handleRoot)
 	mux.HandleFunc("GET /login", handleLogin)
 	mux.HandleFunc("GET /callback", handleCallbackGET)
-	mux.HandleFunc("POST /callback", handleCallbackPOST(allowedOrigin))
-	mux.HandleFunc("GET /logout", handleLogout)
+	mux.HandleFunc("POST /callback", handleCallbackPOST(allowedOrigin, secureCookie))
+	mux.HandleFunc("GET /logout", handleLogout(secureCookie))
 
 	// Guild routes.
 	mux.HandleFunc("GET /guilds", handleGuilds(client))
@@ -137,7 +139,7 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	serverErr := make(chan error, 1)
 	go func() {
 		slog.Info("Starting web server", "addr", addr)
-		if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := s.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			serverErr <- err
 		}
 		close(serverErr)

@@ -3,12 +3,10 @@ package web
 import (
 	"context"
 	"net/http"
-	"strings"
 
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/snowflake/v2"
-	"github.com/spf13/viper"
 
 	"github.com/NLLCommunity/heimdallr/model"
 )
@@ -26,8 +24,7 @@ func setSession(ctx context.Context, session *model.DashboardSession) context.Co
 
 const sessionCookieName = "heimdallr_session"
 
-func makeSessionCookie(token string, maxAge int) *http.Cookie {
-	secure := strings.HasPrefix(strings.ToLower(viper.GetString("dashboard.base_url")), "https")
+func makeSessionCookie(token string, maxAge int, secure bool) *http.Cookie {
 	return &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    token,

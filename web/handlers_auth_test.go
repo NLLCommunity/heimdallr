@@ -100,7 +100,7 @@ func TestHandleLogout_ClearsCookieWithMaxAgeZero(t *testing.T) {
 	req := httptest.NewRequest("GET", "/logout", nil)
 	rec := httptest.NewRecorder()
 
-	handleLogout(rec, req)
+	handleLogout(false)(rec, req)
 
 	assert.Equal(t, http.StatusSeeOther, rec.Code)
 
@@ -124,7 +124,7 @@ func TestHandleLogout_ClearsCookieWithMaxAgeZero(t *testing.T) {
 // never touched (no model.DB set up in this test), so a cookie-bearing
 // response would only happen if the early return failed.
 func TestHandleCallbackPOST_RejectsCrossOrigin(t *testing.T) {
-	handler := handleCallbackPOST(testOrigin)
+	handler := handleCallbackPOST(testOrigin, false)
 
 	cases := []struct {
 		name   string

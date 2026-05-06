@@ -103,14 +103,14 @@ func newKeyedRateLimiter(r rate.Limit, burst int) *keyedRateLimiter {
 	}
 }
 
-func (l *keyedRateLimiter) getLimiter(ip string) *rate.Limiter {
+func (l *keyedRateLimiter) getLimiter(key string) *rate.Limiter {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 
-	entry, ok := l.limiters[ip]
+	entry, ok := l.limiters[key]
 	if !ok {
 		entry = &rateLimiterEntry{limiter: rate.NewLimiter(l.limit, l.burst)}
-		l.limiters[ip] = entry
+		l.limiters[key] = entry
 	}
 	entry.lastSeen = time.Now()
 	return entry.limiter
