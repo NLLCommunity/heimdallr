@@ -18,7 +18,7 @@
     },
     "HEIMDALLR_BOT_DB": {
       "description": "Path to the SQLite database file. Heroku's filesystem is ephemeral; pair with Litestream (DB_REPLICA_URL) to persist across restarts.",
-      "value": "heimdallr.db?_journal_mode=WAL",
+      "value": "heimdallr.db",
       "required": false
     },
     "HEIMDALLR_DASHBOARD_BASE_URL": {

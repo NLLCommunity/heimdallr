@@ -60,7 +60,7 @@ func init() {
 
 	// SET DEFAULTS
 	viper.SetDefault("bot.token", "")
-	viper.SetDefault("bot.db", "heimdallr.db?journal_mode=WAL")
+	viper.SetDefault("bot.db", "heimdallr.db")
 
 	viper.SetDefault("loglevel", "info")
 
