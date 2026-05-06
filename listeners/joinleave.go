@@ -43,18 +43,9 @@ func OnUserJoin(e *events.GuildMemberJoin) {
 
 	if hasV2 {
 		emojiMap := utils.BuildEmojiMap(e.Client(), guildID)
-		_, err = createV2Message(joinleaveInfo, emojiMap, guildSettings.JoinMessageV2Json, guildID, joinLeaveChannel, e.Client())
+		_, _ = createV2Message(joinleaveInfo, emojiMap, guildSettings.JoinMessageV2Json, guildID, joinLeaveChannel, e.Client())
 	} else {
-		_, err = createV1Message(joinleaveInfo, guildSettings.JoinMessage, guildID, joinLeaveChannel, e.Client())
-	}
-
-	if err != nil {
-		slog.Error(
-			"Failed to send join message.",
-			"guild_id", guildID,
-			"channel_id", joinLeaveChannel,
-			"err", err,
-		)
+		_, _ = createV1Message(joinleaveInfo, guildSettings.JoinMessage, guildID, joinLeaveChannel, e.Client())
 	}
 }
 
@@ -93,18 +84,9 @@ func OnUserLeave(e *events.GuildMemberLeave) {
 
 	if hasV2 {
 		emojiMap := utils.BuildEmojiMap(e.Client(), guildID)
-		_, err = createV2Message(joinleaveInfo, emojiMap, guildSettings.LeaveMessageV2Json, guildID, joinLeaveChannel, e.Client())
+		_, _ = createV2Message(joinleaveInfo, emojiMap, guildSettings.LeaveMessageV2Json, guildID, joinLeaveChannel, e.Client())
 	} else {
-		_, err = createV1Message(joinleaveInfo, guildSettings.LeaveMessage, guildID, joinLeaveChannel, e.Client())
-	}
-
-	if err != nil {
-		slog.Error(
-			"Failed to send leave message.",
-			"guild_id", guildID,
-			"channel_id", joinLeaveChannel,
-			"err", err,
-		)
+		_, _ = createV1Message(joinleaveInfo, guildSettings.LeaveMessage, guildID, joinLeaveChannel, e.Client())
 	}
 }
 

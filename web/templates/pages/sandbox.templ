@@ -22,7 +22,7 @@ templ Sandbox(nav layouts.NavData, data SandboxData) {
 				</div>
 				<div>
 					<h3>Send to Channel</h3>
-					<form hx-post={ "/guild/" + data.GuildID + "/sandbox/send" } hx-target="#send-result" hx-swap="innerHTML">
+					<form method="POST" action={ templ.SafeURL("/guild/" + data.GuildID + "/sandbox/send") } hx-post={ "/guild/" + data.GuildID + "/sandbox/send" } hx-target="#send-result" hx-swap="innerHTML">
 						@components.ChannelSelect("channel_id", "Channel", data.Channels, "")
 						<input type="hidden" name="components_json" x-bind:value="JSON.stringify(serialize())"/>
 						<button type="submit">Send Message</button>
