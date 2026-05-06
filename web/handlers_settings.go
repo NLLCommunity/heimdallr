@@ -212,21 +212,24 @@ func handleSaveModChannel(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
+		renderModChannelError := func(message string) {
+			renderSafe(w, r, partials.SettingsModChannel(partials.ModChannelData{
+				GuildID:          guildIDStr,
+				ModeratorChannel: idStr(settings.ModeratorChannel),
+				Channels:         guildChannels(client, guildID),
+				SaveError:        message,
+			}))
+		}
+
 		modChannel, err := parseSnowflakeOrZero(r.FormValue("moderator_channel"))
 		if err != nil {
-			renderSafe(w, r, partials.SettingsModChannel(partials.ModChannelData{
-				GuildID: guildIDStr, SaveError: "Invalid channel ID.",
-				Channels: guildChannels(client, guildID),
-			}))
+			renderModChannelError("Invalid channel ID.")
 			return
 		}
 		settings.ModeratorChannel = modChannel
 		if err := model.SetGuildSettings(settings); err != nil {
 			slog.Error("failed to save mod channel settings", "error", err)
-			renderSafe(w, r, partials.SettingsModChannel(partials.ModChannelData{
-				GuildID: guildIDStr, SaveError: "Failed to save settings.",
-				Channels: guildChannels(client, guildID),
-			}))
+			renderModChannelError("Failed to save settings.")
 			return
 		}
 
@@ -259,20 +262,24 @@ func handleSaveInfractions(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
+		renderInfractionsError := func(message string) {
+			renderSafe(w, r, partials.SettingsInfractions(partials.InfractionsData{
+				GuildID:                     guildIDStr,
+				HalfLifeDays:                settings.InfractionHalfLifeDays,
+				NotifyOnWarnedUserJoin:      settings.NotifyOnWarnedUserJoin,
+				NotifyWarnSeverityThreshold: settings.NotifyWarnSeverityThreshold,
+				SaveError:                   message,
+			}))
+		}
+
 		halfLife, err := parseFloat(r.FormValue("half_life_days"))
 		if err != nil || halfLife < minInfractionHalfLifeDays || halfLife > maxInfractionHalfLifeDays {
-			renderSafe(w, r, partials.SettingsInfractions(partials.InfractionsData{
-				GuildID:   guildIDStr,
-				SaveError: "Half-life must be between 0 and 365 days.",
-			}))
+			renderInfractionsError("Half-life must be between 0 and 365 days.")
 			return
 		}
 		threshold, err := parseFloat(r.FormValue("notify_warn_severity_threshold"))
 		if err != nil || threshold < minNotifyWarnSeverityThreshold || threshold > maxNotifyWarnSeverityThreshold {
-			renderSafe(w, r, partials.SettingsInfractions(partials.InfractionsData{
-				GuildID:   guildIDStr,
-				SaveError: "Severity threshold must be between 0 and 100.",
-			}))
+			renderInfractionsError("Severity threshold must be between 0 and 100.")
 			return
 		}
 		settings.InfractionHalfLifeDays = halfLife
@@ -281,9 +288,7 @@ func handleSaveInfractions(client *bot.Client) http.HandlerFunc {
 
 		if err := model.SetGuildSettings(settings); err != nil {
 			slog.Error("failed to save infraction settings", "error", err)
-			renderSafe(w, r, partials.SettingsInfractions(partials.InfractionsData{
-				GuildID: guildIDStr, SaveError: "Failed to save settings.",
-			}))
+			renderInfractionsError("Failed to save settings.")
 			return
 		}
 
@@ -317,20 +322,24 @@ func handleSaveAntiSpam(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
+		renderAntiSpamError := func(message string) {
+			renderSafe(w, r, partials.SettingsAntiSpam(partials.AntiSpamData{
+				GuildID:         guildIDStr,
+				Enabled:         settings.AntiSpamEnabled,
+				Count:           settings.AntiSpamCount,
+				CooldownSeconds: settings.AntiSpamCooldownSeconds,
+				SaveError:       message,
+			}))
+		}
+
 		count := parseInt(r.FormValue("count"), 5)
 		if count < minAntiSpamCount || count > maxAntiSpamCount {
-			renderSafe(w, r, partials.SettingsAntiSpam(partials.AntiSpamData{
-				GuildID:   guildIDStr,
-				SaveError: "Message count must be between 2 and 10.",
-			}))
+			renderAntiSpamError("Message count must be between 2 and 10.")
 			return
 		}
 		cooldown := parseInt(r.FormValue("cooldown_seconds"), 20)
 		if cooldown < minAntiSpamCooldownSeconds || cooldown > maxAntiSpamCooldownSeconds {
-			renderSafe(w, r, partials.SettingsAntiSpam(partials.AntiSpamData{
-				GuildID:   guildIDStr,
-				SaveError: "Cooldown must be between 1 and 60 seconds.",
-			}))
+			renderAntiSpamError("Cooldown must be between 1 and 60 seconds.")
 			return
 		}
 		settings.AntiSpamEnabled = r.FormValue("enabled") == "true"
@@ -339,9 +348,7 @@ func handleSaveAntiSpam(client *bot.Client) http.HandlerFunc {
 
 		if err := model.SetGuildSettings(settings); err != nil {
 			slog.Error("failed to save anti-spam settings", "error", err)
-			renderSafe(w, r, partials.SettingsAntiSpam(partials.AntiSpamData{
-				GuildID: guildIDStr, SaveError: "Failed to save settings.",
-			}))
+			renderAntiSpamError("Failed to save settings.")
 			return
 		}
 
@@ -381,7 +388,10 @@ func handleSaveBanFooter(client *bot.Client) http.HandlerFunc {
 		if err := model.SetGuildSettings(settings); err != nil {
 			slog.Error("failed to save ban footer settings", "error", err)
 			renderSafe(w, r, partials.SettingsBanFooter(partials.BanFooterData{
-				GuildID: guildIDStr, SaveError: "Failed to save settings.",
+				GuildID:    guildIDStr,
+				Footer:     settings.BanFooter,
+				AlwaysSend: settings.AlwaysSendBanFooter,
+				SaveError:  "Failed to save settings.",
 			}))
 			return
 		}
@@ -415,31 +425,31 @@ func handleSaveModmail(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
+		renderModmailError := func(message string) {
+			renderSafe(w, r, partials.SettingsModmail(partials.ModmailData{
+				GuildID:                   guildIDStr,
+				ReportThreadsChannel:      idStr(ms.ReportThreadsChannel),
+				ReportNotificationChannel: idStr(ms.ReportNotificationChannel),
+				ReportPingRole:            idStr(ms.ReportPingRole),
+				Channels:                  guildChannels(client, guildID),
+				Roles:                     guildRoles(client, guildID),
+				SaveError:                 message,
+			}))
+		}
+
 		reportThreadsChannel, err := parseSnowflakeOrZero(r.FormValue("report_threads_channel"))
 		if err != nil {
-			renderSafe(w, r, partials.SettingsModmail(partials.ModmailData{
-				GuildID: guildIDStr, SaveError: "Invalid channel ID.",
-				Channels: guildChannels(client, guildID),
-				Roles:    guildRoles(client, guildID),
-			}))
+			renderModmailError("Invalid channel ID.")
 			return
 		}
 		reportNotificationChannel, err := parseSnowflakeOrZero(r.FormValue("report_notification_channel"))
 		if err != nil {
-			renderSafe(w, r, partials.SettingsModmail(partials.ModmailData{
-				GuildID: guildIDStr, SaveError: "Invalid channel ID.",
-				Channels: guildChannels(client, guildID),
-				Roles:    guildRoles(client, guildID),
-			}))
+			renderModmailError("Invalid channel ID.")
 			return
 		}
 		reportPingRole, err := parseSnowflakeOrZero(r.FormValue("report_ping_role"))
 		if err != nil {
-			renderSafe(w, r, partials.SettingsModmail(partials.ModmailData{
-				GuildID: guildIDStr, SaveError: "Invalid role ID.",
-				Channels: guildChannels(client, guildID),
-				Roles:    guildRoles(client, guildID),
-			}))
+			renderModmailError("Invalid role ID.")
 			return
 		}
 		ms.ReportThreadsChannel = reportThreadsChannel
@@ -448,11 +458,7 @@ func handleSaveModmail(client *bot.Client) http.HandlerFunc {
 
 		if err := model.SetModmailSettings(ms); err != nil {
 			slog.Error("failed to save modmail settings", "error", err)
-			renderSafe(w, r, partials.SettingsModmail(partials.ModmailData{
-				GuildID: guildIDStr, SaveError: "Failed to save settings.",
-				Channels: guildChannels(client, guildID),
-				Roles:    guildRoles(client, guildID),
-			}))
+			renderModmailError("Failed to save settings.")
 			return
 		}
 
@@ -489,22 +495,36 @@ func handleSaveGatekeep(client *bot.Client) http.HandlerFunc {
 		}
 
 		settings.GatekeepEnabled = r.FormValue("enabled") == "true"
+		approvedV2Raw := r.FormValue("approved_message_v2_json")
+
+		// Closure captures `settings` and `approvedV2Raw` by reference, so the
+		// rendered partial reflects whatever state has been applied at the
+		// point of the error — old DB values for early parse errors, the
+		// would-be-saved values once form fields have been assigned.
+		renderGatekeepError := func(message string) {
+			renderSafe(w, r, partials.SettingsGatekeep(partials.GatekeepData{
+				GuildID:               guildIDStr,
+				Enabled:               settings.GatekeepEnabled,
+				PendingRole:           idStr(settings.GatekeepPendingRole),
+				ApprovedRole:          idStr(settings.GatekeepApprovedRole),
+				AddPendingRoleOnJoin:  settings.GatekeepAddPendingRoleOnJoin,
+				ApprovedMessage:       settings.GatekeepApprovedMessage,
+				ApprovedMessageV2:     settings.GatekeepApprovedMessageV2,
+				ApprovedMessageV2Json: approvedV2Raw,
+				Roles:                 guildRoles(client, guildID),
+				Placeholders:          utils.MessageTemplatePlaceholders,
+				SaveError:             message,
+			}))
+		}
+
 		pendingRole, err := parseSnowflakeOrZero(r.FormValue("pending_role"))
 		if err != nil {
-			renderSafe(w, r, partials.SettingsGatekeep(partials.GatekeepData{
-				GuildID: guildIDStr, SaveError: "Invalid role ID.",
-				Roles:        guildRoles(client, guildID),
-				Placeholders: utils.MessageTemplatePlaceholders,
-			}))
+			renderGatekeepError("Invalid role ID.")
 			return
 		}
 		approvedRole, err := parseSnowflakeOrZero(r.FormValue("approved_role"))
 		if err != nil {
-			renderSafe(w, r, partials.SettingsGatekeep(partials.GatekeepData{
-				GuildID: guildIDStr, SaveError: "Invalid role ID.",
-				Roles:        guildRoles(client, guildID),
-				Placeholders: utils.MessageTemplatePlaceholders,
-			}))
+			renderGatekeepError("Invalid role ID.")
 			return
 		}
 		settings.GatekeepPendingRole = pendingRole
@@ -512,23 +532,10 @@ func handleSaveGatekeep(client *bot.Client) http.HandlerFunc {
 		settings.GatekeepAddPendingRoleOnJoin = r.FormValue("add_pending_role_on_join") == "true"
 		settings.GatekeepApprovedMessage = r.FormValue("approved_message")
 		settings.GatekeepApprovedMessageV2 = r.FormValue("approved_message_v2") == "true"
-		approvedV2Raw := r.FormValue("approved_message_v2_json")
 		if settings.GatekeepApprovedMessageV2 {
 			compact, err := validateAndCompactV2JSON(approvedV2Raw)
 			if err != nil {
-				renderSafe(w, r, partials.SettingsGatekeep(partials.GatekeepData{
-					GuildID:               guildIDStr,
-					Enabled:               settings.GatekeepEnabled,
-					PendingRole:           idStr(settings.GatekeepPendingRole),
-					ApprovedRole:          idStr(settings.GatekeepApprovedRole),
-					AddPendingRoleOnJoin:  settings.GatekeepAddPendingRoleOnJoin,
-					ApprovedMessage:       settings.GatekeepApprovedMessage,
-					ApprovedMessageV2:     settings.GatekeepApprovedMessageV2,
-					ApprovedMessageV2Json: approvedV2Raw,
-					Roles:                 guildRoles(client, guildID),
-					Placeholders:          utils.MessageTemplatePlaceholders,
-					SaveError:             "Approved message: " + err.Error() + ".",
-				}))
+				renderGatekeepError("Approved message: " + err.Error() + ".")
 				return
 			}
 			settings.GatekeepApprovedMessageV2Json = compact
@@ -538,11 +545,7 @@ func handleSaveGatekeep(client *bot.Client) http.HandlerFunc {
 
 		if err := model.SetGuildSettings(settings); err != nil {
 			slog.Error("failed to save gatekeep settings", "error", err)
-			renderSafe(w, r, partials.SettingsGatekeep(partials.GatekeepData{
-				GuildID: guildIDStr, SaveError: "Failed to save settings.",
-				Roles:        guildRoles(client, guildID),
-				Placeholders: utils.MessageTemplatePlaceholders,
-			}))
+			renderGatekeepError("Failed to save settings.")
 			return
 		}
 
