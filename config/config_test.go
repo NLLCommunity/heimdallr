@@ -121,10 +121,15 @@ func TestParsedDashboardBaseURL(t *testing.T) {
 		{"valid https", "https://dashboard.example.com", false},
 		{"valid https with port", "https://dashboard.example.com:8484", false},
 		{"valid http", "http://localhost:8484", false},
+		{"valid trailing slash", "https://dashboard.example.com/", false},
 		{"empty", "", true},
 		{"missing scheme", "example.com", true},
 		{"non-http scheme", "ftp://example.com", true},
 		{"scheme only", "https://", true},
+		{"with path", "https://example.com/dashboard", true},
+		{"with deep path", "https://example.com/foo/bar", true},
+		{"with query", "https://example.com/?foo=bar", true},
+		{"with fragment", "https://example.com/#frag", true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

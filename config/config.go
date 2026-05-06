@@ -15,6 +15,11 @@ import (
 // alone accepts inputs like "" or "example.com" (no scheme), which would
 // otherwise produce broken relative login links and a CORS allow-list that
 // matches no browser-sent Origin.
+//
+// A non-empty path, query, or fragment is rejected: the web server registers
+// its routes (/callback, /static/, /guild/{id}/...) at the root, and templates
+// emit absolute root-relative links, so the app only works mounted at a host
+// root. Sub-path deployment would silently produce broken login links.
 func ParsedDashboardBaseURL() (*url.URL, error) {
 	raw := viper.GetString("dashboard.base_url")
 	u, err := url.Parse(raw)
@@ -26,6 +31,15 @@ func ParsedDashboardBaseURL() (*url.URL, error) {
 	}
 	if u.Host == "" {
 		return nil, fmt.Errorf("dashboard.base_url %q: host is empty", raw)
+	}
+	if u.Path != "" && u.Path != "/" {
+		return nil, fmt.Errorf("dashboard.base_url %q: must not include a path; the dashboard only supports being mounted at the host root", raw)
+	}
+	if u.RawQuery != "" {
+		return nil, fmt.Errorf("dashboard.base_url %q: must not include a query string", raw)
+	}
+	if u.Fragment != "" {
+		return nil, fmt.Errorf("dashboard.base_url %q: must not include a fragment", raw)
 	}
 	return u, nil
 }
