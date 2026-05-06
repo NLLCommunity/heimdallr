@@ -27,7 +27,7 @@ func setSession(ctx context.Context, session *model.DashboardSession) context.Co
 const sessionCookieName = "heimdallr_session"
 
 func makeSessionCookie(token string, maxAge int) *http.Cookie {
-	secure := strings.HasPrefix(viper.GetString("dashboard.base_url"), "https")
+	secure := strings.HasPrefix(strings.ToLower(viper.GetString("dashboard.base_url")), "https")
 	return &http.Cookie{
 		Name:     sessionCookieName,
 		Value:    token,
