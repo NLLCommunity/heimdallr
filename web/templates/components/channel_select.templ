@@ -1,0 +1,29 @@
+package components
+
+import "github.com/disgoorg/disgo/discord"
+
+type ChannelInfo struct {
+	ID       string
+	Name     string
+	Type     discord.ChannelType
+	Position int
+	ParentID string
+}
+
+templ ChannelSelect(name string, label string, channels []ChannelInfo, selected string) {
+	<label for={ name }>{ label }</label>
+	<select id={ name } name={ name }>
+		<option value="">— None —</option>
+		for _, ch := range channels {
+			if isTextChannel(ch.Type) {
+				<option value={ ch.ID } selected?={ ch.ID == selected }>
+					#{ ch.Name }
+				</option>
+			}
+		}
+	</select>
+}
+
+func isTextChannel(t discord.ChannelType) bool {
+	return t == discord.ChannelTypeGuildText || t == discord.ChannelTypeGuildNews
+}

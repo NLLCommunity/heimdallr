@@ -15,10 +15,6 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 )
 
-func Ref[T any](v T) *T {
-	return &v
-}
-
 func CalcHalfLife(timeSince time.Duration, halfLifeTimeDays, weight float64) float64 {
 	if halfLifeTimeDays == 0.0 {
 		return weight
@@ -127,11 +123,8 @@ func GetMembersIter(r rest.Rest, guildID snowflake.ID) iter.Seq[IterResult[disco
 		for {
 			members, err := r.GetMembers(guildID, LIMIT, memberOffset)
 			if err != nil {
-				yield(
-					IterResult[discord.Member]{
-						Error: err,
-					},
-				)
+				yield(IterResult[discord.Member]{Error: err})
+				return
 			}
 
 			count := len(members)

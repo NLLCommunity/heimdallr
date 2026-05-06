@@ -104,6 +104,46 @@ func TestConfigPaths(t *testing.T) {
 	})
 }
 
+func TestParsedDashboardBaseURL(t *testing.T) {
+	// Save/restore only the key this test mutates. viper.Reset() would also
+	// drop the defaults, env-key replacer, and AutomaticEnv wiring registered
+	// in config.init(), making later tests depend on this one running first.
+	original := viper.Get("dashboard.base_url")
+	t.Cleanup(func() { viper.Set("dashboard.base_url", original) })
+
+	cases := []struct {
+		name    string
+		raw     string
+		wantErr bool
+	}{
+		{"valid https", "https://dashboard.example.com", false},
+		{"valid https with port", "https://dashboard.example.com:8484", false},
+		{"valid http", "http://localhost:8484", false},
+		{"valid trailing slash", "https://dashboard.example.com/", false},
+		{"empty", "", true},
+		{"missing scheme", "example.com", true},
+		{"non-http scheme", "ftp://example.com", true},
+		{"scheme only", "https://", true},
+		{"with path", "https://example.com/dashboard", true},
+		{"with deep path", "https://example.com/foo/bar", true},
+		{"with query", "https://example.com/?foo=bar", true},
+		{"with fragment", "https://example.com/#frag", true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			viper.Set("dashboard.base_url", tc.raw)
+			u, err := ParsedDashboardBaseURL()
+			if tc.wantErr {
+				assert.Error(t, err)
+				assert.Nil(t, u)
+				return
+			}
+			assert.NoError(t, err)
+			assert.NotNil(t, u)
+		})
+	}
+}
+
 func TestConfigFileType(t *testing.T) {
 	// Save original config
 	originalConfig := viper.AllSettings()

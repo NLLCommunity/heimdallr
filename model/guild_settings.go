@@ -20,16 +20,22 @@ type GuildSettings struct {
 	NotifyOnWarnedUserJoin      bool
 	NotifyWarnSeverityThreshold float64 `gorm:"default:1.0"`
 
-	GatekeepEnabled              bool
-	GatekeepPendingRole          snowflake.ID
-	GatekeepApprovedRole         snowflake.ID
-	GatekeepAddPendingRoleOnJoin bool
-	GatekeepApprovedMessage      string
+	GatekeepEnabled               bool
+	GatekeepPendingRole           snowflake.ID
+	GatekeepApprovedRole          snowflake.ID
+	GatekeepAddPendingRoleOnJoin  bool
+	GatekeepApprovedMessage       string
+	GatekeepApprovedMessageV2     bool
+	GatekeepApprovedMessageV2Json string
 
 	JoinMessageEnabled  bool
 	JoinMessage         string
+	JoinMessageV2       bool
+	JoinMessageV2Json   string
 	LeaveMessageEnabled bool
 	LeaveMessage        string
+	LeaveMessageV2      bool
+	LeaveMessageV2Json  string
 	JoinLeaveChannel    snowflake.ID
 
 	AntiSpamEnabled         bool

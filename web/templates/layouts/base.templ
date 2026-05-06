@@ -1,0 +1,54 @@
+package layouts
+
+import "github.com/NLLCommunity/heimdallr/model"
+
+type NavData struct {
+	User      *model.DashboardSession
+	GuildID   string
+	GuildName string
+}
+
+templ Base(title string, nav NavData) {
+	<!DOCTYPE html>
+	<html lang="en" data-theme="dark">
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<title>{ title } — Heimdallr</title>
+		<link rel="stylesheet"
+			href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css"
+			integrity="sha384-L1dWfspMTHU/ApYnFiMz2QID/PlP1xCW9visvBdbEkOLkSSWsP6ZJWhPw6apiXxU"
+			crossorigin="anonymous"/>
+		<link rel="stylesheet" href="/static/css/custom.css"/>
+		<script src="/static/js/htmx.min.js"></script>
+		<script src="/static/js/htmx-config.js"></script>
+		<script src="/static/js/message-builder.js"></script>
+		<script src="/static/js/form-tracker.js"></script>
+		<script defer src="/static/js/alpine.min.js"></script>
+	</head>
+	<body>
+		@Navbar(nav)
+		<main class="container">
+			{ children... }
+		</main>
+		<div id="toast-container" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+	</body>
+	</html>
+}
+
+templ Navbar(nav NavData) {
+	<nav class="container">
+		<ul>
+			<li><strong>Heimdallr</strong></li>
+		</ul>
+		<ul>
+			if nav.GuildName != "" {
+				<li>{ nav.GuildName }</li>
+			}
+			if nav.User != nil {
+				<li>{ nav.User.Username }</li>
+				<li><a href="/logout">Logout</a></li>
+			}
+		</ul>
+	</nav>
+}

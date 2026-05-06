@@ -25,22 +25,22 @@ var antiSpamSubcommand = discord.ApplicationCommandOptionSubCommand{
 			Name:        "count",
 			Description: "The number of messages allowed before Heimdallr takes action (within the cooldown period)",
 			Required:    false,
-			MinValue:    utils.Ref(1),
-			MaxValue:    utils.Ref(15),
+			MinValue:    new(1),
+			MaxValue:    new(15),
 		},
 		discord.ApplicationCommandOptionInt{
 			Name:        "cooldown",
 			Description: "The time in seconds to wait before resetting the message count",
 			Required:    false,
-			MinValue:    utils.Ref(1),
-			MaxValue:    utils.Ref(60),
+			MinValue:    new(1),
+			MaxValue:    new(60),
 		},
 		discord.ApplicationCommandOptionInt{
 			Name:        "timeout",
 			Description: "The time in minutes to timeout a user who has exceeded the message count",
 			Required:    false,
-			MinValue:    utils.Ref(1),
-			MaxValue:    utils.Ref(10080), // 7 days
+			MinValue:    new(1),
+			MaxValue:    new(10080), // 7 days
 		},
 		discord.ApplicationCommandOptionString{
 			Name:        "reset",

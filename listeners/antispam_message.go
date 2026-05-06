@@ -6,6 +6,7 @@ import (
 	"math"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/agnivade/levenshtein"
 	"github.com/disgoorg/disgo/discord"
@@ -24,13 +25,10 @@ const maxMessages = 20
 
 var whitespaceReplacer = strings.NewReplacer(
 	" ", "",
-	" ", "",
-	" ", "",
+	"\u00A0", "",
+	"\u202F", "",
 	"\t", "",
 	"\u200b", "",
-	" ", "",
-	" ", "",
-	" ", "",
 )
 
 var userMessages = ttlcache.New[string, userMessagesInfo](
@@ -81,8 +79,9 @@ func OnAntispamMessageCreate(e *events.GuildMessageCreate) {
 
 	messageDetails := createMessageDetails(e.Message)
 
-	// Check if this message is similar to previous messages across channels
-	// matching minimum length and Levenshtein distance thresholds.
+	// Check if this message is similar to any previous message in the user's
+	// recent buffer (same channel or different — the cross-channel guard was
+	// removed deliberately in 5b2170f to broaden detection).
 	matchesPreviousMessage := compareToPreviousMessages(messageDetails, info)
 	if matchesPreviousMessage {
 		info.Score++
@@ -159,32 +158,46 @@ func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSetting
 const (
 	maxTopLevelComponents = 10
 	maxTotalComponents    = 40
-	maxTotalTextLength    = 4000
-	maxPerMessageContent  = 500
+	maxTotalTextLength    = 4000 // characters (runes) — Discord-side limit
+	maxPerMessageContent  = 500  // runes — see truncateContent
 	truncationMarker      = "…"
 )
+
+// truncateContent returns s truncated to at most maxRunes runes, appending
+// the truncation marker (counted within the budget) if anything was cut.
+// Cuts on rune boundaries — never in the middle of a multi-byte UTF-8
+// codepoint. If maxRunes is too small to fit the marker, returns an empty
+// string rather than violating the rune-count contract.
+func truncateContent(s string, maxRunes int) string {
+	if utf8.RuneCountInString(s) <= maxRunes {
+		return s
+	}
+	markerLen := utf8.RuneCountInString(truncationMarker)
+	if maxRunes < markerLen {
+		return ""
+	}
+	runes := []rune(s)
+	return string(runes[:maxRunes-markerLen]) + truncationMarker
+}
 
 func createTimeoutMessage(e *events.GuildMessageCreate, msgs []*messageDetails, deletedCount int) discord.MessageCreate {
 	summary := fmt.Sprintf("User %s has been timed out for spamming. Deleted %d messages.", e.Message.Author.Username, deletedCount)
 
 	components := []discord.LayoutComponent{discord.NewTextDisplay(summary)}
 	totalComponents := 1
-	totalText := len(summary)
+	totalText := utf8.RuneCountInString(summary)
 
 	const omissionReserveText = 64
 	omitted := 0
 
 	for i, m := range msgs {
-		content := m.Content
-		if len(content) > maxPerMessageContent {
-			content = content[:maxPerMessageContent] + truncationMarker
-		}
+		content := truncateContent(m.Content, maxPerMessageContent)
 		contentText := fmt.Sprintf(">>> %s", content)
 		channelText := fmt.Sprintf("-# Channel: <#%d>", m.ChannelID)
 
 		// Each entry adds 1 container + 2 text displays.
 		const addComponents = 3
-		addText := len(contentText) + len(channelText)
+		addText := utf8.RuneCountInString(contentText) + utf8.RuneCountInString(channelText)
 
 		// Reserve budget for a possible "N omitted" notice if there are more entries after this one.
 		reserveComponents := 0
@@ -223,17 +236,18 @@ func compareToPreviousMessages(details *messageDetails, info userMessagesInfo) b
 
 	slog.Debug("Comparing message to previous messages.", "current_message", details.Content, "previous_messages_count", len(info.Messages))
 
+	// Remove all whitespace from the message content
+	currentMessage := whitespaceReplacer.Replace(details.Content)
+
 	for _, mInfo := range info.Messages {
-		// Remove all whitespace from the message content
-		currentMessage := whitespaceReplacer.Replace(details.Content)
-		if len(currentMessage) < minMessageLength {
+		if utf8.RuneCountInString(currentMessage) < minMessageLength {
 			return false
 		}
 
 		prevMessage := whitespaceReplacer.Replace(mInfo.Content)
 
 		distance := levenshtein.ComputeDistance(currentMessage, prevMessage)
-		messageLength := float64(len(currentMessage))
+		messageLength := float64(utf8.RuneCountInString(currentMessage))
 		maxLevenshteinDistance := int(math.Ceil(messageLength * maxLevenshteinDistancePercent / 100))
 		if distance <= maxLevenshteinDistance {
 			// Return true if these are similar messages

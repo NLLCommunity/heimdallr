@@ -66,7 +66,7 @@ func ModmailReportModalHandler(e *handler.ModalEvent) error {
 		discord.GuildPrivateThreadCreate{
 			Name:                title,
 			AutoArchiveDuration: 10080,
-			Invitable:           utils.Ref(false),
+			Invitable:           new(false),
 		},
 	)
 	if err != nil {
@@ -80,7 +80,7 @@ func ModmailReportModalHandler(e *handler.ModalEvent) error {
 	if slowMode > 0 {
 		_, err := e.Client().Rest.UpdateChannel(
 			thread.ID(), discord.GuildThreadUpdate{
-				RateLimitPerUser: utils.Ref(slowMode),
+				RateLimitPerUser: new(slowMode),
 			},
 		)
 		if err != nil {

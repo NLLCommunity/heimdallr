@@ -57,14 +57,14 @@ func TestCalcHalfLife(t *testing.T) {
 func TestRef(t *testing.T) {
 	t.Run("string", func(t *testing.T) {
 		s := "test"
-		ptr := Ref(s)
+		ptr := new(s)
 		assert.Equal(t, &s, ptr)
 		assert.Equal(t, s, *ptr)
 	})
 
 	t.Run("int", func(t *testing.T) {
 		i := 42
-		ptr := Ref(i)
+		ptr := new(i)
 		assert.Equal(t, &i, ptr)
 		assert.Equal(t, i, *ptr)
 	})

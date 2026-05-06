@@ -32,6 +32,8 @@ func InitDB(path string) (*gorm.DB, error) {
 		&ModmailSettings{},
 		&TempBan{},
 		&MemberPendingPrune{},
+		&DashboardLoginCode{},
+		&DashboardSession{},
 	)
 	if err != nil {
 		slog.Error("failed to migrate database", "error", err)

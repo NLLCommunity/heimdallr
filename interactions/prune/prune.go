@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/cbroglie/mustache"
@@ -58,8 +59,8 @@ var PruneCommand = discord.SlashCommandCreate{
 			},
 			Required: true,
 
-			MinValue: utils.Ref(0),
-			MaxValue: utils.Ref(90),
+			MinValue: new(0),
+			MaxValue: new(90),
 		},
 	},
 }
@@ -118,20 +119,18 @@ func removeKickedMembersAndNotify(e *handler.ComponentEvent, guildID snowflake.I
 	// channel if it is enabled.
 
 	modChannelText := ""
-	joinleaveText := ""
+	var joinleaveText strings.Builder
 
 	for _, member := range members {
 
 		modChannelText += fmt.Sprintf("-# %s\n", getUsernameOrID(e.Client(), guildID, member.UserID))
 		text, err := renderLeaveMessage(e.Client(), guildID, member.UserID)
 		if err == nil {
-			joinleaveText += text + "\n"
+			joinleaveText.WriteString(text + "\n")
 		} else {
-			joinleaveText += fmt.Sprintf(
-				"-# `%s` (ID: `%s`) left the server.\n",
+			fmt.Fprintf(&joinleaveText, "-# `%s` (ID: `%s`) left the server.\n",
 				getUsernameOrID(e.Client(), guildID, member.UserID),
-				member.UserID,
-			)
+				member.UserID)
 		}
 	}
 
@@ -144,7 +143,7 @@ func removeKickedMembersAndNotify(e *handler.ComponentEvent, guildID snowflake.I
 
 	// Split messages up into parts, in case there is a long list of pruned members.
 	modChannelTextSplit := utils.SplitStringToLengthByLine(modChannelText, 2000)
-	joinleaveTextSplit := utils.SplitStringToLengthByLine(joinleaveText, 2000)
+	joinleaveTextSplit := utils.SplitStringToLengthByLine(joinleaveText.String(), 2000)
 
 	if settings.ModeratorChannel != 0 {
 		// Handle moderator notification of pruned members if a moderator channel is defined.
@@ -351,12 +350,13 @@ func preparePruneMembers(pruneID uuid.UUID, members []discord.Member) (
 		return discord.MessageCreate{}, err
 	}
 
-	content := fmt.Sprintf("## The following %d members will be pruned and kicked from the server\n", len(members))
+	var content strings.Builder
+	fmt.Fprintf(&content, "## The following %d members will be pruned and kicked from the server\n", len(members))
 	for _, member := range members {
-		content += fmt.Sprintf("- `%s` (`%s`)\n", member.User.Username, member.User.ID)
+		fmt.Fprintf(&content, "- `%s` (`%s`)\n", member.User.Username, member.User.ID)
 	}
 
-	message := ix.EphemeralMessageContent(content).
+	message := ix.EphemeralMessageContent(content.String()).
 		AddActionRow(
 			discord.NewDangerButton("Prune members", fmt.Sprintf("/button/prune-members/confirm/%s", pruneID)),
 			discord.NewSecondaryButton("Cancel", fmt.Sprintf("/button/prune-members/cancel/%s", pruneID)),

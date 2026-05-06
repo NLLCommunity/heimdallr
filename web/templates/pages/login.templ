@@ -1,0 +1,17 @@
+package pages
+
+import "github.com/NLLCommunity/heimdallr/web/templates/layouts"
+
+templ Login() {
+	@layouts.Base("Login", layouts.NavData{}) {
+		<article>
+			<header>
+				<h2>Heimdallr Dashboard</h2>
+			</header>
+			<p>
+				To log in, use the <code>/admin-dashboard</code> command in your Discord server.
+				You will receive a one-time login link that expires in 5 minutes.
+			</p>
+		</article>
+	}
+}

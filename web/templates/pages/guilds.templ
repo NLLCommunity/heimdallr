@@ -1,0 +1,52 @@
+package pages
+
+import (
+	"strings"
+
+	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
+)
+
+type GuildData struct {
+	ID   string
+	Name string
+	Icon string
+}
+
+// initialFor returns the first non-whitespace rune of name as a string, or
+// "?" if name is empty or whitespace-only. Guards against indexing an empty
+// rune slice in the icon fallback.
+func initialFor(name string) string {
+	for _, r := range strings.TrimSpace(name) {
+		return string(r)
+	}
+	return "?"
+}
+
+templ Guilds(nav layouts.NavData, guilds []GuildData) {
+	@layouts.Base("Select Server", nav) {
+		<h2>Select a Server</h2>
+		if len(guilds) == 0 {
+			<p>No servers found where you have admin permissions.</p>
+		}
+		<div class="grid">
+			for _, g := range guilds {
+				<a href={ templ.SafeURL("/guild/" + g.ID) } style="text-decoration: none;">
+					<article style="text-align: center;">
+						if g.Icon != "" {
+							<img
+								src={ "https://cdn.discordapp.com/icons/" + g.ID + "/" + g.Icon + ".png?size=128" }
+								alt={ g.Name }
+								style="width: 64px; height: 64px; border-radius: 50%; margin-bottom: 0.5rem;"
+							/>
+						} else {
+							<div style="width: 64px; height: 64px; border-radius: 50%; background: var(--pico-muted-border-color); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; font-size: 1.5rem; color: var(--pico-muted-color);">
+								{ initialFor(g.Name) }
+							</div>
+						}
+						<h3>{ g.Name }</h3>
+					</article>
+				</a>
+			}
+		</div>
+	}
+}

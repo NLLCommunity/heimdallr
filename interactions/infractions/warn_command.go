@@ -63,8 +63,8 @@ var WarnCommand = discord.SlashCommandCreate{
 				discord.LocaleNorwegian: "Alvorlighetsgraden til advarselen.",
 			},
 			Required: false,
-			MinValue: utils.Ref(0.0),
-			MaxValue: utils.Ref(10.0),
+			MinValue: new(0.0),
+			MaxValue: new(10.0),
 		},
 
 		discord.ApplicationCommandOptionBool{

@@ -11,7 +11,6 @@ import (
 	ix "github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/interactions/quote"
 	"github.com/NLLCommunity/heimdallr/model"
-	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 var ModmailReportMessageCommand = discord.MessageCommandCreate{
@@ -147,7 +146,7 @@ func createReportThreadAndMessage(data *reportData) error {
 		discord.GuildPrivateThreadCreate{
 			Name:                title,
 			AutoArchiveDuration: 10080,
-			Invitable:           utils.Ref(false),
+			Invitable:           new(false),
 		},
 	)
 	if err != nil {

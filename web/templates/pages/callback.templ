@@ -1,0 +1,18 @@
+package pages
+
+import "github.com/NLLCommunity/heimdallr/web/templates/layouts"
+
+templ Callback(code string) {
+	@layouts.Base("Login", layouts.NavData{}) {
+		<article>
+			<header>
+				<h2>Heimdallr Dashboard</h2>
+			</header>
+			<p>Click the button below to complete your login.</p>
+			<form method="POST" action="/callback">
+				<input type="hidden" name="code" value={ code }/>
+				<button type="submit">Log in</button>
+			</form>
+		</article>
+	}
+}
