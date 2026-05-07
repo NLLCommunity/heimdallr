@@ -76,7 +76,8 @@ func ListPosts(guildID snowflake.ID) ([]Post, error) {
 
 // UpdatePostFields runs an optimistic-locked UPDATE: succeeds only if
 // expectedVersion matches the row's current Version, and bumps Version by 1.
-// Returns ErrPostStaleVersion on conflict.
+// Returns gorm.ErrRecordNotFound when no post matches (guildID, id), and
+// ErrPostStaleVersion when the post exists but has been bumped since.
 func UpdatePostFields(guildID snowflake.ID, id, expectedVersion uint, name, componentsJSON string, channelID snowflake.ID, updatedBy snowflake.ID) (*Post, error) {
 	res := DB.Model(&Post{}).
 		Where("guild_id = ? AND id = ? AND version = ?", guildID, id, expectedVersion).
@@ -91,6 +92,13 @@ func UpdatePostFields(guildID snowflake.ID, id, expectedVersion uint, name, comp
 		return nil, res.Error
 	}
 	if res.RowsAffected == 0 {
+		// 0 rows can mean either "no such post in this guild" or "version
+		// drifted". A second SELECT disambiguates so callers can return a
+		// 404 vs 409 instead of conflating them.
+		var existing Post
+		if err := DB.Where("guild_id = ? AND id = ?", guildID, id).First(&existing).Error; err != nil {
+			return nil, err
+		}
 		return nil, ErrPostStaleVersion
 	}
 	return GetPost(guildID, id)

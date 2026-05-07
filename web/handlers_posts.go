@@ -10,6 +10,7 @@ import (
 
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/snowflake/v2"
+	"gorm.io/gorm"
 
 	"github.com/NLLCommunity/heimdallr/interactions/post_dashboard"
 	"github.com/NLLCommunity/heimdallr/model"
@@ -201,6 +202,9 @@ func handlePostSave(client *bot.Client) http.HandlerFunc {
 
 		updated, err := model.UpdatePostFields(guildID, uint(postID), uint(expectedVersion), name, componentsJSON, channelID, session.UserID)
 		switch {
+		case errors.Is(err, gorm.ErrRecordNotFound):
+			http.Error(w, "post not found", http.StatusNotFound)
+			return
 		case errors.Is(err, model.ErrPostStaleVersion):
 			http.Error(w, "this post was updated by someone else; reload and try again", http.StatusConflict)
 			return

@@ -44,6 +44,18 @@ func (s *PostTestSuite) TestUpdatePostFieldsReturnsStaleVersionOnConflict() {
 	assert.ErrorIs(s.T(), err, ErrPostStaleVersion)
 }
 
+func (s *PostTestSuite) TestUpdatePostFieldsReturnsNotFoundForMissingPost() {
+	_, err := UpdatePostFields(postTestGuild, 99999, 1, "x", "[]", 0, 99)
+	assert.ErrorIs(s.T(), err, gorm.ErrRecordNotFound)
+}
+
+func (s *PostTestSuite) TestUpdatePostFieldsReturnsNotFoundForWrongGuild() {
+	p, _ := CreatePost(postTestGuild, "n1", "[]", 0, 99)
+	const otherGuild = snowflake.ID(9999999999)
+	_, err := UpdatePostFields(otherGuild, p.ID, p.Version, "n2", "[]", 0, 99)
+	assert.ErrorIs(s.T(), err, gorm.ErrRecordNotFound)
+}
+
 func (s *PostTestSuite) TestReplacePostMessagesDensifiesPositions() {
 	p, _ := CreatePost(postTestGuild, "n1", "[]", 0, 99)
 	err := ReplacePostMessages(p.ID, []PostMessage{
