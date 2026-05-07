@@ -330,13 +330,22 @@ func handlePostPublish(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 		// the messages it managed to send are already on Discord and need to be tracked
 		// in the DB so subsequent publishes don't orphan them or try to edit deleted
 		// originals. ReplacePostMessages atomically swaps the set in a transaction.
+		// Persist failures here are fatal: Discord-side changes have already happened,
+		// and silently logging would leave the DB pointing at deleted messages so
+		// future publishes can't reconcile.
 		if result.RecreatedAll || (syncErr != nil && len(result.Created) > 0) {
 			rows := make([]model.PostMessage, len(result.Created))
 			for i, c := range result.Created {
 				rows[i] = model.PostMessage{ChannelID: c.ChannelID, MessageID: c.MessageID}
 			}
 			if perr := model.ReplacePostMessages(post.ID, rows); perr != nil {
-				slog.Error("ReplacePostMessages failed during partial-recreate persist", "error", perr, "post_id", post.ID)
+				slog.Error("ReplacePostMessages failed after Discord-side recreate; DB and Discord are now divergent (manual cleanup may be required)",
+					"error", perr,
+					"post_id", post.ID,
+					"created", result.Created,
+				)
+				http.Error(w, "publish committed on Discord but failed to persist; reload and retry", http.StatusInternalServerError)
+				return
 			}
 		} else if len(existing) == 0 && len(result.Created) > 0 {
 			// First-publish success path (no recreate, no existing).
@@ -345,8 +354,12 @@ func handlePostPublish(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 				rows[i] = model.PostMessage{ChannelID: c.ChannelID, MessageID: c.MessageID}
 			}
 			if perr := model.ReplacePostMessages(post.ID, rows); perr != nil {
-				slog.Error("ReplacePostMessages failed on first publish", "error", perr, "post_id", post.ID)
-				http.Error(w, "internal error", http.StatusInternalServerError)
+				slog.Error("ReplacePostMessages failed on first publish; messages live on Discord but untracked in DB",
+					"error", perr,
+					"post_id", post.ID,
+					"created", result.Created,
+				)
+				http.Error(w, "publish committed on Discord but failed to persist; reload and retry", http.StatusInternalServerError)
 				return
 			}
 		}
