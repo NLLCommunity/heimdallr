@@ -80,7 +80,13 @@ document.addEventListener('alpine:init', () => {
           this.message = (await resp.text()) || 'Save failed.';
           return;
         }
-        this.message = 'Saved. Reload to refresh version number.';
+        // Server returns {"version": N} so we can keep editing without
+        // reloading; the next save sends the new expectedVersion.
+        const data = await resp.json().catch(() => null);
+        if (data && typeof data.version === 'number') {
+          this.version = data.version;
+        }
+        this.message = 'Saved.';
       } finally {
         this.busy = false;
       }

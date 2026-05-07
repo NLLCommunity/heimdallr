@@ -148,7 +148,7 @@ func handlePostSave(client *bot.Client) http.HandlerFunc {
 			}
 		}
 
-		_, err = model.UpdatePostFields(guildID, uint(postID), uint(expectedVersion), name, componentsJSON, channelID, session.UserID)
+		updated, err := model.UpdatePostFields(guildID, uint(postID), uint(expectedVersion), name, componentsJSON, channelID, session.UserID)
 		switch {
 		case errors.Is(err, model.ErrPostStaleVersion):
 			http.Error(w, "this post was updated by someone else; reload and try again", http.StatusConflict)
@@ -158,7 +158,12 @@ func handlePostSave(client *bot.Client) http.HandlerFunc {
 			http.Error(w, "failed to save post", http.StatusInternalServerError)
 			return
 		}
-		w.WriteHeader(http.StatusNoContent)
+
+		// Return the bumped version so the client can keep editing without
+		// reloading. Without this, the next save would 409 with a stale
+		// expectedVersion.
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_ = json.NewEncoder(w).Encode(map[string]uint{"version": updated.Version})
 	}
 }
 
