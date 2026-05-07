@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/snowflake/v2"
@@ -19,6 +20,23 @@ import (
 	"github.com/NLLCommunity/heimdallr/web/templates/pages"
 	"github.com/NLLCommunity/heimdallr/web/templates/partials"
 )
+
+// publishLocks serializes publish/unpublish operations per post. Without it,
+// two moderators clicking Publish concurrently can both run posts.Sync against
+// the same Discord state and leave orphaned messages or stale post_messages
+// rows. TryLock + 409 surfaces contention to the user instead of silently
+// racing.
+//
+// Single-process only: the dashboard runs as one bot, so a sync.Map is enough.
+// If we ever scale to multiple replicas, this needs to move to a row lock or
+// a distributed lock.
+var publishLocks sync.Map // map[uint]*sync.Mutex
+
+func acquirePublishLock(postID uint) (*sync.Mutex, bool) {
+	m, _ := publishLocks.LoadOrStore(postID, &sync.Mutex{})
+	mu := m.(*sync.Mutex)
+	return mu, mu.TryLock()
+}
 
 // modGate runs the post-mod permission check using the captured slash command ID.
 // Returns parsed guildID and true on success; writes the error response and
@@ -291,6 +309,12 @@ func handlePostPublish(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 			http.Error(w, "invalid post ID", http.StatusBadRequest)
 			return
 		}
+		mu, acquired := acquirePublishLock(uint(postID))
+		if !acquired {
+			http.Error(w, "another publish/unpublish is in progress for this post; try again in a moment", http.StatusConflict)
+			return
+		}
+		defer mu.Unlock()
 		post, err := model.GetPost(guildID, uint(postID))
 		if err != nil {
 			http.Error(w, "post not found", http.StatusNotFound)
@@ -325,6 +349,18 @@ func handlePostPublish(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 
 		dc := posts.NewLiveDiscord(client, guildID)
 		result, syncErr := posts.Sync(dc, posts.SyncPlan{NewChunks: chunks, ChannelID: post.ChannelID}, existingMsgs)
+
+		// Log best-effort delete failures from Sync (e.g. messages already
+		// removed manually or permissions changed) so an operator can spot
+		// orphans. The publish itself can still succeed.
+		for _, f := range result.DeleteFailures {
+			slog.Warn("post sync: failed to delete Discord message during publish",
+				"error", f.Err,
+				"post_id", post.ID,
+				"channel_id", f.ChannelID,
+				"message_id", f.MessageID,
+			)
+		}
 
 		// Persist created messages first — even if Sync returned an error mid-recreate,
 		// the messages it managed to send are already on Discord and need to be tracked
@@ -411,6 +447,12 @@ func handlePostUnpublish(client *bot.Client, limiter *keyedRateLimiter) http.Han
 			http.Error(w, "invalid post ID", http.StatusBadRequest)
 			return
 		}
+		mu, acquired := acquirePublishLock(uint(postID))
+		if !acquired {
+			http.Error(w, "another publish/unpublish is in progress for this post; try again in a moment", http.StatusConflict)
+			return
+		}
+		defer mu.Unlock()
 		post, err := model.GetPost(guildID, uint(postID))
 		if err != nil {
 			http.Error(w, "post not found", http.StatusNotFound)
@@ -424,7 +466,14 @@ func handlePostUnpublish(client *bot.Client, limiter *keyedRateLimiter) http.Han
 		}
 		dc := posts.NewLiveDiscord(client, guildID)
 		for _, e := range existing {
-			_ = dc.Delete(e.ChannelID, e.MessageID)
+			if derr := dc.Delete(e.ChannelID, e.MessageID); derr != nil {
+				slog.Warn("unpublish: failed to delete Discord message",
+					"error", derr,
+					"post_id", post.ID,
+					"channel_id", e.ChannelID,
+					"message_id", e.MessageID,
+				)
+			}
 		}
 		if err := model.ReplacePostMessages(post.ID, nil); err != nil {
 			slog.Error("ReplacePostMessages(nil) failed", "error", err, "post_id", post.ID)
@@ -451,6 +500,12 @@ func handlePostDelete(client *bot.Client, limiter *keyedRateLimiter) http.Handle
 			http.Error(w, "invalid post ID", http.StatusBadRequest)
 			return
 		}
+		mu, acquired := acquirePublishLock(uint(postID))
+		if !acquired {
+			http.Error(w, "another publish/unpublish is in progress for this post; try again in a moment", http.StatusConflict)
+			return
+		}
+		defer mu.Unlock()
 		post, err := model.GetPost(guildID, uint(postID))
 		if err != nil {
 			http.Error(w, "post not found", http.StatusNotFound)
@@ -459,7 +514,14 @@ func handlePostDelete(client *bot.Client, limiter *keyedRateLimiter) http.Handle
 		existing, _ := model.ListPostMessages(guildID, post.ID)
 		dc := posts.NewLiveDiscord(client, guildID)
 		for _, e := range existing {
-			_ = dc.Delete(e.ChannelID, e.MessageID)
+			if derr := dc.Delete(e.ChannelID, e.MessageID); derr != nil {
+				slog.Warn("delete: failed to remove Discord message",
+					"error", derr,
+					"post_id", post.ID,
+					"channel_id", e.ChannelID,
+					"message_id", e.MessageID,
+				)
+			}
 		}
 		if err := model.DeletePost(guildID, post.ID); err != nil {
 			slog.Error("DeletePost failed", "error", err, "post_id", post.ID)

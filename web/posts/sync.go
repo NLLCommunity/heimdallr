@@ -38,21 +38,40 @@ type SyncPlan struct {
 //   - KeptCount: how many of `existing` were edited in place
 //   - DeletedCount: how many trailing existing rows were deleted
 //   - RecreatedAll: true when the engine deleted everything and re-sent
+//   - DeleteFailures: best-effort deletes that errored on Discord — typically
+//     because the message was already gone or permissions changed. Surfaced
+//     to the caller so it can log specific IDs for manual cleanup; the sync
+//     engine itself ignores them on the assumption that "we wanted it gone
+//     and now it's gone (or never was there)" is fine.
 type SyncResult struct {
-	Created      []CreatedMessage
-	KeptCount    int
-	DeletedCount int
-	RecreatedAll bool
+	Created        []CreatedMessage
+	KeptCount      int
+	DeletedCount   int
+	RecreatedAll   bool
+	DeleteFailures []DeleteFailure
+}
+
+// DeleteFailure is a single Discord delete error captured by Sync. ChannelID
+// + MessageID identify the (now-orphaned-or-already-gone) message; Err is
+// the underlying REST error.
+type DeleteFailure struct {
+	ChannelID snowflake.ID
+	MessageID snowflake.ID
+	Err       error
 }
 
 // Sync executes the publish-or-update operation against Discord.
 func Sync(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (SyncResult, error) {
 	if isRetargeted(plan.ChannelID, existing) {
+		var failures []DeleteFailure
 		for _, e := range existing {
-			_ = c.Delete(e.ChannelID, e.MessageID)
+			if err := c.Delete(e.ChannelID, e.MessageID); err != nil {
+				failures = append(failures, DeleteFailure{ChannelID: e.ChannelID, MessageID: e.MessageID, Err: err})
+			}
 		}
 		result, err := firstPublish(c, plan)
 		result.RecreatedAll = true
+		result.DeleteFailures = failures
 		return result, err
 	}
 
@@ -83,10 +102,12 @@ func isRetargeted(target snowflake.ID, existing []ExistingMessage) bool {
 }
 
 func recreateAll(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (SyncResult, error) {
-	for _, e := range existing {
-		_ = c.Delete(e.ChannelID, e.MessageID)
-	}
 	out := SyncResult{RecreatedAll: true}
+	for _, e := range existing {
+		if err := c.Delete(e.ChannelID, e.MessageID); err != nil {
+			out.DeleteFailures = append(out.DeleteFailures, DeleteFailure{ChannelID: e.ChannelID, MessageID: e.MessageID, Err: err})
+		}
+	}
 	for _, chunk := range plan.NewChunks {
 		id, err := c.SendV2(plan.ChannelID, chunk)
 		if err != nil {
@@ -106,15 +127,14 @@ func editAndTrim(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (Sy
 			return SyncResult{}, err
 		}
 	}
-	deleted := 0
+	out := SyncResult{KeptCount: len(plan.NewChunks)}
 	for i := len(plan.NewChunks); i < len(existing); i++ {
-		_ = c.Delete(existing[i].ChannelID, existing[i].MessageID)
-		deleted++
+		if err := c.Delete(existing[i].ChannelID, existing[i].MessageID); err != nil {
+			out.DeleteFailures = append(out.DeleteFailures, DeleteFailure{ChannelID: existing[i].ChannelID, MessageID: existing[i].MessageID, Err: err})
+		}
+		out.DeletedCount++
 	}
-	return SyncResult{
-		KeptCount:    len(plan.NewChunks),
-		DeletedCount: deleted,
-	}, nil
+	return out, nil
 }
 
 func editAllInPlace(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (SyncResult, error) {

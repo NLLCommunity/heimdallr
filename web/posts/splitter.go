@@ -5,6 +5,7 @@ package posts
 
 import (
 	"fmt"
+	"unicode/utf8"
 )
 
 // Discord per-message caps for V2 component messages. Update if Discord
@@ -58,7 +59,7 @@ func textDisplayCharCount(v any) int {
 	total := 0
 	if t, ok := obj["type"].(float64); ok && int(t) == typeTextDisplay {
 		if s, ok := obj["content"].(string); ok {
-			total += len([]rune(s))
+			total += utf8.RuneCountInString(s)
 		}
 	}
 	if children, ok := obj["components"].([]any); ok {

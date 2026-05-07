@@ -132,7 +132,7 @@ func TestSync_FewerChunksDeletesTrailing(t *testing.T) {
 	assert.Equal(t, 2, result.DeletedCount)
 }
 
-func TestSync_FewerChunks_DeleteFailureIsSwallowed(t *testing.T) {
+func TestSync_FewerChunks_DeleteFailureIsCapturedNotFatal(t *testing.T) {
 	chunks := [][]any{
 		{map[string]any{"type": float64(typeTextDisplay), "content": "kept1"}},
 	}
@@ -144,6 +144,11 @@ func TestSync_FewerChunks_DeleteFailureIsSwallowed(t *testing.T) {
 	result, err := Sync(fd, SyncPlan{NewChunks: chunks, ChannelID: 42}, existing)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, result.DeletedCount)
+	if assert.Len(t, result.DeleteFailures, 1, "delete failure must be surfaced for caller logging") {
+		assert.EqualValues(t, 1002, result.DeleteFailures[0].MessageID)
+		assert.EqualValues(t, 42, result.DeleteFailures[0].ChannelID)
+		assert.Error(t, result.DeleteFailures[0].Err)
+	}
 }
 
 func TestSync_MoreChunksRecreatesAll(t *testing.T) {
