@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"gorm.io/gorm"
 )
 
 type PostTestSuite struct {
@@ -51,7 +52,7 @@ func (s *PostTestSuite) TestReplacePostMessagesDensifiesPositions() {
 		{ChannelID: 100, MessageID: 1003},
 	})
 	require.NoError(s.T(), err)
-	rows, err := ListPostMessages(p.ID)
+	rows, err := ListPostMessages(postTestGuild, p.ID)
 	require.NoError(s.T(), err)
 	require.Len(s.T(), rows, 3)
 	assert.Equal(s.T(), 0, rows[0].Position)
@@ -63,7 +64,7 @@ func (s *PostTestSuite) TestReplacePostMessagesNilClearsAll() {
 	p, _ := CreatePost(postTestGuild, "n1", "[]", 99)
 	_ = ReplacePostMessages(p.ID, []PostMessage{{ChannelID: 100, MessageID: 1}})
 	require.NoError(s.T(), ReplacePostMessages(p.ID, nil))
-	rows, _ := ListPostMessages(p.ID)
+	rows, _ := ListPostMessages(postTestGuild, p.ID)
 	assert.Empty(s.T(), rows)
 }
 
@@ -71,8 +72,8 @@ func (s *PostTestSuite) TestDeletePostDropsCascadingMessages() {
 	p, _ := CreatePost(postTestGuild, "n1", "[]", 99)
 	_ = ReplacePostMessages(p.ID, []PostMessage{{ChannelID: 100, MessageID: 1}})
 	require.NoError(s.T(), DeletePost(postTestGuild, p.ID))
-	rows, _ := ListPostMessages(p.ID)
+	rows, _ := ListPostMessages(postTestGuild, p.ID)
 	assert.Empty(s.T(), rows)
 	_, err := GetPost(postTestGuild, p.ID)
-	assert.Error(s.T(), err)
+	assert.ErrorIs(s.T(), err, gorm.ErrRecordNotFound)
 }

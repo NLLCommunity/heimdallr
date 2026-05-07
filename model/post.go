@@ -94,21 +94,39 @@ func UpdatePostFields(guildID snowflake.ID, id, expectedVersion uint, name, comp
 	return GetPost(guildID, id)
 }
 
-// DeletePost removes the post and its PostMessage rows. Discord-side cleanup
-// is the caller's responsibility (see web/posts/sync.go).
+// DeletePost removes the post and its PostMessage rows. Returns
+// gorm.ErrRecordNotFound if no post matches the (guildID, id) tuple, so
+// callers can distinguish "deleted" from "didn't exist or wrong guild".
+// Discord-side cleanup is the caller's responsibility (see web/posts/sync.go).
 func DeletePost(guildID snowflake.ID, id uint) error {
 	return DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("post_id = ?", id).Delete(&PostMessage{}).Error; err != nil {
-			return err
+		// Verify ownership first; fail fast if the post doesn't belong to
+		// this guild. This avoids deleting another guild's PostMessage
+		// rows in the (vanishingly rare) case of a guessed post ID that
+		// belongs to a different guild — the rollback would protect us
+		// anyway, but ordering the checks correctly is cheaper and clearer.
+		res := tx.Where("guild_id = ? AND id = ?", guildID, id).Delete(&Post{})
+		if res.Error != nil {
+			return res.Error
 		}
-		return tx.Where("guild_id = ? AND id = ?", guildID, id).Delete(&Post{}).Error
+		if res.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return tx.Where("post_id = ?", id).Delete(&PostMessage{}).Error
 	})
 }
 
 // ListPostMessages returns the post's Discord-message rows in position order.
-func ListPostMessages(postID uint) ([]PostMessage, error) {
+// The guild_id parameter is enforced by joining through the posts table so a
+// caller can't enumerate messages for a post in another guild via raw post IDs.
+func ListPostMessages(guildID snowflake.ID, postID uint) ([]PostMessage, error) {
 	var msgs []PostMessage
-	if err := DB.Where("post_id = ?", postID).Order("position ASC").Find(&msgs).Error; err != nil {
+	err := DB.
+		Joins("JOIN posts ON posts.id = post_messages.post_id").
+		Where("posts.guild_id = ? AND post_messages.post_id = ?", guildID, postID).
+		Order("post_messages.position ASC").
+		Find(&msgs).Error
+	if err != nil {
 		return nil, err
 	}
 	return msgs, nil
