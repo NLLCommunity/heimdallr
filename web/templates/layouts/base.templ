@@ -43,6 +43,16 @@ templ Navbar(nav NavData) {
 	<nav class="container">
 		<ul>
 			<li><strong>Heimdallr</strong></li>
+			if nav.GuildID != "" {
+				if nav.IsAdmin {
+					<li><a href={ templ.SafeURL("/guild/" + nav.GuildID) }>Settings</a></li>
+					<li><a href={ templ.SafeURL("/guild/" + nav.GuildID + "/sandbox") }>Sandbox</a></li>
+				}
+				if nav.IsPostMod {
+					<li><a href={ templ.SafeURL("/guild/" + nav.GuildID + "/posts") }>Posts</a></li>
+				}
+				<li><a href="/guilds">← All guilds</a></li>
+			}
 		</ul>
 		<ul>
 			if nav.GuildName != "" {

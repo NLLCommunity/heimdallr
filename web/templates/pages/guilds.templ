@@ -7,9 +7,11 @@ import (
 )
 
 type GuildData struct {
-	ID   string
-	Name string
-	Icon string
+	ID        string
+	Name      string
+	Icon      string
+	IsAdmin   bool
+	IsPostMod bool
 }
 
 // initialFor returns the first non-whitespace rune of name as a string, or
@@ -26,26 +28,45 @@ templ Guilds(nav layouts.NavData, guilds []GuildData) {
 	@layouts.Base("Select Server", nav) {
 		<h2>Select a Server</h2>
 		if len(guilds) == 0 {
-			<p>No servers found where you have admin permissions.</p>
+			<p>No servers found where you have admin or moderator permissions.</p>
 		}
 		<div class="grid">
 			for _, g := range guilds {
-				<a href={ templ.SafeURL("/guild/" + g.ID) } style="text-decoration: none;">
-					<article style="text-align: center;">
-						if g.Icon != "" {
-							<img
-								src={ "https://cdn.discordapp.com/icons/" + g.ID + "/" + g.Icon + ".png?size=128" }
-								alt={ g.Name }
-								style="width: 64px; height: 64px; border-radius: 50%; margin-bottom: 0.5rem;"
-							/>
-						} else {
-							<div style="width: 64px; height: 64px; border-radius: 50%; background: var(--pico-muted-border-color); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; font-size: 1.5rem; color: var(--pico-muted-color);">
-								{ initialFor(g.Name) }
-							</div>
-						}
-						<h3>{ g.Name }</h3>
-					</article>
-				</a>
+				if g.IsAdmin {
+					<a href={ templ.SafeURL("/guild/" + g.ID) } style="text-decoration: none;">
+						<article style="text-align: center;">
+							if g.Icon != "" {
+								<img
+									src={ "https://cdn.discordapp.com/icons/" + g.ID + "/" + g.Icon + ".png?size=128" }
+									alt={ g.Name }
+									style="width: 64px; height: 64px; border-radius: 50%; margin-bottom: 0.5rem;"
+								/>
+							} else {
+								<div style="width: 64px; height: 64px; border-radius: 50%; background: var(--pico-muted-border-color); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; font-size: 1.5rem; color: var(--pico-muted-color);">
+									{ initialFor(g.Name) }
+								</div>
+							}
+							<h3>{ g.Name } <small><span class="badge">Admin</span></small></h3>
+						</article>
+					</a>
+				} else {
+					<a href={ templ.SafeURL("/guild/" + g.ID + "/posts") } style="text-decoration: none;">
+						<article style="text-align: center;">
+							if g.Icon != "" {
+								<img
+									src={ "https://cdn.discordapp.com/icons/" + g.ID + "/" + g.Icon + ".png?size=128" }
+									alt={ g.Name }
+									style="width: 64px; height: 64px; border-radius: 50%; margin-bottom: 0.5rem;"
+								/>
+							} else {
+								<div style="width: 64px; height: 64px; border-radius: 50%; background: var(--pico-muted-border-color); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; font-size: 1.5rem; color: var(--pico-muted-color);">
+									{ initialFor(g.Name) }
+								</div>
+							}
+							<h3>{ g.Name } <small><span class="badge">Mod</span></small></h3>
+						</article>
+					</a>
+				}
 			}
 		</div>
 	}

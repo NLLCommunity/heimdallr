@@ -73,6 +73,8 @@ func handleSandbox(client *bot.Client) http.HandlerFunc {
 			User:      session,
 			GuildID:   guildIDStr,
 			GuildName: guild.Name,
+			IsAdmin:   true,
+			IsPostMod: true,
 		}
 
 		renderSafe(w, r, pages.Sandbox(nav, pages.SandboxData{

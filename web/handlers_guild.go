@@ -7,6 +7,7 @@ import (
 
 	"github.com/disgoorg/disgo/bot"
 
+	"github.com/NLLCommunity/heimdallr/interactions/post_dashboard"
 	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
 	"github.com/NLLCommunity/heimdallr/web/templates/pages"
 )
@@ -21,7 +22,12 @@ func handleGuilds(client *bot.Client) http.HandlerFunc {
 
 		var guilds []pages.GuildData
 		for guild := range client.Caches.Guilds() {
-			if !isGuildAdmin(client, guild, session.UserID) {
+			isAdmin := isGuildAdmin(client, guild, session.UserID)
+			isMod := false
+			if !isAdmin {
+				isMod = canUsePostDashboard(client, guild, session.UserID, post_dashboard.CommandID(), post_dashboard.DefaultMemberPerm)
+			}
+			if !isAdmin && !isMod {
 				continue
 			}
 
@@ -30,9 +36,11 @@ func handleGuilds(client *bot.Client) http.HandlerFunc {
 				icon = *guild.Icon
 			}
 			guilds = append(guilds, pages.GuildData{
-				ID:   guild.ID.String(),
-				Name: guild.Name,
-				Icon: icon,
+				ID:        guild.ID.String(),
+				Name:      guild.Name,
+				Icon:      icon,
+				IsAdmin:   isAdmin,
+				IsPostMod: isAdmin || isMod,
 			})
 		}
 

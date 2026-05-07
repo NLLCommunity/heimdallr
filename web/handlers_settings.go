@@ -17,6 +17,7 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/snowflake/v2"
 
+	"github.com/NLLCommunity/heimdallr/interactions/post_dashboard"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 	"github.com/NLLCommunity/heimdallr/web/templates/components"
@@ -154,6 +155,18 @@ func handleDashboard(client *bot.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := sessionFromContext(r.Context())
 		guildIDStr := r.PathValue("id")
+
+		// If the user is a post-mod but not an admin, send them to /posts
+		// rather than 403'ing — they have *some* access to this guild.
+		if parsedID, err := snowflake.Parse(guildIDStr); err == nil {
+			if guild, ok := client.Caches.Guild(parsedID); ok && session != nil &&
+				!isGuildAdmin(client, guild, session.UserID) &&
+				canUsePostDashboard(client, guild, session.UserID, post_dashboard.CommandID(), post_dashboard.DefaultMemberPerm) {
+				http.Redirect(w, r, "/guild/"+parsedID.String()+"/posts", http.StatusSeeOther)
+				return
+			}
+		}
+
 		guildID, ok := checkGuildAdmin(w, r, client, guildIDStr)
 		if !ok {
 			return
@@ -179,6 +192,8 @@ func handleDashboard(client *bot.Client) http.HandlerFunc {
 			User:      session,
 			GuildID:   guildIDStr,
 			GuildName: guild.Name,
+			IsAdmin:   true,
+			IsPostMod: true,
 		}
 
 		allSections := allSettingsSections(guildIDStr, settings, ms, channels, roles)
