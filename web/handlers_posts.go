@@ -242,33 +242,48 @@ func handlePostPublish(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 		}
 
 		dc := posts.NewLiveDiscord(client, guildID)
-		result, err := posts.Sync(dc, posts.SyncPlan{NewChunks: chunks, ChannelID: post.ChannelID}, existingMsgs)
-		if err != nil {
-			slog.Error("post sync failed", "error", err, "post_id", post.ID)
-			http.Error(w, "publish failed: "+err.Error(), http.StatusBadGateway)
-			return
-		}
+		result, syncErr := posts.Sync(dc, posts.SyncPlan{NewChunks: chunks, ChannelID: post.ChannelID}, existingMsgs)
 
-		// Persist the new message set.
-		if result.RecreatedAll || len(existing) == 0 {
+		// Persist created messages first — even if Sync returned an error mid-recreate,
+		// the messages it managed to send are already on Discord and need to be tracked
+		// in the DB so subsequent publishes don't orphan them or try to edit deleted
+		// originals. ReplacePostMessages atomically swaps the set in a transaction.
+		if result.RecreatedAll || (syncErr != nil && len(result.Created) > 0) {
 			rows := make([]model.PostMessage, len(result.Created))
 			for i, c := range result.Created {
 				rows[i] = model.PostMessage{ChannelID: c.ChannelID, MessageID: c.MessageID}
 			}
-			if err := model.ReplacePostMessages(post.ID, rows); err != nil {
-				slog.Error("ReplacePostMessages failed", "error", err, "post_id", post.ID)
+			if perr := model.ReplacePostMessages(post.ID, rows); perr != nil {
+				slog.Error("ReplacePostMessages failed during partial-recreate persist", "error", perr, "post_id", post.ID)
+			}
+		} else if len(existing) == 0 && len(result.Created) > 0 {
+			// First-publish success path (no recreate, no existing).
+			rows := make([]model.PostMessage, len(result.Created))
+			for i, c := range result.Created {
+				rows[i] = model.PostMessage{ChannelID: c.ChannelID, MessageID: c.MessageID}
+			}
+			if perr := model.ReplacePostMessages(post.ID, rows); perr != nil {
+				slog.Error("ReplacePostMessages failed on first publish", "error", perr, "post_id", post.ID)
 				http.Error(w, "internal error", http.StatusInternalServerError)
 				return
 			}
-		} else if result.DeletedCount > 0 {
-			// Trailing deletes: drop those rows by ID.
+		}
+
+		if syncErr != nil {
+			slog.Error("post sync failed", "error", syncErr, "post_id", post.ID)
+			http.Error(w, "publish failed: "+syncErr.Error(), http.StatusBadGateway)
+			return
+		}
+
+		// N == M edit-in-place path: nothing to persist.
+		// N < M edit-and-trim path: drop trailing rows by ID.
+		if !result.RecreatedAll && result.DeletedCount > 0 {
 			for i := result.KeptCount; i < len(existing); i++ {
-				if err := model.DeletePostMessage(existing[i].ID); err != nil {
-					slog.Warn("DeletePostMessage failed", "error", err, "id", existing[i].ID)
+				if perr := model.DeletePostMessage(existing[i].ID); perr != nil {
+					slog.Warn("DeletePostMessage failed", "error", perr, "id", existing[i].ID)
 				}
 			}
 		}
-		// N == M edits leave PostMessage rows unchanged.
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

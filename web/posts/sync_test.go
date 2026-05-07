@@ -166,6 +166,39 @@ func TestSync_MoreChunksRecreatesAll(t *testing.T) {
 	assert.Len(t, result.Created, 3)
 }
 
+func TestSync_RecreateAllAbortsMidwayWithPartialCreated(t *testing.T) {
+	chunks := [][]any{
+		{map[string]any{"type": float64(typeTextDisplay), "content": "n1"}},
+		{map[string]any{"type": float64(typeTextDisplay), "content": "n2"}},
+		{map[string]any{"type": float64(typeTextDisplay), "content": "n3"}},
+	}
+	existing := []ExistingMessage{
+		{ChannelID: 42, MessageID: 1001},
+		{ChannelID: 42, MessageID: 1002},
+	}
+	// Fail on the third send only.
+	fd := &fakeDiscordFailNthSend{n: 3}
+	result, err := Sync(fd, SyncPlan{NewChunks: chunks, ChannelID: 42}, existing)
+	assert.Error(t, err)
+	assert.True(t, result.RecreatedAll)
+	assert.Len(t, result.Created, 2) // first two succeeded
+}
+
+// fakeDiscordFailNthSend wraps fakeDiscord, but fails on the Nth Send call.
+type fakeDiscordFailNthSend struct {
+	fakeDiscord
+	n     int
+	calls int
+}
+
+func (f *fakeDiscordFailNthSend) SendV2(channelID snowflake.ID, chunk []any) (snowflake.ID, error) {
+	f.calls++
+	if f.calls == f.n {
+		return 0, errors.New("rate limited")
+	}
+	return f.fakeDiscord.SendV2(channelID, chunk)
+}
+
 func TestSync_ReTargetTriggersFullRecreate(t *testing.T) {
 	chunks := [][]any{
 		{map[string]any{"type": float64(typeTextDisplay), "content": "x"}},
