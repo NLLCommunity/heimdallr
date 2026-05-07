@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
@@ -24,10 +25,11 @@ import (
 // adversarial input early.
 const maxSandboxBodyBytes = 64 * 1024
 
-// maxSandboxContentBytes caps the V1 message content the sandbox accepts when
-// editing legacy messages. Discord's own ceiling is 2000 chars, but we leave
-// some headroom for multi-byte runes.
-const maxSandboxContentBytes = 8 * 1024
+// maxSandboxContentChars caps the V1 message content the sandbox accepts when
+// editing legacy messages, matching Discord's 2000-character ceiling. Counted
+// in runes (not bytes) so multi-byte content isn't falsely rejected and so
+// large all-ASCII payloads aren't silently waved through to a Discord 4xx.
+const maxSandboxContentChars = 2000
 
 // sandboxMessageLinkRegex matches Discord message URLs across the canary,
 // ptb, and stable subdomains. The named groups carry the snowflake IDs.
@@ -344,7 +346,7 @@ func handleSandboxEdit(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 			update = discord.NewMessageUpdateV2(discordComponents)
 		} else {
 			content := r.FormValue("content")
-			if len(content) > maxSandboxContentBytes {
+			if utf8.RuneCountInString(content) > maxSandboxContentChars {
 				renderError(http.StatusRequestEntityTooLarge, "Message content too large.")
 				return
 			}

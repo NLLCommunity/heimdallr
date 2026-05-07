@@ -58,7 +58,10 @@ func handlePostsList(client *bot.Client) http.HandlerFunc {
 	}
 }
 
-func handlePostsCreate(client *bot.Client) http.HandlerFunc {
+// handlePostsNew renders the editor for an unsaved post. Nothing is persisted
+// until the user clicks Save — handlePostsCreate inserts the row using the
+// submitted form data and the JS redirects to /posts/{id}.
+func handlePostsNew(client *bot.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := sessionFromContext(r.Context())
 		guildID, ok := modGate(w, r, client)
@@ -66,17 +69,65 @@ func handlePostsCreate(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
-		post, err := model.CreatePost(guildID, "Untitled post", "[]", session.UserID)
+		guild, _ := client.Caches.Guild(guildID)
+		nav := layouts.NavData{
+			User:      session,
+			GuildID:   guildID.String(),
+			GuildName: guild.Name,
+			IsAdmin:   isGuildAdmin(client, guild, session.UserID),
+			IsPostMod: true,
+		}
+		renderSafe(w, r, pages.PostEditor(nav, pages.PostEditorData{
+			GuildID:  guildID.String(),
+			Post:     model.Post{ComponentsJSON: "[]"},
+			Channels: guildChannels(client, guildID),
+		}))
+	}
+}
+
+func handlePostsCreate(client *bot.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		session := sessionFromContext(r.Context())
+		guildID, ok := modGate(w, r, client)
+		if !ok {
+			return
+		}
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+
+		name := r.FormValue("name")
+		if name == "" {
+			name = "Untitled post"
+		}
+		componentsJSON := r.FormValue("components_json")
+		if componentsJSON == "" {
+			componentsJSON = "[]"
+		}
+		channelIDStr := r.FormValue("channel_id")
+		var channelID snowflake.ID
+		if channelIDStr != "" {
+			id, err := snowflake.Parse(channelIDStr)
+			if err != nil {
+				http.Error(w, "invalid channel ID", http.StatusBadRequest)
+				return
+			}
+			channelID = id
+		}
+
+		post, err := model.CreatePost(guildID, name, componentsJSON, channelID, session.UserID)
 		if err != nil {
 			slog.Error("CreatePost failed", "error", err, "guild_id", guildID)
 			http.Error(w, "failed to create post", http.StatusInternalServerError)
 			return
 		}
 
-		http.Redirect(w, r,
-			"/guild/"+guildID.String()+"/posts/"+strconv.FormatUint(uint64(post.ID), 10),
-			http.StatusSeeOther,
-		)
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		_ = json.NewEncoder(w).Encode(map[string]uint{
+			"id":      post.ID,
+			"version": post.Version,
+		})
 	}
 }
 

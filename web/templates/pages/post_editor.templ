@@ -16,7 +16,11 @@ type PostEditorData struct {
 
 templ PostEditor(nav layouts.NavData, data PostEditorData) {
 	@layouts.Base("Edit post", nav) {
-		<h2>Edit post</h2>
+		if data.Post.ID == 0 {
+			<h2>New post</h2>
+		} else {
+			<h2>Edit post</h2>
+		}
 		<p><a href={ templ.SafeURL("/guild/" + data.GuildID + "/posts") }>← Back to posts</a></p>
 		<div
 			x-data="postEditor()"
@@ -25,11 +29,14 @@ templ PostEditor(nav layouts.NavData, data PostEditorData) {
 			data-version={ strconv.FormatUint(uint64(data.Post.Version), 10) }
 			data-name={ data.Post.Name }
 			data-channel-id={ data.Post.ChannelID.String() }
-			data-save-url={ "/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) }
-			data-publish-url={ "/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) + "/publish" }
-			data-unpublish-url={ "/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) + "/unpublish" }
-			data-delete-url={ "/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) + "/delete" }
-			data-preview-url={ "/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) + "/preview" }
+			data-save-url={ postSaveURL(data.GuildID, data.Post.ID) }
+			data-redirect-url-prefix={ "/guild/" + data.GuildID + "/posts/" }
+			data-preview-url={ postPreviewURL(data.GuildID, data.Post.ID) }
+			if data.Post.ID != 0 {
+				data-publish-url={ "/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) + "/publish" }
+				data-unpublish-url={ "/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) + "/unpublish" }
+				data-delete-url={ "/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) + "/delete" }
+			}
 		>
 			<div class="grid" style="grid-template-columns: 1fr 1fr;">
 				<div>
@@ -48,15 +55,17 @@ templ PostEditor(nav layouts.NavData, data PostEditorData) {
 					<form @submit.prevent="save()">
 						<button type="submit" :disabled="busy">Save</button>
 					</form>
-					<form @submit.prevent="publish()" style="margin-top: 0.5rem;">
-						<button type="submit" :disabled="busy || !channelId">Publish / Update on Discord</button>
-					</form>
-					<form @submit.prevent="unpublish()" style="margin-top: 0.5rem;">
-						<button type="submit" class="outline" :disabled="busy">Unpublish (delete from Discord)</button>
-					</form>
-					<form @submit.prevent="del()" style="margin-top: 0.5rem;">
-						<button type="submit" class="btn-danger" :disabled="busy">Delete post</button>
-					</form>
+					if data.Post.ID != 0 {
+						<form @submit.prevent="publish()" style="margin-top: 0.5rem;">
+							<button type="submit" :disabled="busy || !channelId">Publish / Update on Discord</button>
+						</form>
+						<form @submit.prevent="unpublish()" style="margin-top: 0.5rem;">
+							<button type="submit" class="outline" :disabled="busy">Unpublish (delete from Discord)</button>
+						</form>
+						<form @submit.prevent="del()" style="margin-top: 0.5rem;">
+							<button type="submit" class="btn-danger" :disabled="busy">Delete post</button>
+						</form>
+					}
 					<div x-show="message" x-text="message" class="alert" style="margin-top: 1rem;"></div>
 					<h3 style="margin-top: 1rem;">Split preview</h3>
 					<div id="split-preview"></div>
@@ -64,4 +73,18 @@ templ PostEditor(nav layouts.NavData, data PostEditorData) {
 			</div>
 		</div>
 	}
+}
+
+func postSaveURL(guildID string, postID uint) string {
+	if postID == 0 {
+		return "/guild/" + guildID + "/posts"
+	}
+	return "/guild/" + guildID + "/posts/" + strconv.FormatUint(uint64(postID), 10)
+}
+
+func postPreviewURL(guildID string, postID uint) string {
+	if postID == 0 {
+		return "/guild/" + guildID + "/posts/preview"
+	}
+	return "/guild/" + guildID + "/posts/" + strconv.FormatUint(uint64(postID), 10) + "/preview"
 }

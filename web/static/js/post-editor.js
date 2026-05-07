@@ -15,6 +15,7 @@ document.addEventListener('alpine:init', () => {
     unpublishUrl: '',
     deleteUrl: '',
     previewUrl: '',
+    redirectUrlPrefix: '',
     init() {
       const ds = this.$el.dataset;
       this.name = ds.name || '';
@@ -25,6 +26,7 @@ document.addEventListener('alpine:init', () => {
       this.unpublishUrl = ds.unpublishUrl || '';
       this.deleteUrl = ds.deleteUrl || '';
       this.previewUrl = ds.previewUrl || '';
+      this.redirectUrlPrefix = ds.redirectUrlPrefix || '';
       const raw = ds.initial || '[]';
       try {
         const parsed = JSON.parse(raw);
@@ -80,9 +82,15 @@ document.addEventListener('alpine:init', () => {
           this.message = (await resp.text()) || 'Save failed.';
           return;
         }
-        // Server returns {"version": N} so we can keep editing without
-        // reloading; the next save sends the new expectedVersion.
         const data = await resp.json().catch(() => null);
+        // First save of a new post — server returns the freshly-assigned ID
+        // and the client navigates to the editor URL so publish/delete/etc.
+        // become available.
+        if (data && typeof data.id === 'number' && this.redirectUrlPrefix) {
+          window.location.assign(this.redirectUrlPrefix + data.id);
+          return;
+        }
+        // Existing-post save: bump version so the next save doesn't 409.
         if (data && typeof data.version === 'number') {
           this.version = data.version;
         }

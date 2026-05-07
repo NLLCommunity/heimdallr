@@ -16,9 +16,9 @@ type PostsData struct {
 templ Posts(nav layouts.NavData, data PostsData) {
 	@layouts.Base("Posts", nav) {
 		<h2>Posts</h2>
-		<form method="POST" action={ templ.SafeURL("/guild/" + data.GuildID + "/posts") } style="margin-bottom: 1rem;">
-			<button type="submit">+ New post</button>
-		</form>
+		<p style="margin-bottom: 1rem;">
+			<a href={ templ.SafeURL("/guild/" + data.GuildID + "/posts/new") } role="button">+ New post</a>
+		</p>
 		<table>
 			<thead>
 				<tr>

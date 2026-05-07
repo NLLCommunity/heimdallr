@@ -40,10 +40,12 @@ type PostMessage struct {
 var ErrPostStaleVersion = errors.New("post has been updated by another writer")
 
 // CreatePost inserts a new post and returns it with ID + Version populated.
-func CreatePost(guildID snowflake.ID, name, componentsJSON string, updatedBy snowflake.ID) (*Post, error) {
+// Pass 0 for channelID to leave the post without a target channel.
+func CreatePost(guildID snowflake.ID, name, componentsJSON string, channelID, updatedBy snowflake.ID) (*Post, error) {
 	p := &Post{
 		GuildID:        guildID,
 		Name:           name,
+		ChannelID:      channelID,
 		ComponentsJSON: componentsJSON,
 		Version:        1,
 		UpdatedBy:      updatedBy,

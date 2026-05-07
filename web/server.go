@@ -81,7 +81,9 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	)
 
 	mux.HandleFunc("GET /guild/{id}/posts", handlePostsList(client))
+	mux.HandleFunc("GET /guild/{id}/posts/new", handlePostsNew(client))
 	mux.HandleFunc("POST /guild/{id}/posts", handlePostsCreate(client))
+	mux.HandleFunc("POST /guild/{id}/posts/preview", handlePostPreview(client))
 	mux.HandleFunc("GET /guild/{id}/posts/{postID}", handlePostEditor(client))
 	mux.HandleFunc("POST /guild/{id}/posts/{postID}", handlePostSave(client))
 	mux.HandleFunc("POST /guild/{id}/posts/{postID}/preview", handlePostPreview(client))

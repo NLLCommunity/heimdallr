@@ -21,7 +21,7 @@ func TestPostSuite(t *testing.T) {
 const postTestGuild = snowflake.ID(1234567890)
 
 func (s *PostTestSuite) TestCreatePostAssignsVersion1() {
-	p, err := CreatePost(postTestGuild, "Hello", "[]", 99)
+	p, err := CreatePost(postTestGuild, "Hello", "[]", 0, 99)
 	require.NoError(s.T(), err)
 	assert.EqualValues(s.T(), 1, p.Version)
 	assert.Equal(s.T(), "Hello", p.Name)
@@ -29,7 +29,7 @@ func (s *PostTestSuite) TestCreatePostAssignsVersion1() {
 }
 
 func (s *PostTestSuite) TestUpdatePostFieldsBumpsVersionOnSuccess() {
-	p, _ := CreatePost(postTestGuild, "n1", "[]", 99)
+	p, _ := CreatePost(postTestGuild, "n1", "[]", 0, 99)
 	updated, err := UpdatePostFields(postTestGuild, p.ID, p.Version, "n2", `[{"type":10,"content":"x"}]`, 0, 99)
 	require.NoError(s.T(), err)
 	assert.EqualValues(s.T(), 2, updated.Version)
@@ -37,7 +37,7 @@ func (s *PostTestSuite) TestUpdatePostFieldsBumpsVersionOnSuccess() {
 }
 
 func (s *PostTestSuite) TestUpdatePostFieldsReturnsStaleVersionOnConflict() {
-	p, _ := CreatePost(postTestGuild, "n1", "[]", 99)
+	p, _ := CreatePost(postTestGuild, "n1", "[]", 0, 99)
 	_, err := UpdatePostFields(postTestGuild, p.ID, p.Version, "n2", "[]", 0, 99)
 	require.NoError(s.T(), err)
 	_, err = UpdatePostFields(postTestGuild, p.ID, p.Version, "n3", "[]", 0, 99)
@@ -45,7 +45,7 @@ func (s *PostTestSuite) TestUpdatePostFieldsReturnsStaleVersionOnConflict() {
 }
 
 func (s *PostTestSuite) TestReplacePostMessagesDensifiesPositions() {
-	p, _ := CreatePost(postTestGuild, "n1", "[]", 99)
+	p, _ := CreatePost(postTestGuild, "n1", "[]", 0, 99)
 	err := ReplacePostMessages(p.ID, []PostMessage{
 		{ChannelID: 100, MessageID: 1001},
 		{ChannelID: 100, MessageID: 1002},
@@ -61,7 +61,7 @@ func (s *PostTestSuite) TestReplacePostMessagesDensifiesPositions() {
 }
 
 func (s *PostTestSuite) TestReplacePostMessagesNilClearsAll() {
-	p, _ := CreatePost(postTestGuild, "n1", "[]", 99)
+	p, _ := CreatePost(postTestGuild, "n1", "[]", 0, 99)
 	_ = ReplacePostMessages(p.ID, []PostMessage{{ChannelID: 100, MessageID: 1}})
 	require.NoError(s.T(), ReplacePostMessages(p.ID, nil))
 	rows, _ := ListPostMessages(postTestGuild, p.ID)
@@ -69,7 +69,7 @@ func (s *PostTestSuite) TestReplacePostMessagesNilClearsAll() {
 }
 
 func (s *PostTestSuite) TestDeletePostDropsCascadingMessages() {
-	p, _ := CreatePost(postTestGuild, "n1", "[]", 99)
+	p, _ := CreatePost(postTestGuild, "n1", "[]", 0, 99)
 	_ = ReplacePostMessages(p.ID, []PostMessage{{ChannelID: 100, MessageID: 1}})
 	require.NoError(s.T(), DeletePost(postTestGuild, p.ID))
 	rows, _ := ListPostMessages(postTestGuild, p.ID)
@@ -80,10 +80,10 @@ func (s *PostTestSuite) TestDeletePostDropsCascadingMessages() {
 
 func (s *PostTestSuite) TestListPostsWithCounts_RoundTrip() {
 	// Unpublished post — no PostMessage rows.
-	p1, _ := CreatePost(postTestGuild, "draft", "[]", 99)
+	p1, _ := CreatePost(postTestGuild, "draft", "[]", 0, 99)
 
 	// Published post — two PostMessage rows.
-	p2, _ := CreatePost(postTestGuild, "published", "[]", 99)
+	p2, _ := CreatePost(postTestGuild, "published", "[]", 0, 99)
 	_ = ReplacePostMessages(p2.ID, []PostMessage{
 		{ChannelID: 100, MessageID: 2001},
 		{ChannelID: 100, MessageID: 2002},
