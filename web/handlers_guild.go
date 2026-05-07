@@ -2,6 +2,8 @@ package web
 
 import (
 	"net/http"
+	"sort"
+	"strings"
 
 	"github.com/disgoorg/disgo/bot"
 
@@ -33,6 +35,14 @@ func handleGuilds(client *bot.Client) http.HandlerFunc {
 				Icon: icon,
 			})
 		}
+
+		sort.Slice(guilds, func(i, j int) bool {
+			ni, nj := strings.ToLower(guilds[i].Name), strings.ToLower(guilds[j].Name)
+			if ni != nj {
+				return ni < nj
+			}
+			return guilds[i].ID < guilds[j].ID
+		})
 
 		nav := layouts.NavData{User: session}
 		renderSafe(w, r, pages.Guilds(nav, guilds))
