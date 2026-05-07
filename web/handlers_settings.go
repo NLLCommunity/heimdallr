@@ -25,40 +25,14 @@ import (
 	"github.com/NLLCommunity/heimdallr/web/templates/partials"
 )
 
-// guildChannels returns text channels for the guild grouped by category in
-// Discord's display order: uncategorized channels first, then each category
-// (ordered by position) followed by its child channels (ordered by position).
-// The cache iterator is non-deterministic, so without explicit ordering the
-// dropdown order would change between page loads. Categories that have no
-// text channels are omitted.
+// guildChannels reads channels for the guild from the cache and returns them
+// grouped by category in Discord's display order. The cache iterator is
+// non-deterministic, so without explicit ordering the dropdown order would
+// change between page loads. Pure ordering logic lives in groupChannels so
+// it can be unit tested without a live bot client.
 func guildChannels(client *bot.Client, guildID snowflake.ID) []components.ChannelGroup {
-	type category struct {
-		name     string
-		position int
-		channels []components.ChannelInfo
-	}
-	var topLevel []components.ChannelInfo
-	categories := map[string]*category{}
-
-	getCategory := func(id string) *category {
-		if c, ok := categories[id]; ok {
-			return c
-		}
-		c := &category{}
-		categories[id] = c
-		return c
-	}
-
+	var all []components.ChannelInfo
 	for ch := range client.Caches.ChannelsForGuild(guildID) {
-		if ch.Type() == discord.ChannelTypeGuildCategory {
-			c := getCategory(ch.ID().String())
-			c.name = ch.Name()
-			c.position = ch.Position()
-			continue
-		}
-		if !components.IsTextChannel(ch.Type()) {
-			continue
-		}
 		info := components.ChannelInfo{
 			ID:       ch.ID().String(),
 			Name:     ch.Name(),
@@ -67,11 +41,53 @@ func guildChannels(client *bot.Client, guildID snowflake.ID) []components.Channe
 		}
 		if pid := ch.ParentID(); pid != nil {
 			info.ParentID = pid.String()
-			c := getCategory(info.ParentID)
-			c.channels = append(c.channels, info)
-		} else {
-			topLevel = append(topLevel, info)
 		}
+		all = append(all, info)
+	}
+	return groupChannels(all)
+}
+
+// groupChannels takes a flat list of channels (categories included) and
+// returns text channels grouped by category in Discord's display order:
+// uncategorized channels first, then each category (ordered by position)
+// followed by its text children (ordered by position). Name is the
+// tiebreaker at every level. Categories with no text children are omitted;
+// a channel whose ParentID does not match any category in the input is
+// treated as uncategorized rather than producing an empty-label optgroup.
+func groupChannels(all []components.ChannelInfo) []components.ChannelGroup {
+	type category struct {
+		name     string
+		position int
+		channels []components.ChannelInfo
+	}
+	categories := map[string]*category{}
+	for _, c := range all {
+		if c.Type == discord.ChannelTypeGuildCategory {
+			cat, ok := categories[c.ID]
+			if !ok {
+				cat = &category{}
+				categories[c.ID] = cat
+			}
+			cat.name = c.Name
+			cat.position = c.Position
+		}
+	}
+
+	var topLevel []components.ChannelInfo
+	for _, c := range all {
+		if !components.IsTextChannel(c.Type) {
+			continue
+		}
+		if c.ParentID == "" {
+			topLevel = append(topLevel, c)
+			continue
+		}
+		cat, ok := categories[c.ParentID]
+		if !ok {
+			topLevel = append(topLevel, c)
+			continue
+		}
+		cat.channels = append(cat.channels, c)
 	}
 
 	byPosition := func(a, b components.ChannelInfo) int {
