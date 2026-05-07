@@ -1,7 +1,9 @@
 package web
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
@@ -11,8 +13,10 @@ import (
 
 	"github.com/NLLCommunity/heimdallr/interactions/post_dashboard"
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/web/posts"
 	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
 	"github.com/NLLCommunity/heimdallr/web/templates/pages"
+	"github.com/NLLCommunity/heimdallr/web/templates/partials"
 )
 
 // modGate runs the post-mod permission check using the captured slash command ID.
@@ -154,6 +158,193 @@ func handlePostSave(client *bot.Client) http.HandlerFunc {
 			http.Error(w, "failed to save post", http.StatusInternalServerError)
 			return
 		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func handlePostPreview(client *bot.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		_, ok := modGate(w, r, client)
+		if !ok {
+			return
+		}
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		raw := r.FormValue("components_json")
+		var arr []any
+		if err := json.Unmarshal([]byte(raw), &arr); err != nil {
+			renderSafe(w, r, partials.PostSplitPreview(partials.PostSplitPreviewData{Error: "Invalid components JSON."}))
+			return
+		}
+		chunks, err := posts.Plan(arr)
+		if err != nil {
+			renderSafe(w, r, partials.PostSplitPreview(partials.PostSplitPreviewData{Error: err.Error()}))
+			return
+		}
+		strs := make([]string, len(chunks))
+		for i, c := range chunks {
+			b, _ := json.MarshalIndent(c, "", "  ")
+			strs[i] = string(b)
+		}
+		renderSafe(w, r, partials.PostSplitPreview(partials.PostSplitPreviewData{Chunks: strs}))
+	}
+}
+
+func handlePostPublish(client *bot.Client, limiter *keyedRateLimiter) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		session := sessionFromContext(r.Context())
+		guildID, ok := modGate(w, r, client)
+		if !ok {
+			return
+		}
+		if !limiter.getLimiter(session.UserID.String()).Allow() {
+			http.Error(w, "rate limited", http.StatusTooManyRequests)
+			return
+		}
+
+		postID, err := strconv.ParseUint(r.PathValue("postID"), 10, 64)
+		if err != nil {
+			http.Error(w, "invalid post ID", http.StatusBadRequest)
+			return
+		}
+		post, err := model.GetPost(guildID, uint(postID))
+		if err != nil {
+			http.Error(w, "post not found", http.StatusNotFound)
+			return
+		}
+		if post.ChannelID == 0 {
+			http.Error(w, "select a channel before publishing", http.StatusBadRequest)
+			return
+		}
+
+		var arr []any
+		if err := json.Unmarshal([]byte(post.ComponentsJSON), &arr); err != nil {
+			http.Error(w, "stored components are invalid; re-save the post", http.StatusUnprocessableEntity)
+			return
+		}
+		chunks, err := posts.Plan(arr)
+		if err != nil {
+			http.Error(w, fmt.Sprintf("cannot publish: %v", err), http.StatusBadRequest)
+			return
+		}
+
+		existing, err := model.ListPostMessages(guildID, post.ID)
+		if err != nil {
+			slog.Error("ListPostMessages failed", "error", err, "post_id", post.ID)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		existingMsgs := make([]posts.ExistingMessage, len(existing))
+		for i, e := range existing {
+			existingMsgs[i] = posts.ExistingMessage{ChannelID: e.ChannelID, MessageID: e.MessageID}
+		}
+
+		dc := posts.NewLiveDiscord(client, guildID)
+		result, err := posts.Sync(dc, posts.SyncPlan{NewChunks: chunks, ChannelID: post.ChannelID}, existingMsgs)
+		if err != nil {
+			slog.Error("post sync failed", "error", err, "post_id", post.ID)
+			http.Error(w, "publish failed: "+err.Error(), http.StatusBadGateway)
+			return
+		}
+
+		// Persist the new message set.
+		if result.RecreatedAll || len(existing) == 0 {
+			rows := make([]model.PostMessage, len(result.Created))
+			for i, c := range result.Created {
+				rows[i] = model.PostMessage{ChannelID: c.ChannelID, MessageID: c.MessageID}
+			}
+			if err := model.ReplacePostMessages(post.ID, rows); err != nil {
+				slog.Error("ReplacePostMessages failed", "error", err, "post_id", post.ID)
+				http.Error(w, "internal error", http.StatusInternalServerError)
+				return
+			}
+		} else if result.DeletedCount > 0 {
+			// Trailing deletes: drop those rows by ID.
+			for i := result.KeptCount; i < len(existing); i++ {
+				if err := model.DeletePostMessage(existing[i].ID); err != nil {
+					slog.Warn("DeletePostMessage failed", "error", err, "id", existing[i].ID)
+				}
+			}
+		}
+		// N == M edits leave PostMessage rows unchanged.
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func handlePostUnpublish(client *bot.Client, limiter *keyedRateLimiter) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		session := sessionFromContext(r.Context())
+		guildID, ok := modGate(w, r, client)
+		if !ok {
+			return
+		}
+		if !limiter.getLimiter(session.UserID.String()).Allow() {
+			http.Error(w, "rate limited", http.StatusTooManyRequests)
+			return
+		}
+		postID, err := strconv.ParseUint(r.PathValue("postID"), 10, 64)
+		if err != nil {
+			http.Error(w, "invalid post ID", http.StatusBadRequest)
+			return
+		}
+		post, err := model.GetPost(guildID, uint(postID))
+		if err != nil {
+			http.Error(w, "post not found", http.StatusNotFound)
+			return
+		}
+		existing, err := model.ListPostMessages(guildID, post.ID)
+		if err != nil {
+			slog.Error("ListPostMessages failed", "error", err, "post_id", post.ID)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		dc := posts.NewLiveDiscord(client, guildID)
+		for _, e := range existing {
+			_ = dc.Delete(e.ChannelID, e.MessageID)
+		}
+		if err := model.ReplacePostMessages(post.ID, nil); err != nil {
+			slog.Error("ReplacePostMessages(nil) failed", "error", err, "post_id", post.ID)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func handlePostDelete(client *bot.Client, limiter *keyedRateLimiter) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		session := sessionFromContext(r.Context())
+		guildID, ok := modGate(w, r, client)
+		if !ok {
+			return
+		}
+		if !limiter.getLimiter(session.UserID.String()).Allow() {
+			http.Error(w, "rate limited", http.StatusTooManyRequests)
+			return
+		}
+		postID, err := strconv.ParseUint(r.PathValue("postID"), 10, 64)
+		if err != nil {
+			http.Error(w, "invalid post ID", http.StatusBadRequest)
+			return
+		}
+		post, err := model.GetPost(guildID, uint(postID))
+		if err != nil {
+			http.Error(w, "post not found", http.StatusNotFound)
+			return
+		}
+		existing, _ := model.ListPostMessages(guildID, post.ID)
+		dc := posts.NewLiveDiscord(client, guildID)
+		for _, e := range existing {
+			_ = dc.Delete(e.ChannelID, e.MessageID)
+		}
+		if err := model.DeletePost(guildID, post.ID); err != nil {
+			slog.Error("DeletePost failed", "error", err, "post_id", post.ID)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		_ = session
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
