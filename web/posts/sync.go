@@ -1,0 +1,69 @@
+package posts
+
+import (
+	"github.com/disgoorg/snowflake/v2"
+)
+
+// DiscordClient is the narrow interface the sync engine needs. The
+// production wrapper lives in web/posts/discord_client.go (Task 16) and
+// adapts the disgo REST client to this interface.
+type DiscordClient interface {
+	SendV2(channelID snowflake.ID, chunk []any) (snowflake.ID, error)
+	EditV2(channelID, messageID snowflake.ID, chunk []any) error
+	Delete(channelID, messageID snowflake.ID) error
+}
+
+// ExistingMessage is one of the post's currently-published Discord messages.
+type ExistingMessage struct {
+	ChannelID snowflake.ID
+	MessageID snowflake.ID
+}
+
+// CreatedMessage is a freshly-sent message; the caller persists these as
+// PostMessage rows.
+type CreatedMessage struct {
+	ChannelID snowflake.ID
+	MessageID snowflake.ID
+}
+
+// SyncPlan is the input to Sync(): the new chunks to publish and the target
+// channel for new sends.
+type SyncPlan struct {
+	NewChunks [][]any
+	ChannelID snowflake.ID
+}
+
+// SyncResult tells the caller what changed on Discord:
+//   - Created: messages newly sent (caller must persist as PostMessage rows)
+//   - KeptCount: how many of `existing` were edited in place
+//   - DeletedCount: how many trailing existing rows were deleted
+//   - RecreatedAll: true when the engine deleted everything and re-sent
+type SyncResult struct {
+	Created      []CreatedMessage
+	KeptCount    int
+	DeletedCount int
+	RecreatedAll bool
+}
+
+// Sync executes the publish-or-update operation against Discord.
+func Sync(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (SyncResult, error) {
+	if len(existing) == 0 {
+		return firstPublish(c, plan)
+	}
+	return SyncResult{}, nil
+}
+
+func firstPublish(c DiscordClient, plan SyncPlan) (SyncResult, error) {
+	out := SyncResult{}
+	for _, chunk := range plan.NewChunks {
+		id, err := c.SendV2(plan.ChannelID, chunk)
+		if err != nil {
+			return out, err
+		}
+		out.Created = append(out.Created, CreatedMessage{
+			ChannelID: plan.ChannelID,
+			MessageID: id,
+		})
+	}
+	return out, nil
+}
