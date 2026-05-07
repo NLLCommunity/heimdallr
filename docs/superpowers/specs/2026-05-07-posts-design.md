@@ -55,6 +55,51 @@ A new `checkGuildPostMod(w, r, client, guildID)` helper in `web/context.go` mirr
 
 The slash command's interaction handler reuses the existing `/admin-dashboard` flow: generate a 5-minute one-shot login code, respond ephemerally with a clickable link to `/callback?code=…&target=posts`. The `/callback` POST flow already handles code-to-session exchange; `target` just controls where to redirect after auth (`admin` → `/guilds`, `posts` → the post dashboard for the calling guild).
 
+## Navigation and feature scoping
+
+Two dashboards share one session; what differs is which routes accept it and how the navigation surfaces what the user can reach.
+
+**Guild list (`/guilds`).** Lists every guild where the user is admin OR mod. Each entry carries a role badge: "Admin", "Mod", or "Admin & Mod". Clicking the entry routes to the appropriate landing page:
+
+- Admin (or Admin & Mod): `/guild/{id}` — the existing settings dashboard.
+- Mod-only: `/guild/{id}/posts` — the post list page.
+
+**Per-guild navigation.** `layouts.NavData` already carries `User`, `GuildID`, `GuildName`. It gains `IsAdmin` and `IsPostMod`. The nav rendered on guild-scoped pages shows:
+
+- Admin (or Admin & Mod): `Settings | Sandbox | Posts | ← All guilds`
+- Mod-only: `Posts | ← All guilds`
+
+**Default landing inside a guild.** A mod-only user who hits `/guild/{id}` directly (e.g. an old bookmark, or the redirect from `/guilds` is bypassed) is redirected to `/guild/{id}/posts` rather than 403'd, since they do have *some* access to this guild. The redirect is implemented in the existing `handleDashboard` handler: if the user is post-mod but not admin, send a 303 to the posts list. Admins see the existing settings page as before.
+
+**Slash command landing pages.** Each slash command needs to carry both the target dashboard and (for the post dashboard) the calling guild through the login round-trip. The current `DashboardLoginCode` model doesn't have these fields, so the migration adds two columns:
+
+```go
+type DashboardLoginCode struct {
+    // existing fields …
+    Target  string       // "admin" | "posts"; defaults to "admin" for backwards-compat
+    GuildID snowflake.ID // 0 unless the code came from /post-dashboard
+}
+```
+
+The handlers thread these through the login URL (`/callback?code=…`) so the POST /callback handler can issue the appropriate redirect after creating the session:
+
+- `/admin-dashboard`: writes `Target="admin"`, `GuildID=0` → post-login redirect to `/guilds` (unchanged behavior).
+- `/post-dashboard`: writes `Target="posts"`, `GuildID={callingGuildID}` → post-login redirect directly to `/guild/{GuildID}/posts`.
+
+Falling back to `/guilds` is always safe if the redirect target is missing or invalid (e.g. the user lost mod access between code creation and login).
+
+**Cross-dashboard switching.** The "← All guilds" link goes to `/guilds` regardless of which dashboard the user came from; from there they can pick another guild and the role-aware routing decides where to go next. Admins viewing the post dashboard see "Settings" and "Sandbox" in the same per-guild nav, so they don't need to bounce through `/guilds` to switch contexts.
+
+**403 vs redirect, summarized:**
+
+| Route                              | Admin | Mod-only            | Neither |
+| ---------------------------------- | ----- | ------------------- | ------- |
+| `/guild/{id}`                      | OK    | 303 → `…/posts`     | 403     |
+| `/guild/{id}/settings/*`           | OK    | 403                 | 403     |
+| `/guild/{id}/sandbox*`             | OK    | 403                 | 403     |
+| `/guild/{id}/posts*`               | OK    | OK                  | 403     |
+| `/guilds`                          | OK    | OK (mod-only items) | empty list |
+
 ## Data model
 
 Two new GORM models live in `model/`:
