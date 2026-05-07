@@ -54,10 +54,30 @@ func Sync(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (SyncResul
 	N := len(plan.NewChunks)
 	M := len(existing)
 
-	if N == M {
+	switch {
+	case N == M:
 		return editAllInPlace(c, plan, existing)
+	case N < M:
+		return editAndTrim(c, plan, existing)
 	}
 	return SyncResult{}, nil
+}
+
+func editAndTrim(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (SyncResult, error) {
+	for i, chunk := range plan.NewChunks {
+		if err := c.EditV2(existing[i].ChannelID, existing[i].MessageID, chunk); err != nil {
+			return SyncResult{}, err
+		}
+	}
+	deleted := 0
+	for i := len(plan.NewChunks); i < len(existing); i++ {
+		_ = c.Delete(existing[i].ChannelID, existing[i].MessageID)
+		deleted++
+	}
+	return SyncResult{
+		KeptCount:    len(plan.NewChunks),
+		DeletedCount: deleted,
+	}, nil
 }
 
 func editAllInPlace(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (SyncResult, error) {

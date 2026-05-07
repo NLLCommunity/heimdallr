@@ -111,3 +111,37 @@ func TestSync_EqualLengthEditsInPlace(t *testing.T) {
 	assert.EqualValues(t, 1002, fd.edited[1].messageID)
 	assert.Equal(t, 2, result.KeptCount)
 }
+
+func TestSync_FewerChunksDeletesTrailing(t *testing.T) {
+	chunks := [][]any{
+		{map[string]any{"type": float64(typeTextDisplay), "content": "kept1"}},
+	}
+	existing := []ExistingMessage{
+		{ChannelID: 42, MessageID: 1001},
+		{ChannelID: 42, MessageID: 1002},
+		{ChannelID: 42, MessageID: 1003},
+	}
+	fd := &fakeDiscord{}
+
+	result, err := Sync(fd, SyncPlan{NewChunks: chunks, ChannelID: 42}, existing)
+	assert.NoError(t, err)
+	assert.Len(t, fd.edited, 1)
+	assert.EqualValues(t, 1001, fd.edited[0].messageID)
+	assert.ElementsMatch(t, []snowflake.ID{1002, 1003}, fd.deleted)
+	assert.Equal(t, 1, result.KeptCount)
+	assert.Equal(t, 2, result.DeletedCount)
+}
+
+func TestSync_FewerChunks_DeleteFailureIsSwallowed(t *testing.T) {
+	chunks := [][]any{
+		{map[string]any{"type": float64(typeTextDisplay), "content": "kept1"}},
+	}
+	existing := []ExistingMessage{
+		{ChannelID: 42, MessageID: 1001},
+		{ChannelID: 42, MessageID: 1002},
+	}
+	fd := &fakeDiscord{deleteErr: errors.New("unknown message")}
+	result, err := Sync(fd, SyncPlan{NewChunks: chunks, ChannelID: 42}, existing)
+	assert.NoError(t, err)
+	assert.Equal(t, 1, result.DeletedCount)
+}
