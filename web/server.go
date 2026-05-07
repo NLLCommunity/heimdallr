@@ -72,6 +72,9 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	mux.HandleFunc("POST /guild/{id}/sandbox/load", handleSandboxLoad(client, sandboxLimiter))
 	mux.HandleFunc("POST /guild/{id}/sandbox/edit", handleSandboxEdit(client, sandboxLimiter))
 
+	mux.HandleFunc("GET /guild/{id}/posts", handlePostsList(client))
+	mux.HandleFunc("POST /guild/{id}/posts", handlePostsCreate(client))
+
 	// Static files.
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(getStaticFS())))
 

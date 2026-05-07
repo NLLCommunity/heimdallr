@@ -6,6 +6,8 @@ type NavData struct {
 	User      *model.DashboardSession
 	GuildID   string
 	GuildName string
+	IsAdmin   bool
+	IsPostMod bool
 }
 
 templ Base(title string, nav NavData) {
