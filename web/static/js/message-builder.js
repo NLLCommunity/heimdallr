@@ -144,6 +144,21 @@ function createDefaultNode(type) {
 document.addEventListener('alpine:init', () => {
   Alpine.data('messageBuilder', () => ({
     components: [],
+    // Editor mode:
+    //   'create'   — new V2 message (default)
+    //   'edit-v2'  — editing an existing V2 message (component editor)
+    //   'edit-v1'  — editing an existing V1 message (plain content textarea)
+    mode: 'create',
+    loadLink: '',
+    loadError: '',
+    loading: false,
+    loadedChannelId: '',
+    loadedMessageId: '',
+    v1Content: '',
+    // Captured in init() because $el rebinds to the event-target element
+    // inside event handlers (so this.$el.dataset.loadUrl would be undefined
+    // when loadMessage runs from a button click).
+    loadUrl: '',
     init() {
       // Initial JSON arrives via the `data-initial` attribute on the host
       // element. Templ's built-in HTML-attribute escaping makes that path
@@ -158,6 +173,48 @@ document.addEventListener('alpine:init', () => {
           }
         } catch (e) { /* empty */ }
       }
+      this.loadUrl = this.$el.dataset.loadUrl || '';
+    },
+    async loadMessage() {
+      if (!this.loadUrl || !this.loadLink.trim()) return;
+      this.loading = true;
+      this.loadError = '';
+      try {
+        const resp = await fetch(this.loadUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({ link: this.loadLink }),
+        });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok) {
+          this.loadError = data.error || 'Failed to load message.';
+          return;
+        }
+        this.loadedChannelId = data.channel_id || '';
+        this.loadedMessageId = data.message_id || '';
+        if (data.is_v2) {
+          this.mode = 'edit-v2';
+          this.v1Content = '';
+          this.components = (data.components || []).map(deserializeComponent).filter(Boolean);
+        } else {
+          this.mode = 'edit-v1';
+          this.v1Content = data.content || '';
+          this.components = [];
+        }
+      } catch (e) {
+        this.loadError = 'Network error while loading message.';
+      } finally {
+        this.loading = false;
+      }
+    },
+    resetToCreate() {
+      this.mode = 'create';
+      this.loadedChannelId = '';
+      this.loadedMessageId = '';
+      this.v1Content = '';
+      this.components = [];
+      this.loadLink = '';
+      this.loadError = '';
     },
     addComponent(type) {
       this.components.push(createDefaultNode(type));
