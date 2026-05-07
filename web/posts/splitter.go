@@ -127,3 +127,54 @@ func validateComponent(v any) error {
 	}
 	return nil
 }
+
+// fits reports whether the candidate chunk (current + appendant) is within
+// every per-message Discord limit. The "candidate" is conceptually the chunk
+// you would have if you appended `c` to `current`.
+func fits(current []any, c any) bool {
+	totalCount := 0
+	totalChars := 0
+	totalMedia := 0
+	for _, x := range current {
+		totalCount += componentCount(x)
+		totalChars += textDisplayCharCount(x)
+		totalMedia += mediaItemCount(x)
+	}
+	totalCount += componentCount(c)
+	totalChars += textDisplayCharCount(c)
+	totalMedia += mediaItemCount(c)
+	return totalCount <= maxComponentsPerMessage &&
+		totalChars <= maxTextDisplayCharsTotal &&
+		totalMedia <= maxMediaItemsTotal
+}
+
+// Plan packs a top-level component array into the smallest number of
+// Discord-message-sized chunks, splitting only at top-level boundaries.
+// Returns an error if a single component exceeds per-component caps and
+// could never fit a message on its own.
+func Plan(components []any) ([][]any, error) {
+	for _, c := range components {
+		if err := validateComponent(c); err != nil {
+			return nil, err
+		}
+	}
+
+	var out [][]any
+	var current []any
+	for _, c := range components {
+		if !fits(current, c) {
+			if len(current) == 0 {
+				// Single component doesn't fit on its own — should have been
+				// caught by validateComponent above, but treat defensively.
+				return nil, fmt.Errorf("component too large to fit in a single Discord message")
+			}
+			out = append(out, current)
+			current = nil
+		}
+		current = append(current, c)
+	}
+	if len(current) > 0 {
+		out = append(out, current)
+	}
+	return out, nil
+}

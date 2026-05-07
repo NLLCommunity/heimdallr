@@ -99,3 +99,66 @@ func toAnySlice[T any](in []T) []any {
 	}
 	return out
 }
+
+func TestPlan_EmptyInputReturnsEmpty(t *testing.T) {
+	chunks, err := Plan(nil)
+	assert.NoError(t, err)
+	assert.Empty(t, chunks)
+}
+
+func TestPlan_SingleSmallComponentFitsInOneMessage(t *testing.T) {
+	in := []any{parseAny(t, `{"type":10,"content":"hi"}`)}
+	chunks, err := Plan(in)
+	assert.NoError(t, err)
+	assert.Len(t, chunks, 1)
+	assert.Len(t, chunks[0], 1)
+}
+
+func TestPlan_PacksMultipleComponentsIntoOneMessage(t *testing.T) {
+	in := []any{
+		parseAny(t, `{"type":10,"content":"a"}`),
+		parseAny(t, `{"type":10,"content":"b"}`),
+		parseAny(t, `{"type":10,"content":"c"}`),
+	}
+	chunks, err := Plan(in)
+	assert.NoError(t, err)
+	assert.Len(t, chunks, 1)
+	assert.Len(t, chunks[0], 3)
+}
+
+func TestPlan_SplitsOnCharLimit(t *testing.T) {
+	half := make([]byte, maxTextDisplayCharsTotal/2+10)
+	for i := range half {
+		half[i] = 'x'
+	}
+	mk := func() any {
+		return map[string]any{"type": float64(typeTextDisplay), "content": string(half)}
+	}
+	in := []any{mk(), mk(), mk()}
+	chunks, err := Plan(in)
+	assert.NoError(t, err)
+	assert.Len(t, chunks, 3)
+}
+
+func TestPlan_SplitsOnComponentCountLimit(t *testing.T) {
+	mk := func() any { return map[string]any{"type": float64(typeTextDisplay), "content": "a"} }
+	in := make([]any, maxComponentsPerMessage+1)
+	for i := range in {
+		in[i] = mk()
+	}
+	chunks, err := Plan(in)
+	assert.NoError(t, err)
+	assert.Len(t, chunks, 2)
+	assert.Len(t, chunks[0], maxComponentsPerMessage)
+	assert.Len(t, chunks[1], 1)
+}
+
+func TestPlan_RejectsSingleOversizedComponent(t *testing.T) {
+	big := make([]byte, maxTextDisplayCharsEach+1)
+	for i := range big {
+		big[i] = 'x'
+	}
+	in := []any{map[string]any{"type": float64(typeTextDisplay), "content": string(big)}}
+	_, err := Plan(in)
+	assert.Error(t, err)
+}
