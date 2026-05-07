@@ -83,10 +83,18 @@ document.addEventListener('alpine:init', () => {
           return;
         }
         const data = await resp.json().catch(() => null);
-        // First save of a new post — server returns the freshly-assigned ID
-        // and the client navigates to the editor URL so publish/delete/etc.
-        // become available.
-        if (data && typeof data.id === 'number' && this.redirectUrlPrefix) {
+        // New posts start with version 0 in the data attribute; the server
+        // assigned a real ID on first save and the client must navigate so
+        // publish/delete/etc. become available. If the response can't be
+        // parsed or lacks an id, treat it as an error rather than silently
+        // staying on /posts/new — clicking Save again would otherwise insert
+        // a second row.
+        const isNewPost = this.version === 0;
+        if (isNewPost) {
+          if (!data || typeof data.id !== 'number' || !this.redirectUrlPrefix) {
+            this.message = 'Save returned an unexpected response. Reload the post list to see if it was saved.';
+            return;
+          }
           window.location.assign(this.redirectUrlPrefix + data.id);
           return;
         }
