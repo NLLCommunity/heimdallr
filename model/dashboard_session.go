@@ -25,10 +25,17 @@ const (
 )
 
 type DashboardLoginCode struct {
-	Code      string `gorm:"primaryKey"`
-	UserID    snowflake.ID
-	Username  string
-	Avatar    string
+	Code     string `gorm:"primaryKey"`
+	UserID   snowflake.ID
+	Username string
+	Avatar   string
+	// Target is the dashboard the post-login redirect should land on.
+	// "admin" (default) → /guilds. "posts" → /guild/{GuildID}/posts.
+	Target string `gorm:"default:admin"`
+	// GuildID is the calling guild ID for slash commands that have one
+	// (e.g. /post-dashboard). Zero for /admin-dashboard, which lets the
+	// user pick a guild on the next page.
+	GuildID   snowflake.ID
 	ExpiresAt time.Time
 }
 
@@ -40,7 +47,10 @@ type DashboardSession struct {
 	ExpiresAt time.Time
 }
 
-func CreateLoginCode(userID snowflake.ID, username, avatar string) (string, error) {
+func CreateLoginCode(userID snowflake.ID, username, avatar, target string, guildID snowflake.ID) (string, error) {
+	if target == "" {
+		target = "admin"
+	}
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
@@ -52,6 +62,8 @@ func CreateLoginCode(userID snowflake.ID, username, avatar string) (string, erro
 		UserID:    userID,
 		Username:  username,
 		Avatar:    avatar,
+		Target:    target,
+		GuildID:   guildID,
 		ExpiresAt: time.Now().Add(loginCodeExpiry),
 	}
 	if err := DB.Create(&loginCode).Error; err != nil {

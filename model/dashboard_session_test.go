@@ -10,7 +10,7 @@ import (
 
 func (suite *ModelTestSuite) TestExchangeLoginCode_Success() {
 	userID := snowflake.ID(111222333)
-	code, err := CreateLoginCode(userID, "alice", "avatar-hash")
+	code, err := CreateLoginCode(userID, "alice", "avatar-hash", "admin", 0)
 	require.NoError(suite.T(), err)
 	require.NotEmpty(suite.T(), code)
 
@@ -25,7 +25,7 @@ func (suite *ModelTestSuite) TestExchangeLoginCode_Success() {
 }
 
 func (suite *ModelTestSuite) TestExchangeLoginCode_IsOneTime() {
-	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "")
+	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "", "admin", 0)
 	require.NoError(suite.T(), err)
 
 	_, err = ExchangeLoginCode(code)
@@ -48,6 +48,7 @@ func (suite *ModelTestSuite) TestExchangeLoginCode_ExpiredCodeRejected() {
 		Code:      "expired-code-fixture",
 		UserID:    snowflake.ID(111222333),
 		Username:  "alice",
+		Target:    "admin",
 		ExpiresAt: time.Now().Add(-time.Minute),
 	}
 	require.NoError(suite.T(), DB.Create(&expired).Error)
@@ -62,7 +63,7 @@ func (suite *ModelTestSuite) TestExchangeLoginCode_UnknownCodeRejected() {
 }
 
 func (suite *ModelTestSuite) TestGetSession_RequiresRawToken() {
-	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "")
+	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "", "admin", 0)
 	require.NoError(suite.T(), err)
 	session, err := ExchangeLoginCode(code)
 	require.NoError(suite.T(), err)
@@ -79,7 +80,7 @@ func (suite *ModelTestSuite) TestGetSession_RequiresRawToken() {
 }
 
 func (suite *ModelTestSuite) TestGetSession_DBStoresHashOnly() {
-	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "")
+	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "", "admin", 0)
 	require.NoError(suite.T(), err)
 	session, err := ExchangeLoginCode(code)
 	require.NoError(suite.T(), err)
@@ -109,7 +110,7 @@ func (suite *ModelTestSuite) TestGetSession_ExpiredSessionRejected() {
 }
 
 func (suite *ModelTestSuite) TestDeleteSession_RemovesByRawToken() {
-	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "")
+	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "", "admin", 0)
 	require.NoError(suite.T(), err)
 	session, err := ExchangeLoginCode(code)
 	require.NoError(suite.T(), err)
@@ -123,10 +124,10 @@ func (suite *ModelTestSuite) TestDeleteSession_RemovesByRawToken() {
 func (suite *ModelTestSuite) TestCleanExpiredSessions() {
 	// Two expired records and one fresh one across both tables.
 	require.NoError(suite.T(), DB.Create(&DashboardLoginCode{
-		Code: "expired-code", ExpiresAt: time.Now().Add(-time.Minute),
+		Code: "expired-code", Target: "admin", ExpiresAt: time.Now().Add(-time.Minute),
 	}).Error)
 	require.NoError(suite.T(), DB.Create(&DashboardLoginCode{
-		Code: "fresh-code", ExpiresAt: time.Now().Add(time.Minute),
+		Code: "fresh-code", Target: "admin", ExpiresAt: time.Now().Add(time.Minute),
 	}).Error)
 	require.NoError(suite.T(), DB.Create(&DashboardSession{
 		Token: tokenHash("expired"), ExpiresAt: time.Now().Add(-time.Minute),
