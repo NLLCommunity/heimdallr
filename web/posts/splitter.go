@@ -3,7 +3,10 @@
 // that drives Discord-side updates from a Post's stored state.
 package posts
 
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 // Discord per-message caps for V2 component messages. Update if Discord
 // publishes new limits.
@@ -78,4 +81,49 @@ func jsonMustMarshal(v any) []byte {
 		panic(err)
 	}
 	return b
+}
+
+// mediaItemCount sums the number of items inside any media_gallery in the
+// subtree. Used to enforce Discord's per-message attachment cap.
+func mediaItemCount(v any) int {
+	obj, ok := v.(map[string]any)
+	if !ok {
+		return 0
+	}
+	total := 0
+	if t, ok := obj["type"].(float64); ok && int(t) == typeMediaGallery {
+		if items, ok := obj["items"].([]any); ok {
+			total += len(items)
+		}
+	}
+	if children, ok := obj["components"].([]any); ok {
+		for _, c := range children {
+			total += mediaItemCount(c)
+		}
+	}
+	if acc, ok := obj["accessory"].(map[string]any); ok {
+		total += mediaItemCount(acc)
+	}
+	return total
+}
+
+// validateComponent rejects components that, in isolation, can never fit a
+// Discord message — used both at save time (early feedback) and at split
+// time (defense in depth). Callers that need full per-message limits enforced
+// should check fits() instead.
+func validateComponent(v any) error {
+	obj, ok := v.(map[string]any)
+	if !ok {
+		return fmt.Errorf("component is not an object")
+	}
+	if textDisplayCharCount(obj) > maxTextDisplayCharsEach {
+		return fmt.Errorf("text_display content exceeds %d characters", maxTextDisplayCharsEach)
+	}
+	if mediaItemCount(obj) > maxMediaItemsTotal {
+		return fmt.Errorf("component contains more than %d media items", maxMediaItemsTotal)
+	}
+	if componentCount(obj) > maxComponentsPerMessage {
+		return fmt.Errorf("component tree exceeds %d total components", maxComponentsPerMessage)
+	}
+	return nil
 }
