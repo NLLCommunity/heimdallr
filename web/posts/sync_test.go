@@ -90,3 +90,24 @@ func TestSync_FirstPublishAbortsOnSendError(t *testing.T) {
 	_, err := Sync(fd, SyncPlan{NewChunks: chunks, ChannelID: 42}, nil)
 	assert.Error(t, err)
 }
+
+func TestSync_EqualLengthEditsInPlace(t *testing.T) {
+	chunks := [][]any{
+		{map[string]any{"type": float64(typeTextDisplay), "content": "new1"}},
+		{map[string]any{"type": float64(typeTextDisplay), "content": "new2"}},
+	}
+	existing := []ExistingMessage{
+		{ChannelID: 42, MessageID: 1001},
+		{ChannelID: 42, MessageID: 1002},
+	}
+	fd := &fakeDiscord{}
+
+	result, err := Sync(fd, SyncPlan{NewChunks: chunks, ChannelID: 42}, existing)
+	assert.NoError(t, err)
+	assert.Len(t, fd.edited, 2)
+	assert.Empty(t, fd.sent)
+	assert.Empty(t, fd.deleted)
+	assert.EqualValues(t, 1001, fd.edited[0].messageID)
+	assert.EqualValues(t, 1002, fd.edited[1].messageID)
+	assert.Equal(t, 2, result.KeptCount)
+}

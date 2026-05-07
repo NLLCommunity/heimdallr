@@ -50,7 +50,23 @@ func Sync(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (SyncResul
 	if len(existing) == 0 {
 		return firstPublish(c, plan)
 	}
+
+	N := len(plan.NewChunks)
+	M := len(existing)
+
+	if N == M {
+		return editAllInPlace(c, plan, existing)
+	}
 	return SyncResult{}, nil
+}
+
+func editAllInPlace(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (SyncResult, error) {
+	for i, chunk := range plan.NewChunks {
+		if err := c.EditV2(existing[i].ChannelID, existing[i].MessageID, chunk); err != nil {
+			return SyncResult{}, err
+		}
+	}
+	return SyncResult{KeptCount: len(plan.NewChunks)}, nil
 }
 
 func firstPublish(c DiscordClient, plan SyncPlan) (SyncResult, error) {
