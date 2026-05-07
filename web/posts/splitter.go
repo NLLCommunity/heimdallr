@@ -4,7 +4,6 @@
 package posts
 
 import (
-	"encoding/json"
 	"fmt"
 )
 
@@ -71,16 +70,6 @@ func textDisplayCharCount(v any) int {
 		total += textDisplayCharCount(acc)
 	}
 	return total
-}
-
-// jsonMustMarshal returns the marshaled bytes or panics — used in test/
-// rendering paths where the structure is known to be safe.
-func jsonMustMarshal(v any) []byte {
-	b, err := json.Marshal(v)
-	if err != nil {
-		panic(err)
-	}
-	return b
 }
 
 // mediaItemCount sums the number of items inside any media_gallery in the
