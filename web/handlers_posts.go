@@ -28,6 +28,20 @@ func modGate(w http.ResponseWriter, r *http.Request, client *bot.Client) (snowfl
 	return checkGuildPostMod(w, r, client, guildIDStr, post_dashboard.CommandID(), post_dashboard.DefaultMemberPerm)
 }
 
+// validatePostComponents parses the editor's components_json payload and runs
+// it through the splitter so structural problems surface at save time instead
+// of becoming "poisoned" rows that only blow up at preview/publish.
+func validatePostComponents(componentsJSON string) error {
+	var arr []any
+	if err := json.Unmarshal([]byte(componentsJSON), &arr); err != nil {
+		return fmt.Errorf("invalid components JSON: %w", err)
+	}
+	if _, err := posts.Plan(arr); err != nil {
+		return err
+	}
+	return nil
+}
+
 func handlePostsList(client *bot.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := sessionFromContext(r.Context())
@@ -105,6 +119,10 @@ func handlePostsCreate(client *bot.Client) http.HandlerFunc {
 		componentsJSON := r.FormValue("components_json")
 		if componentsJSON == "" {
 			componentsJSON = "[]"
+		}
+		if err := validatePostComponents(componentsJSON); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
 		channelIDStr := r.FormValue("channel_id")
 		var channelID snowflake.ID
@@ -190,6 +208,10 @@ func handlePostSave(client *bot.Client) http.HandlerFunc {
 		}
 		name := r.FormValue("name")
 		componentsJSON := r.FormValue("components_json")
+		if err := validatePostComponents(componentsJSON); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		channelIDStr := r.FormValue("channel_id")
 		var channelID snowflake.ID
 		if channelIDStr != "" {
