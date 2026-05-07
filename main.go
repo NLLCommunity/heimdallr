@@ -31,6 +31,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/interactions/kick"
 	"github.com/NLLCommunity/heimdallr/interactions/modmail"
 	"github.com/NLLCommunity/heimdallr/interactions/ping"
+	"github.com/NLLCommunity/heimdallr/interactions/post_dashboard"
 	"github.com/NLLCommunity/heimdallr/interactions/prune"
 	"github.com/NLLCommunity/heimdallr/interactions/quote"
 	"github.com/NLLCommunity/heimdallr/interactions/role_button"
@@ -86,6 +87,7 @@ func main() {
 	commandInteractions := []interactions.ApplicationCommandRegisterFunc{
 		admin.Register,
 		admin_dashboard.Register,
+		post_dashboard.Register,
 		ban.Register,
 		gatekeep.Register,
 		infractions.Register,
