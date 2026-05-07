@@ -71,9 +71,16 @@ document.addEventListener('alpine:init', () => {
         });
         const resp = await fetch(this.saveUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
           body,
         });
+        if (resp.status === 401) {
+          window.location.assign('/login');
+          return;
+        }
         if (resp.status === 409) {
           this.message = 'This post was updated elsewhere. Reload to see the latest version.';
           return;
@@ -111,7 +118,14 @@ document.addEventListener('alpine:init', () => {
     async unpublish() { await this._postAction(this.unpublishUrl, 'Unpublished from Discord.'); },
     async del() {
       if (!confirm('Delete this post permanently? Discord messages will also be removed.')) return;
-      const resp = await fetch(this.deleteUrl, { method: 'POST' });
+      const resp = await fetch(this.deleteUrl, {
+        method: 'POST',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+      });
+      if (resp.status === 401) {
+        window.location.assign('/login');
+        return;
+      }
       if (resp.ok) {
         window.location.assign(this.deleteUrl.replace(/\/posts\/\d+\/delete$/, '/posts'));
       } else {
@@ -122,7 +136,14 @@ document.addEventListener('alpine:init', () => {
       this.busy = true;
       this.message = '';
       try {
-        const resp = await fetch(url, { method: 'POST' });
+        const resp = await fetch(url, {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (resp.status === 401) {
+          window.location.assign('/login');
+          return;
+        }
         if (!resp.ok) {
           this.message = (await resp.text()) || 'Request failed.';
           return;
@@ -137,9 +158,13 @@ document.addEventListener('alpine:init', () => {
       try {
         const resp = await fetch(this.previewUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
           body: new URLSearchParams({ components_json: JSON.stringify(this.serialize()) }),
         });
+        if (resp.status === 401) return;
         const html = await resp.text();
         const target = document.getElementById('split-preview');
         if (target) target.innerHTML = html;

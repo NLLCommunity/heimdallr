@@ -29,16 +29,41 @@ const (
 	maxRequestBodyBytes  int64 = 1 << 20 // 1 MiB
 )
 
-// redirectToLogin issues an HX-Redirect for HTMX requests (HTMX swallows 3xx
-// silently and would swap the login page HTML into a settings panel) and a
-// normal 303 otherwise.
+// redirectToLogin steers an unauthenticated request to the login page in a
+// way each kind of caller can actually handle:
+//   - HTMX requests get HX-Redirect (HTMX swallows 3xx silently and would
+//     otherwise swap the login page HTML into a settings panel).
+//   - AJAX/fetch callers (X-Requested-With: XMLHttpRequest, or Accept asks
+//     for JSON) get 401 with a small JSON body. Without this, fetch() follows
+//     the 303 to /login and the JS sees a 200 HTML response, which it
+//     mistakes for success.
+//   - Browser navigations get a normal 303 to /login.
 func redirectToLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("HX-Request") == "true" {
 		w.Header().Set("HX-Redirect", "/login")
 		w.WriteHeader(http.StatusOK)
 		return
 	}
+	if isAJAXRequest(r) {
+		w.Header().Set("Content-Type", "application/json; charset=utf-8")
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":"not signed in","login_url":"/login"}`))
+		return
+	}
 	http.Redirect(w, r, "/login", http.StatusSeeOther)
+}
+
+// isAJAXRequest is true when the request signals that it expects a structured
+// (JSON) response rather than HTML — either via the historical
+// X-Requested-With: XMLHttpRequest marker or via Accept: application/json.
+// Used by redirectToLogin so fetch() callers don't silently follow a 303 to
+// the login page HTML.
+func isAJAXRequest(r *http.Request) bool {
+	if strings.EqualFold(r.Header.Get("X-Requested-With"), "XMLHttpRequest") {
+		return true
+	}
+	accept := r.Header.Get("Accept")
+	return strings.Contains(accept, "application/json")
 }
 
 // authMiddleware checks the session cookie and injects the session into context.

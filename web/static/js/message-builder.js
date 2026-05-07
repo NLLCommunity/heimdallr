@@ -182,9 +182,16 @@ document.addEventListener('alpine:init', () => {
       try {
         const resp = await fetch(this.loadUrl, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'X-Requested-With': 'XMLHttpRequest',
+          },
           body: new URLSearchParams({ link: this.loadLink }),
         });
+        if (resp.status === 401) {
+          window.location.assign('/login');
+          return;
+        }
         const data = await resp.json().catch(() => ({}));
         if (!resp.ok) {
           this.loadError = data.error || 'Failed to load message.';
