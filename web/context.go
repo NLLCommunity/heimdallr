@@ -116,7 +116,7 @@ func idStr(id snowflake.ID) string {
 // /post-dashboard command's permission check. Mirrors checkGuildAdmin's
 // error semantics. The caller passes the cached command ID + default perm
 // so this helper doesn't need a global registry of slash commands.
-func checkGuildPostMod(w http.ResponseWriter, r *http.Request, client *bot.Client, guildIDStr string, postDashboardCmdID snowflake.ID, defaultPerm discord.Permissions) (snowflake.ID, bool) { //nolint:unused
+func checkGuildPostMod(w http.ResponseWriter, r *http.Request, client *bot.Client, guildIDStr string, postDashboardCmdID snowflake.ID, defaultPerm discord.Permissions) (snowflake.ID, bool) {
 	session := sessionFromContext(r.Context())
 	if session == nil {
 		redirectToLogin(w, r)

@@ -35,9 +35,9 @@ func handlePostsList(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
-		posts, err := model.ListPosts(guildID)
+		postEntries, err := model.ListPostsWithCounts(guildID)
 		if err != nil {
-			slog.Error("ListPosts failed", "error", err, "guild_id", guildID)
+			slog.Error("ListPostsWithCounts failed", "error", err, "guild_id", guildID)
 			http.Error(w, "failed to load posts", http.StatusInternalServerError)
 			return
 		}
@@ -53,7 +53,7 @@ func handlePostsList(client *bot.Client) http.HandlerFunc {
 
 		renderSafe(w, r, pages.Posts(nav, pages.PostsData{
 			GuildID: guildID.String(),
-			Posts:   posts,
+			Posts:   postEntries,
 		}))
 	}
 }
@@ -359,7 +359,6 @@ func handlePostDelete(client *bot.Client, limiter *keyedRateLimiter) http.Handle
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
-		_ = session
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

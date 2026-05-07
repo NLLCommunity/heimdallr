@@ -108,7 +108,7 @@ func (c *commandOverrideCache) invalidate(guildID snowflake.ID) {
 // postDashboardOverrideCache is the package-global cache for the
 // /post-dashboard command's per-guild overrides. TTL is 5 minutes;
 // settings saves should call invalidate explicitly.
-var postDashboardOverrideCache = newCommandOverrideCache(5 * time.Minute) //nolint:unused
+var postDashboardOverrideCache = newCommandOverrideCache(5 * time.Minute)
 
 // canUsePostDashboard returns true if the user is allowed to invoke the
 // /post-dashboard command in the guild — admins always pass. It mirrors
@@ -119,7 +119,7 @@ var postDashboardOverrideCache = newCommandOverrideCache(5 * time.Minute) //noli
 // (fail-closed) — better to deny mod-only access on a transient error than
 // expose the moderator dashboard to someone whose permissions can't be
 // confirmed.
-func canUsePostDashboard(client *bot.Client, guild discord.Guild, userID, postDashboardCommandID snowflake.ID, defaultMemberPerm discord.Permissions) bool { //nolint:unused
+func canUsePostDashboard(client *bot.Client, guild discord.Guild, userID, postDashboardCommandID snowflake.ID, defaultMemberPerm discord.Permissions) bool {
 	if isGuildAdmin(client, guild, userID) {
 		return true
 	}

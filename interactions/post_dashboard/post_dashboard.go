@@ -28,6 +28,18 @@ func CommandID() snowflake.ID {
 	return snowflake.ID(commandID.Load())
 }
 
+// SetCommandID is called by main.go after handler.SyncCommands returns the
+// list of registered commands, so we know /post-dashboard's ID without
+// having to wait for someone to invoke the command first.
+func SetCommandID(cmds []discord.ApplicationCommand) {
+	for _, c := range cmds {
+		if c.Name() == "post-dashboard" {
+			commandID.Store(uint64(c.ID()))
+			return
+		}
+	}
+}
+
 // DefaultMemberPerm is the command's default permission gate; web handlers
 // use this when no per-guild overrides apply.
 const DefaultMemberPerm = discord.PermissionManageMessages

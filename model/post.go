@@ -155,3 +155,37 @@ func ReplacePostMessages(postID uint, msgs []PostMessage) error {
 func DeletePostMessage(id uint) error {
 	return DB.Where("id = ?", id).Delete(&PostMessage{}).Error
 }
+
+// PostListEntry pairs a Post with its current published-message count.
+// Used by the posts list view to render Draft vs Published correctly.
+type PostListEntry struct {
+	Post         Post
+	MessageCount int
+}
+
+// ListPostsWithCounts returns all posts for a guild with each post's current
+// PostMessage count, ordered by most-recently-updated. A MessageCount of zero
+// means the post is a draft (not currently published to Discord).
+func ListPostsWithCounts(guildID snowflake.ID) ([]PostListEntry, error) {
+	type row struct {
+		Post
+		MessageCount int
+	}
+	var rows []row
+	err := DB.
+		Table("posts").
+		Select("posts.*, COUNT(post_messages.id) AS message_count").
+		Joins("LEFT JOIN post_messages ON post_messages.post_id = posts.id").
+		Where("posts.guild_id = ?", guildID).
+		Group("posts.id").
+		Order("posts.updated_at DESC").
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]PostListEntry, len(rows))
+	for i, r := range rows {
+		out[i] = PostListEntry{Post: r.Post, MessageCount: r.MessageCount}
+	}
+	return out, nil
+}

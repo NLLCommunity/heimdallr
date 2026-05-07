@@ -156,6 +156,21 @@ func main() {
 		panic(fmt.Errorf("failed to sync commands: %w", err))
 	}
 
+	// Record the /post-dashboard command ID so the web dashboard can fetch
+	// per-guild permission overrides immediately, instead of waiting for a
+	// non-admin user to discover the dashboard via the slash command first.
+	var registered []discord.ApplicationCommand
+	if len(devGuilds) > 0 {
+		registered, err = client.Rest.GetGuildCommands(client.ApplicationID, devGuilds[0], false)
+	} else {
+		registered, err = client.Rest.GetGlobalCommands(client.ApplicationID, false)
+	}
+	if err != nil {
+		slog.Warn("failed to fetch registered commands; /post-dashboard ID will be captured on first use", "error", err)
+	} else {
+		post_dashboard.SetCommandID(registered)
+	}
+
 	err = client.OpenGateway(context.Background())
 	if err != nil {
 		panic(fmt.Errorf("failed to open gateway: %w", err))

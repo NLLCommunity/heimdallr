@@ -77,3 +77,27 @@ func (s *PostTestSuite) TestDeletePostDropsCascadingMessages() {
 	_, err := GetPost(postTestGuild, p.ID)
 	assert.ErrorIs(s.T(), err, gorm.ErrRecordNotFound)
 }
+
+func (s *PostTestSuite) TestListPostsWithCounts_RoundTrip() {
+	// Unpublished post — no PostMessage rows.
+	p1, _ := CreatePost(postTestGuild, "draft", "[]", 99)
+
+	// Published post — two PostMessage rows.
+	p2, _ := CreatePost(postTestGuild, "published", "[]", 99)
+	_ = ReplacePostMessages(p2.ID, []PostMessage{
+		{ChannelID: 100, MessageID: 2001},
+		{ChannelID: 100, MessageID: 2002},
+	})
+
+	entries, err := ListPostsWithCounts(postTestGuild)
+	require.NoError(s.T(), err)
+	require.Len(s.T(), entries, 2)
+
+	byID := make(map[uint]PostListEntry, len(entries))
+	for _, e := range entries {
+		byID[e.Post.ID] = e
+	}
+
+	assert.Equal(s.T(), 0, byID[p1.ID].MessageCount, "draft post should have zero messages")
+	assert.Equal(s.T(), 2, byID[p2.ID].MessageCount, "published post should have two messages")
+}

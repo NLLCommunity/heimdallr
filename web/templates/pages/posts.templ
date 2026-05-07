@@ -10,7 +10,7 @@ import (
 
 type PostsData struct {
 	GuildID string
-	Posts   []model.Post
+	Posts   []model.PostListEntry
 }
 
 templ Posts(nav layouts.NavData, data PostsData) {
@@ -31,16 +31,16 @@ templ Posts(nav layouts.NavData, data PostsData) {
 				for _, p := range data.Posts {
 					<tr>
 						<td>
-							<a href={ templ.SafeURL("/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(p.ID), 10)) }>{ p.Name }</a>
+							<a href={ templ.SafeURL("/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(p.Post.ID), 10)) }>{ p.Post.Name }</a>
 						</td>
 						<td>
-							if p.ChannelID == 0 {
+							if p.MessageCount == 0 {
 								Draft
 							} else {
 								Published
 							}
 						</td>
-						<td>{ p.UpdatedAt.Format(time.RFC3339) }</td>
+						<td>{ p.Post.UpdatedAt.Format(time.RFC3339) }</td>
 					</tr>
 				}
 			</tbody>
