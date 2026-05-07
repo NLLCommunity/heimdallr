@@ -5,7 +5,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/disgoorg/disgo/discord"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/NLLCommunity/heimdallr/web/templates/components"
 )
 
 func TestValidateAndCompactV2JSON(t *testing.T) {
@@ -192,4 +195,176 @@ func TestSettingsBoundsMatchErrorMessages(t *testing.T) {
 	assert.Equal(t, 365.0, maxInfractionHalfLifeDays, "half-life error text says 'between 0 and 365'")
 	assert.Equal(t, 0.0, minNotifyWarnSeverityThreshold, "severity error text says 'between 0 and 100'")
 	assert.Equal(t, 100.0, maxNotifyWarnSeverityThreshold, "severity error text says 'between 0 and 100'")
+}
+
+func TestGroupChannels(t *testing.T) {
+	const (
+		text     = discord.ChannelTypeGuildText
+		news     = discord.ChannelTypeGuildNews
+		voice    = discord.ChannelTypeGuildVoice
+		category = discord.ChannelTypeGuildCategory
+	)
+
+	cases := []struct {
+		name string
+		in   []components.ChannelInfo
+		want []components.ChannelGroup
+	}{
+		{
+			name: "empty input returns no groups",
+			in:   nil,
+			want: []components.ChannelGroup{},
+		},
+		{
+			name: "top-level only, sorted by position",
+			in: []components.ChannelInfo{
+				{ID: "b", Name: "beta", Type: text, Position: 1},
+				{ID: "a", Name: "alpha", Type: text, Position: 0},
+			},
+			want: []components.ChannelGroup{
+				{Channels: []components.ChannelInfo{
+					{ID: "a", Name: "alpha", Type: text, Position: 0},
+					{ID: "b", Name: "beta", Type: text, Position: 1},
+				}},
+			},
+		},
+		{
+			name: "duplicate positions break tie by name",
+			in: []components.ChannelInfo{
+				{ID: "z", Name: "zebra", Type: text, Position: 0},
+				{ID: "a", Name: "alpha", Type: text, Position: 0},
+			},
+			want: []components.ChannelGroup{
+				{Channels: []components.ChannelInfo{
+					{ID: "a", Name: "alpha", Type: text, Position: 0},
+					{ID: "z", Name: "zebra", Type: text, Position: 0},
+				}},
+			},
+		},
+		{
+			name: "categories interleaved with top-level: top-level rendered first, categories ordered by position",
+			in: []components.ChannelInfo{
+				{ID: "cat2", Name: "second", Type: category, Position: 1},
+				{ID: "cat1", Name: "first", Type: category, Position: 0},
+				{ID: "ch_top", Name: "top", Type: text, Position: 5},
+				{ID: "ch_b", Name: "bravo", Type: text, Position: 1, ParentID: "cat1"},
+				{ID: "ch_a", Name: "alpha", Type: text, Position: 0, ParentID: "cat1"},
+				{ID: "ch_c", Name: "charlie", Type: text, Position: 0, ParentID: "cat2"},
+			},
+			want: []components.ChannelGroup{
+				{Channels: []components.ChannelInfo{
+					{ID: "ch_top", Name: "top", Type: text, Position: 5},
+				}},
+				{Name: "first", Channels: []components.ChannelInfo{
+					{ID: "ch_a", Name: "alpha", Type: text, Position: 0, ParentID: "cat1"},
+					{ID: "ch_b", Name: "bravo", Type: text, Position: 1, ParentID: "cat1"},
+				}},
+				{Name: "second", Channels: []components.ChannelInfo{
+					{ID: "ch_c", Name: "charlie", Type: text, Position: 0, ParentID: "cat2"},
+				}},
+			},
+		},
+		{
+			name: "category appearing after its child in input is still found",
+			in: []components.ChannelInfo{
+				{ID: "ch", Name: "ch", Type: text, Position: 0, ParentID: "cat1"},
+				{ID: "cat1", Name: "late", Type: category, Position: 0},
+			},
+			want: []components.ChannelGroup{
+				{Name: "late", Channels: []components.ChannelInfo{
+					{ID: "ch", Name: "ch", Type: text, Position: 0, ParentID: "cat1"},
+				}},
+			},
+		},
+		{
+			name: "channel with ParentID matching no category falls back to top-level",
+			in: []components.ChannelInfo{
+				{ID: "orphan", Name: "orphan", Type: text, Position: 5, ParentID: "ghost"},
+			},
+			want: []components.ChannelGroup{
+				{Channels: []components.ChannelInfo{
+					{ID: "orphan", Name: "orphan", Type: text, Position: 5, ParentID: "ghost"},
+				}},
+			},
+		},
+		{
+			name: "non-text channels are filtered out",
+			in: []components.ChannelInfo{
+				{ID: "v", Name: "voice", Type: voice, Position: 0},
+				{ID: "t", Name: "text", Type: text, Position: 1},
+				{ID: "n", Name: "news", Type: news, Position: 2},
+			},
+			want: []components.ChannelGroup{
+				{Channels: []components.ChannelInfo{
+					{ID: "t", Name: "text", Type: text, Position: 1},
+					{ID: "n", Name: "news", Type: news, Position: 2},
+				}},
+			},
+		},
+		{
+			name: "category with no text channels is omitted",
+			in: []components.ChannelInfo{
+				{ID: "cat1", Name: "voice-only", Type: category, Position: 0},
+				{ID: "cat2", Name: "with-text", Type: category, Position: 1},
+				{ID: "v", Name: "v", Type: voice, Position: 0, ParentID: "cat1"},
+				{ID: "t", Name: "t", Type: text, Position: 0, ParentID: "cat2"},
+			},
+			want: []components.ChannelGroup{
+				{Name: "with-text", Channels: []components.ChannelInfo{
+					{ID: "t", Name: "t", Type: text, Position: 0, ParentID: "cat2"},
+				}},
+			},
+		},
+		{
+			name: "two categories at the same position break tie by name",
+			in: []components.ChannelInfo{
+				{ID: "cat_z", Name: "zulu", Type: category, Position: 0},
+				{ID: "cat_a", Name: "alpha", Type: category, Position: 0},
+				{ID: "cz", Name: "cz", Type: text, Position: 0, ParentID: "cat_z"},
+				{ID: "ca", Name: "ca", Type: text, Position: 0, ParentID: "cat_a"},
+			},
+			want: []components.ChannelGroup{
+				{Name: "alpha", Channels: []components.ChannelInfo{
+					{ID: "ca", Name: "ca", Type: text, Position: 0, ParentID: "cat_a"},
+				}},
+				{Name: "zulu", Channels: []components.ChannelInfo{
+					{ID: "cz", Name: "cz", Type: text, Position: 0, ParentID: "cat_z"},
+				}},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := groupChannels(tc.in)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+// The whole point of grouping is to be deterministic across page loads:
+// shuffling the input (simulating a different cache iteration order) must
+// not change the output.
+func TestGroupChannels_OrderIndependentOfInput(t *testing.T) {
+	const (
+		text     = discord.ChannelTypeGuildText
+		category = discord.ChannelTypeGuildCategory
+	)
+	canonical := []components.ChannelInfo{
+		{ID: "cat1", Name: "general", Type: category, Position: 0},
+		{ID: "cat2", Name: "voice", Type: category, Position: 1},
+		{ID: "top1", Name: "rules", Type: text, Position: 0},
+		{ID: "top2", Name: "announcements", Type: text, Position: 1},
+		{ID: "g1", Name: "chat", Type: text, Position: 0, ParentID: "cat1"},
+		{ID: "g2", Name: "memes", Type: text, Position: 1, ParentID: "cat1"},
+		{ID: "v1", Name: "voice-text", Type: text, Position: 0, ParentID: "cat2"},
+	}
+	want := groupChannels(canonical)
+
+	shuffled := []components.ChannelInfo{
+		canonical[6], canonical[0], canonical[3], canonical[5],
+		canonical[1], canonical[4], canonical[2],
+	}
+	got := groupChannels(shuffled)
+	assert.Equal(t, want, got, "output must not depend on input order")
 }
