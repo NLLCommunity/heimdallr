@@ -31,7 +31,7 @@ type DashboardLoginCode struct {
 	Avatar   string
 	// Target is the dashboard the post-login redirect should land on.
 	// "admin" (default) → /guilds. "posts" → /guild/{GuildID}/posts.
-	Target string `gorm:"default:admin"`
+	Target string `gorm:"default:'admin'"`
 	// GuildID is the calling guild ID for slash commands that have one
 	// (e.g. /post-dashboard). Zero for /admin-dashboard, which lets the
 	// user pick a guild on the next page.
