@@ -14,6 +14,7 @@ import (
 
 	"github.com/a-h/templ"
 	"github.com/disgoorg/disgo/bot"
+	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/model"
@@ -24,35 +25,91 @@ import (
 	"github.com/NLLCommunity/heimdallr/web/templates/partials"
 )
 
-// guildChannels returns a list of channels for the guild from cache, sorted
-// by parent category, then channel position, then name. The cache iterator
-// has non-deterministic order, so without sorting the dropdown order would
-// change between page loads.
-func guildChannels(client *bot.Client, guildID snowflake.ID) []components.ChannelInfo {
-	var channels []components.ChannelInfo
-	for ch := range client.Caches.ChannelsForGuild(guildID) {
-		var parentID string
-		if pid := ch.ParentID(); pid != nil {
-			parentID = pid.String()
+// guildChannels returns text channels for the guild grouped by category in
+// Discord's display order: uncategorized channels first, then each category
+// (ordered by position) followed by its child channels (ordered by position).
+// The cache iterator is non-deterministic, so without explicit ordering the
+// dropdown order would change between page loads. Categories that have no
+// text channels are omitted.
+func guildChannels(client *bot.Client, guildID snowflake.ID) []components.ChannelGroup {
+	type category struct {
+		name     string
+		position int
+		channels []components.ChannelInfo
+	}
+	var topLevel []components.ChannelInfo
+	categories := map[string]*category{}
+
+	getCategory := func(id string) *category {
+		if c, ok := categories[id]; ok {
+			return c
 		}
-		channels = append(channels, components.ChannelInfo{
+		c := &category{}
+		categories[id] = c
+		return c
+	}
+
+	for ch := range client.Caches.ChannelsForGuild(guildID) {
+		if ch.Type() == discord.ChannelTypeGuildCategory {
+			c := getCategory(ch.ID().String())
+			c.name = ch.Name()
+			c.position = ch.Position()
+			continue
+		}
+		if !components.IsTextChannel(ch.Type()) {
+			continue
+		}
+		info := components.ChannelInfo{
 			ID:       ch.ID().String(),
 			Name:     ch.Name(),
 			Type:     ch.Type(),
 			Position: ch.Position(),
-			ParentID: parentID,
-		})
-	}
-	slices.SortStableFunc(channels, func(a, b components.ChannelInfo) int {
-		if c := cmp.Compare(a.ParentID, b.ParentID); c != 0 {
-			return c
 		}
+		if pid := ch.ParentID(); pid != nil {
+			info.ParentID = pid.String()
+			c := getCategory(info.ParentID)
+			c.channels = append(c.channels, info)
+		} else {
+			topLevel = append(topLevel, info)
+		}
+	}
+
+	byPosition := func(a, b components.ChannelInfo) int {
 		if c := cmp.Compare(a.Position, b.Position); c != 0 {
 			return c
 		}
 		return cmp.Compare(a.Name, b.Name)
+	}
+	slices.SortStableFunc(topLevel, byPosition)
+
+	type sortedCat struct {
+		name     string
+		position int
+		channels []components.ChannelInfo
+	}
+	cats := make([]sortedCat, 0, len(categories))
+	for _, c := range categories {
+		if len(c.channels) == 0 {
+			continue
+		}
+		slices.SortStableFunc(c.channels, byPosition)
+		cats = append(cats, sortedCat{name: c.name, position: c.position, channels: c.channels})
+	}
+	slices.SortStableFunc(cats, func(a, b sortedCat) int {
+		if c := cmp.Compare(a.position, b.position); c != 0 {
+			return c
+		}
+		return cmp.Compare(a.name, b.name)
 	})
-	return channels
+
+	groups := make([]components.ChannelGroup, 0, len(cats)+1)
+	if len(topLevel) > 0 {
+		groups = append(groups, components.ChannelGroup{Channels: topLevel})
+	}
+	for _, c := range cats {
+		groups = append(groups, components.ChannelGroup{Name: c.name, Channels: c.channels})
+	}
+	return groups
 }
 
 // guildRoles returns a list of roles for the guild from cache, sorted to
@@ -114,7 +171,7 @@ func handleDashboard(client *bot.Client) http.HandlerFunc {
 }
 
 // allSettingsSections renders all 7 settings sections as a single component.
-func allSettingsSections(guildID string, settings *model.GuildSettings, ms *model.ModmailSettings, channels []components.ChannelInfo, roles []components.RoleInfo) templ.Component {
+func allSettingsSections(guildID string, settings *model.GuildSettings, ms *model.ModmailSettings, channels []components.ChannelGroup, roles []components.RoleInfo) templ.Component {
 	return templ.ComponentFunc(func(ctx context.Context, w io.Writer) error {
 		if err := partials.SettingsModChannel(partials.ModChannelData{
 			GuildID:          guildID,

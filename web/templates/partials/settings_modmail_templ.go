@@ -15,7 +15,7 @@ type ModmailData struct {
 	ReportThreadsChannel      string
 	ReportNotificationChannel string
 	ReportPingRole            string
-	Channels                  []components.ChannelInfo
+	Channels                  []components.ChannelGroup
 	Roles                     []components.RoleInfo
 	SaveSuccess               bool
 	SaveError                 string

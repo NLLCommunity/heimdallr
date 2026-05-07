@@ -15,7 +15,7 @@ import (
 
 type SandboxData struct {
 	GuildID  string
-	Channels []components.ChannelInfo
+	Channels []components.ChannelGroup
 }
 
 func Sandbox(nav layouts.NavData, data SandboxData) templ.Component {

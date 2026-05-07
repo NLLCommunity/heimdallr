@@ -10,20 +10,41 @@ type ChannelInfo struct {
 	ParentID string
 }
 
-templ ChannelSelect(name string, label string, channels []ChannelInfo, selected string) {
+// ChannelGroup is a set of channels under an optional category. Name is empty
+// for the top-level (uncategorized) group.
+type ChannelGroup struct {
+	Name     string
+	Channels []ChannelInfo
+}
+
+templ ChannelSelect(name string, label string, groups []ChannelGroup, selected string) {
 	<label for={ name }>{ label }</label>
 	<select id={ name } name={ name }>
 		<option value="">— None —</option>
-		for _, ch := range channels {
-			if isTextChannel(ch.Type) {
-				<option value={ ch.ID } selected?={ ch.ID == selected }>
-					#{ ch.Name }
-				</option>
+		for _, group := range groups {
+			if group.Name == "" {
+				for _, ch := range group.Channels {
+					<option value={ ch.ID } selected?={ ch.ID == selected }>
+						#{ ch.Name }
+					</option>
+				}
+			} else {
+				@channelOptGroup(group, selected)
 			}
 		}
 	</select>
 }
 
-func isTextChannel(t discord.ChannelType) bool {
+templ channelOptGroup(group ChannelGroup, selected string) {
+	<optgroup label={ group.Name }>
+		for _, ch := range group.Channels {
+			<option value={ ch.ID } selected?={ ch.ID == selected }>
+				#{ ch.Name }
+			</option>
+		}
+	</optgroup>
+}
+
+func IsTextChannel(t discord.ChannelType) bool {
 	return t == discord.ChannelTypeGuildText || t == discord.ChannelTypeGuildNews
 }
