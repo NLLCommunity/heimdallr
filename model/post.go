@@ -161,11 +161,6 @@ func ReplacePostMessages(postID uint, msgs []PostMessage) error {
 	})
 }
 
-// DeletePostMessage drops a single PostMessage row by its primary key.
-func DeletePostMessage(id uint) error {
-	return DB.Where("id = ?", id).Delete(&PostMessage{}).Error
-}
-
 // PostListEntry pairs a Post with its current published-message count.
 // Used by the posts list view to render Draft vs Published correctly.
 type PostListEntry struct {

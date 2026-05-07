@@ -371,12 +371,24 @@ func handlePostPublish(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 		}
 
 		// N == M edit-in-place path: nothing to persist.
-		// N < M edit-and-trim path: drop trailing rows by ID.
+		// N < M edit-and-trim path: trailing messages were deleted on Discord;
+		// reflect that in the DB by atomically replacing the row set with just
+		// the kept prefix. Failure here is fatal — leaving stale rows would
+		// make the next publish try to edit messages that no longer exist.
 		if !result.RecreatedAll && result.DeletedCount > 0 {
-			for i := result.KeptCount; i < len(existing); i++ {
-				if perr := model.DeletePostMessage(existing[i].ID); perr != nil {
-					slog.Warn("DeletePostMessage failed", "error", perr, "id", existing[i].ID)
-				}
+			kept := make([]model.PostMessage, result.KeptCount)
+			for i := 0; i < result.KeptCount; i++ {
+				kept[i] = model.PostMessage{ChannelID: existing[i].ChannelID, MessageID: existing[i].MessageID}
+			}
+			if perr := model.ReplacePostMessages(post.ID, kept); perr != nil {
+				slog.Error("ReplacePostMessages failed after trim; stale rows may point at deleted Discord messages",
+					"error", perr,
+					"post_id", post.ID,
+					"kept_count", result.KeptCount,
+					"deleted_count", result.DeletedCount,
+				)
+				http.Error(w, "publish committed on Discord but failed to persist; reload and retry", http.StatusInternalServerError)
+				return
 			}
 		}
 		w.WriteHeader(http.StatusNoContent)
