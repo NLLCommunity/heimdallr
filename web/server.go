@@ -72,16 +72,18 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	mux.HandleFunc("POST /guild/{id}/sandbox/load", handleSandboxLoad(client, sandboxLimiter))
 	mux.HandleFunc("POST /guild/{id}/sandbox/edit", handleSandboxEdit(client, sandboxLimiter))
 
-	mux.HandleFunc("GET /guild/{id}/posts", handlePostsList(client))
-	mux.HandleFunc("POST /guild/{id}/posts", handlePostsCreate(client))
-	mux.HandleFunc("GET /guild/{id}/posts/{postID}", handlePostEditor(client))
-	mux.HandleFunc("POST /guild/{id}/posts/{postID}", handlePostSave(client))
-
+	// Per-user rate limiter for post publish/unpublish/delete. Save/list/
+	// editor/preview don't hit Discord, so they're left unlimited beyond the
+	// global body-limit + auth gate.
 	postsLimiter := newKeyedRateLimiter(
 		rate.Every(time.Minute/sandboxRatePerMinute),
 		sandboxBurst,
 	)
 
+	mux.HandleFunc("GET /guild/{id}/posts", handlePostsList(client))
+	mux.HandleFunc("POST /guild/{id}/posts", handlePostsCreate(client))
+	mux.HandleFunc("GET /guild/{id}/posts/{postID}", handlePostEditor(client))
+	mux.HandleFunc("POST /guild/{id}/posts/{postID}", handlePostSave(client))
 	mux.HandleFunc("POST /guild/{id}/posts/{postID}/preview", handlePostPreview(client))
 	mux.HandleFunc("POST /guild/{id}/posts/{postID}/publish", handlePostPublish(client, postsLimiter))
 	mux.HandleFunc("POST /guild/{id}/posts/{postID}/unpublish", handlePostUnpublish(client, postsLimiter))
