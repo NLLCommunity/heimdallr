@@ -59,8 +59,27 @@ func Sync(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (SyncResul
 		return editAllInPlace(c, plan, existing)
 	case N < M:
 		return editAndTrim(c, plan, existing)
+	default:
+		return recreateAll(c, plan, existing)
 	}
-	return SyncResult{}, nil
+}
+
+func recreateAll(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (SyncResult, error) {
+	for _, e := range existing {
+		_ = c.Delete(e.ChannelID, e.MessageID)
+	}
+	out := SyncResult{RecreatedAll: true}
+	for _, chunk := range plan.NewChunks {
+		id, err := c.SendV2(plan.ChannelID, chunk)
+		if err != nil {
+			return out, err
+		}
+		out.Created = append(out.Created, CreatedMessage{
+			ChannelID: plan.ChannelID,
+			MessageID: id,
+		})
+	}
+	return out, nil
 }
 
 func editAndTrim(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (SyncResult, error) {
