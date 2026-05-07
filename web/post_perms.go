@@ -1,11 +1,14 @@
 package web
 
 import (
+	"errors"
+	"net/http"
 	"sync"
 	"time"
 
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
 )
 
@@ -139,6 +142,13 @@ func canUsePostDashboard(client *bot.Client, guild discord.Guild, userID, postDa
 	overrides, err := postDashboardOverrideCache.get(guild.ID, func() ([]discord.ApplicationCommandPermission, error) {
 		perms, err := client.Rest.GetGuildCommandPermissions(client.ApplicationID, guild.ID, postDashboardCommandID)
 		if err != nil {
+			var rerr *rest.Error
+			if errors.As(err, &rerr) && rerr.Response != nil && rerr.Response.StatusCode == http.StatusNotFound {
+				// No overrides configured for this guild — that's the common case.
+				// Cache an empty list so we fall through to the default permission
+				// without re-hitting Discord on every request.
+				return []discord.ApplicationCommandPermission{}, nil
+			}
 			return nil, err
 		}
 		return perms.Permissions, nil
