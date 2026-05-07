@@ -1,0 +1,67 @@
+package pages
+
+import (
+	"strconv"
+
+	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/web/templates/components"
+	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
+)
+
+type PostEditorData struct {
+	GuildID  string
+	Post     model.Post
+	Channels []components.ChannelGroup
+}
+
+templ PostEditor(nav layouts.NavData, data PostEditorData) {
+	@layouts.Base("Edit post", nav) {
+		<h2>Edit post</h2>
+		<p><a href={ templ.SafeURL("/guild/" + data.GuildID + "/posts") }>← Back to posts</a></p>
+		<div
+			x-data="postEditor()"
+			data-initial={ data.Post.ComponentsJSON }
+			data-post-id={ strconv.FormatUint(uint64(data.Post.ID), 10) }
+			data-version={ strconv.FormatUint(uint64(data.Post.Version), 10) }
+			data-name={ data.Post.Name }
+			data-channel-id={ data.Post.ChannelID.String() }
+			data-save-url={ "/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) }
+			data-publish-url={ "/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) + "/publish" }
+			data-unpublish-url={ "/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) + "/unpublish" }
+			data-delete-url={ "/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) + "/delete" }
+			data-preview-url={ "/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) + "/preview" }
+		>
+			<div class="grid" style="grid-template-columns: 1fr 1fr;">
+				<div>
+					<h3>Editor</h3>
+					<label>
+						Name
+						<input type="text" x-model="name"/>
+					</label>
+					<label>Channel</label>
+					@components.ChannelSelect("channel_id", "", data.Channels, data.Post.ChannelID.String())
+					<input type="hidden" x-model="channelId" name="channel_id_mirror"/>
+					@components.MessageEditor()
+				</div>
+				<div>
+					<h3>Actions</h3>
+					<form @submit.prevent="save()">
+						<button type="submit" :disabled="busy">Save</button>
+					</form>
+					<form @submit.prevent="publish()" style="margin-top: 0.5rem;">
+						<button type="submit" :disabled="busy || !channelId">Publish / Update on Discord</button>
+					</form>
+					<form @submit.prevent="unpublish()" style="margin-top: 0.5rem;">
+						<button type="submit" class="outline" :disabled="busy">Unpublish (delete from Discord)</button>
+					</form>
+					<form @submit.prevent="del()" style="margin-top: 0.5rem;">
+						<button type="submit" class="btn-danger" :disabled="busy">Delete post</button>
+					</form>
+					<div x-show="message" x-text="message" class="alert" style="margin-top: 1rem;"></div>
+					<h3 style="margin-top: 1rem;">Split preview</h3>
+					<div id="split-preview"></div>
+				</div>
+			</div>
+		</div>
+	}
+}
