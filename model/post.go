@@ -16,8 +16,8 @@ type Post struct {
 	GuildID        snowflake.ID `gorm:"index;not null"`
 	Name           string       `gorm:"not null"`
 	ChannelID      snowflake.ID
-	ComponentsJSON string       `gorm:"type:text;not null"`
-	Version        uint         `gorm:"not null;default:1"`
+	ComponentsJSON string `gorm:"type:text;not null"`
+	Version        uint   `gorm:"not null;default:1"`
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 	UpdatedBy      snowflake.ID

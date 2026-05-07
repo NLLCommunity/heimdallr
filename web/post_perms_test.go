@@ -1,7 +1,9 @@
 package web
 
 import (
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/snowflake/v2"
@@ -79,4 +81,44 @@ func TestResolveCommandPermission_EveryoneRoleApplies(t *testing.T) {
 	}
 	allow := resolveCommandPermission(overrides, testUserA, nil, testGuildID, true)
 	assert.False(t, allow)
+}
+
+func TestCommandOverrideCache_HitWithinTTL(t *testing.T) {
+	c := newCommandOverrideCache(50 * time.Millisecond)
+	calls := int64(0)
+	fetch := func() ([]discord.ApplicationCommandPermission, error) {
+		atomic.AddInt64(&calls, 1)
+		return []discord.ApplicationCommandPermission{}, nil
+	}
+	for i := 0; i < 5; i++ {
+		_, err := c.get(testGuildID, fetch)
+		assert.NoError(t, err)
+	}
+	assert.EqualValues(t, 1, atomic.LoadInt64(&calls))
+}
+
+func TestCommandOverrideCache_RefetchesAfterTTL(t *testing.T) {
+	c := newCommandOverrideCache(20 * time.Millisecond)
+	calls := int64(0)
+	fetch := func() ([]discord.ApplicationCommandPermission, error) {
+		atomic.AddInt64(&calls, 1)
+		return nil, nil
+	}
+	_, _ = c.get(testGuildID, fetch)
+	time.Sleep(30 * time.Millisecond)
+	_, _ = c.get(testGuildID, fetch)
+	assert.EqualValues(t, 2, atomic.LoadInt64(&calls))
+}
+
+func TestCommandOverrideCache_InvalidateForcesRefetch(t *testing.T) {
+	c := newCommandOverrideCache(time.Hour)
+	calls := int64(0)
+	fetch := func() ([]discord.ApplicationCommandPermission, error) {
+		atomic.AddInt64(&calls, 1)
+		return nil, nil
+	}
+	_, _ = c.get(testGuildID, fetch)
+	c.invalidate(testGuildID)
+	_, _ = c.get(testGuildID, fetch)
+	assert.EqualValues(t, 2, atomic.LoadInt64(&calls))
 }

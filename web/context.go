@@ -110,3 +110,35 @@ func idStr(id snowflake.ID) string {
 	}
 	return id.String()
 }
+
+// checkGuildPostMod verifies the session user can access the post dashboard
+// for the given guild — i.e., they're an admin OR they pass the
+// /post-dashboard command's permission check. Mirrors checkGuildAdmin's
+// error semantics. The caller passes the cached command ID + default perm
+// so this helper doesn't need a global registry of slash commands.
+func checkGuildPostMod(w http.ResponseWriter, r *http.Request, client *bot.Client, guildIDStr string, postDashboardCmdID snowflake.ID, defaultPerm discord.Permissions) (snowflake.ID, bool) { //nolint:unused
+	session := sessionFromContext(r.Context())
+	if session == nil {
+		redirectToLogin(w, r)
+		return 0, false
+	}
+
+	guildID, err := snowflake.Parse(guildIDStr)
+	if err != nil {
+		http.Error(w, "invalid guild ID", http.StatusBadRequest)
+		return 0, false
+	}
+
+	guild, ok := client.Caches.Guild(guildID)
+	if !ok {
+		http.Error(w, "bot is not in this guild", http.StatusForbidden)
+		return 0, false
+	}
+
+	if !canUsePostDashboard(client, guild, session.UserID, postDashboardCmdID, defaultPerm) {
+		http.Error(w, "you do not have permission to access the post dashboard in this guild", http.StatusForbidden)
+		return 0, false
+	}
+
+	return guildID, true
+}
