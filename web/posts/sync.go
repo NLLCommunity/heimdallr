@@ -47,6 +47,15 @@ type SyncResult struct {
 
 // Sync executes the publish-or-update operation against Discord.
 func Sync(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (SyncResult, error) {
+	if isRetargeted(plan.ChannelID, existing) {
+		for _, e := range existing {
+			_ = c.Delete(e.ChannelID, e.MessageID)
+		}
+		result, err := firstPublish(c, plan)
+		result.RecreatedAll = true
+		return result, err
+	}
+
 	if len(existing) == 0 {
 		return firstPublish(c, plan)
 	}
@@ -62,6 +71,15 @@ func Sync(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (SyncResul
 	default:
 		return recreateAll(c, plan, existing)
 	}
+}
+
+func isRetargeted(target snowflake.ID, existing []ExistingMessage) bool {
+	for _, e := range existing {
+		if e.ChannelID != target {
+			return true
+		}
+	}
+	return false
 }
 
 func recreateAll(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (SyncResult, error) {

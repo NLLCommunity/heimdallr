@@ -165,3 +165,21 @@ func TestSync_MoreChunksRecreatesAll(t *testing.T) {
 	assert.True(t, result.RecreatedAll)
 	assert.Len(t, result.Created, 3)
 }
+
+func TestSync_ReTargetTriggersFullRecreate(t *testing.T) {
+	chunks := [][]any{
+		{map[string]any{"type": float64(typeTextDisplay), "content": "x"}},
+	}
+	existing := []ExistingMessage{
+		{ChannelID: 11, MessageID: 1001},
+		{ChannelID: 11, MessageID: 1002},
+	}
+	fd := &fakeDiscord{}
+	result, err := Sync(fd, SyncPlan{NewChunks: chunks, ChannelID: 22}, existing)
+	assert.NoError(t, err)
+	assert.ElementsMatch(t, []snowflake.ID{1001, 1002}, fd.deleted)
+	assert.Len(t, fd.sent, 1)
+	assert.EqualValues(t, 22, fd.sent[0].channelID)
+	assert.True(t, result.RecreatedAll)
+	assert.Len(t, result.Created, 1)
+}
