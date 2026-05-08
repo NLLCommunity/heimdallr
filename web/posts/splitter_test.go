@@ -116,6 +116,34 @@ func TestValidateComponent_RejectsNestedUnknownType(t *testing.T) {
 	}
 }
 
+func TestValidateComponent_RejectsUnknownTypeNestedInAccessory(t *testing.T) {
+	// A malformed accessory carrying its own "components" array with an
+	// unknown nested type must still be rejected — walkNestedTypes recurses
+	// into accessories.
+	s := parseAny(t, `{"type":9,"components":[{"type":10,"content":"x"}],"accessory":{"type":11,"components":[{"type":42,"content":"weird"}]}}`)
+	err := validateComponent(s)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "42")
+	}
+}
+
+func TestValidateComponent_RejectsFractionalType(t *testing.T) {
+	// 10.9 must not be silently truncated to 10 (text_display).
+	tx := parseAny(t, `{"type":10.9,"content":"hi"}`)
+	err := validateComponent(tx)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "integer")
+	}
+}
+
+func TestValidateComponent_RejectsFractionalNestedType(t *testing.T) {
+	c := parseAny(t, `{"type":17,"components":[{"type":10.5,"content":"hi"}]}`)
+	err := validateComponent(c)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "integer")
+	}
+}
+
 func TestValidateComponent_RejectsTooManyMediaInGallery(t *testing.T) {
 	items := make([]map[string]any, maxMediaItemsTotal+1)
 	for i := range items {

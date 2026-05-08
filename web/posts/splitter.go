@@ -151,6 +151,9 @@ func validateStructure(v any) error {
 	if !ok {
 		return fmt.Errorf(`component is missing a numeric "type" field`)
 	}
+	if typeF != float64(int(typeF)) {
+		return fmt.Errorf(`component "type" %v is not an integer`, typeF)
+	}
 	t := int(typeF)
 	if !topLevelComponentTypes[t] {
 		if name, known := componentTypeNames[t]; known {
@@ -183,6 +186,9 @@ func walkNestedTypes(obj map[string]any) error {
 		if err := requireKnownType(acc, "section accessory"); err != nil {
 			return err
 		}
+		if err := walkNestedTypes(acc); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -191,6 +197,9 @@ func requireKnownType(obj map[string]any, label string) error {
 	typeF, ok := obj["type"].(float64)
 	if !ok {
 		return fmt.Errorf(`%s is missing a numeric "type" field`, label)
+	}
+	if typeF != float64(int(typeF)) {
+		return fmt.Errorf(`%s "type" %v is not an integer`, label, typeF)
 	}
 	if _, known := componentTypeNames[int(typeF)]; !known {
 		return fmt.Errorf("unknown %s type %d", label, int(typeF))
