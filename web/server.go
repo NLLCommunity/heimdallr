@@ -76,8 +76,8 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	// editor/preview don't hit Discord, so they're left unlimited beyond the
 	// global body-limit + auth gate.
 	postsLimiter := newKeyedRateLimiter(
-		rate.Every(time.Minute/sandboxRatePerMinute),
-		sandboxBurst,
+		rate.Every(time.Minute/postsDiscordRatePerMinute),
+		postsDiscordBurst,
 	)
 
 	mux.HandleFunc("GET /guild/{id}/posts", handlePostsList(client))

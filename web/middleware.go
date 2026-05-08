@@ -23,10 +23,17 @@ const (
 	// so a single admin can't drain the bot's Discord quota by spamming the
 	// sandbox. ~10/min steady, burst 5 is generous for testing message
 	// previews while clamping abuse.
-	sandboxRatePerMinute       = 10
-	sandboxBurst               = 5
-	rateLimiterTTL             = 10 * time.Minute
-	maxRequestBodyBytes  int64 = 1 << 20 // 1 MiB
+	sandboxRatePerMinute = 10
+	sandboxBurst         = 5
+	// Post publish/unpublish/delete also touch Discord's REST API, so they
+	// get the same per-user shape — but a separate pair of constants so the
+	// posts limiter can be tuned without dragging the sandbox along (or vice
+	// versa). They start at the same numeric values; that's coincidence, not
+	// coupling.
+	postsDiscordRatePerMinute       = 10
+	postsDiscordBurst               = 5
+	rateLimiterTTL                  = 10 * time.Minute
+	maxRequestBodyBytes       int64 = 1 << 20 // 1 MiB
 )
 
 // redirectToLogin steers an unauthenticated request to the login page in a

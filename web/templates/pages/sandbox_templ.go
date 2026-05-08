@@ -77,7 +77,7 @@ func Sandbox(nav layouts.NavData, data SandboxData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"><article style=\"margin-bottom: 1rem;\"><header><strong>Load existing message</strong></header><form @submit.prevent=\"loadMessage()\"><fieldset role=\"group\"><input type=\"text\" x-model=\"loadLink\" placeholder=\"https://discord.com/channels/.../.../...\"> <button type=\"submit\" :disabled=\"loading\" @click.prevent=\"loadMessage()\">Load</button></fieldset><div x-show=\"loadError\" x-text=\"loadError\" class=\"alert alert-error\" role=\"alert\" style=\"margin-top: 0.5rem;\"></div><div x-show=\"mode !== 'create'\" style=\"margin-top: 0.5rem;\"><small>Editing <span x-text=\"mode === 'edit-v1' ? 'V1 (content only)' : 'V2 (components)'\"></span> message <code x-text=\"loadedMessageId\"></code> <button type=\"button\" class=\"outline\" @click=\"resetToCreate()\" style=\"margin-left: 0.5rem;\">New message</button></small></div></form></article><div class=\"grid\" style=\"grid-template-columns: 1fr 1fr;\"><div><h3>Editor</h3><div x-show=\"mode === 'edit-v1'\"><textarea x-model=\"v1Content\" rows=\"12\" placeholder=\"Message content\"></textarea></div><div x-show=\"mode !== 'edit-v1'\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "\"><article style=\"margin-bottom: 1rem;\"><header><strong>Load existing message</strong></header><form @submit.prevent=\"loadMessage()\"><fieldset role=\"group\"><input type=\"text\" x-model=\"loadLink\" placeholder=\"https://discord.com/channels/.../.../...\"><!-- @submit.prevent on the form already runs loadMessage(); a second @click handler here would fire it twice (and could diverge silently if either is later changed). --><button type=\"submit\" :disabled=\"loading\">Load</button></fieldset><div x-show=\"loadError\" x-text=\"loadError\" class=\"alert alert-error\" role=\"alert\" style=\"margin-top: 0.5rem;\"></div><div x-show=\"mode !== 'create'\" style=\"margin-top: 0.5rem;\"><small>Editing <span x-text=\"mode === 'edit-v1' ? 'V1 (content only)' : 'V2 (components)'\"></span> message <code x-text=\"loadedMessageId\"></code> <button type=\"button\" class=\"outline\" @click=\"resetToCreate()\" style=\"margin-left: 0.5rem;\">New message</button></small></div></form></article><div class=\"grid\" style=\"grid-template-columns: 1fr 1fr;\"><div><h3>Editor</h3><div x-show=\"mode === 'edit-v1'\"><textarea x-model=\"v1Content\" rows=\"12\" placeholder=\"Message content\"></textarea></div><div x-show=\"mode !== 'edit-v1'\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -92,7 +92,7 @@ func Sandbox(nav layouts.NavData, data SandboxData) templ.Component {
 			var templ_7745c5c3_Var5 templ.SafeURL
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/guild/" + data.GuildID + "/sandbox/send"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 60, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 61, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -105,7 +105,7 @@ func Sandbox(nav layouts.NavData, data SandboxData) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs("/guild/" + data.GuildID + "/sandbox/send")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 61, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 62, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -126,7 +126,7 @@ func Sandbox(nav layouts.NavData, data SandboxData) templ.Component {
 			var templ_7745c5c3_Var7 templ.SafeURL
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/guild/" + data.GuildID + "/sandbox/edit"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 72, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 73, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -139,7 +139,7 @@ func Sandbox(nav layouts.NavData, data SandboxData) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs("/guild/" + data.GuildID + "/sandbox/edit")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 73, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 74, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {

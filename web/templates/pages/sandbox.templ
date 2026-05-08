@@ -28,7 +28,8 @@ templ Sandbox(nav layouts.NavData, data SandboxData) {
 							x-model="loadLink"
 							placeholder="https://discord.com/channels/.../.../..."
 						/>
-						<button type="submit" :disabled="loading" @click.prevent="loadMessage()">Load</button>
+						<!-- @submit.prevent on the form already runs loadMessage(); a second @click handler here would fire it twice (and could diverge silently if either is later changed). -->
+						<button type="submit" :disabled="loading">Load</button>
 					</fieldset>
 					<div x-show="loadError" x-text="loadError" class="alert alert-error" role="alert" style="margin-top: 0.5rem;"></div>
 					<div x-show="mode !== 'create'" style="margin-top: 0.5rem;">

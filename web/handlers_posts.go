@@ -116,11 +116,12 @@ func handlePostsNew(client *bot.Client) http.HandlerFunc {
 
 		guild, _ := client.Caches.Guild(guildID)
 		nav := layouts.NavData{
-			User:      session,
-			GuildID:   guildID.String(),
-			GuildName: guild.Name,
-			IsAdmin:   isGuildAdmin(client, guild, session.UserID),
-			IsPostMod: true,
+			User:         session,
+			GuildID:      guildID.String(),
+			GuildName:    guild.Name,
+			IsAdmin:      isGuildAdmin(client, guild, session.UserID),
+			IsPostMod:    true,
+			ExtraScripts: []string{"post-editor.js"},
 		}
 		renderSafe(w, r, pages.PostEditor(nav, pages.PostEditorData{
 			GuildID:  guildID.String(),
@@ -204,11 +205,12 @@ func handlePostEditor(client *bot.Client) http.HandlerFunc {
 
 		guild, _ := client.Caches.Guild(guildID)
 		nav := layouts.NavData{
-			User:      session,
-			GuildID:   guildID.String(),
-			GuildName: guild.Name,
-			IsAdmin:   isGuildAdmin(client, guild, session.UserID),
-			IsPostMod: true,
+			User:         session,
+			GuildID:      guildID.String(),
+			GuildName:    guild.Name,
+			IsAdmin:      isGuildAdmin(client, guild, session.UserID),
+			IsPostMod:    true,
+			ExtraScripts: []string{"post-editor.js"},
 		}
 		renderSafe(w, r, pages.PostEditor(nav, pages.PostEditorData{
 			GuildID:  guildID.String(),
