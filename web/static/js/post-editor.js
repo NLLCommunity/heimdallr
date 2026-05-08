@@ -266,7 +266,17 @@ document.addEventListener("alpine:init", () => {
           signal: controller.signal,
         });
         if (controller.signal.aborted) return;
-        if (resp.status === 401) return;
+        if (resp.status === 401) {
+          // Match save/_postAction/del: redirect on session expiry instead
+          // of silently swallowing. Without this, the preview just stops
+          // updating after the session times out and the user has no idea
+          // why their typing isn't reflected — meanwhile the next Save would
+          // redirect, but only after they noticed the preview was frozen.
+          // Any unsaved edits are lost either way (the next Save would 401
+          // too); redirecting from here makes the failure mode obvious.
+          window.location.assign("/login");
+          return;
+        }
         // Success path returns a templ partial (text/html). On 4xx/5xx the
         // handler emits text/plain via http.Error; swapping that into the
         // preview pane would replace the last good preview with a raw error
