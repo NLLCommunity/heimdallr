@@ -241,6 +241,11 @@ func handlePostSave(client *bot.Client) http.HandlerFunc {
 			return
 		}
 		name := r.FormValue("name")
+		if name == "" {
+			// Mirror handlePostsCreate so a saved post can never end up with a
+			// blank name in the list view.
+			name = "Untitled post"
+		}
 		componentsJSON := r.FormValue("components_json")
 		if err := validatePostComponents(componentsJSON); err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)

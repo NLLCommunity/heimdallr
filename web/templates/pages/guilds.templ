@@ -33,41 +33,34 @@ templ Guilds(nav layouts.NavData, guilds []GuildData) {
 		<div class="grid">
 			for _, g := range guilds {
 				if g.IsAdmin {
-					<a href={ templ.SafeURL("/guild/" + g.ID) } style="text-decoration: none;">
-						<article style="text-align: center;">
-							if g.Icon != "" {
-								<img
-									src={ "https://cdn.discordapp.com/icons/" + g.ID + "/" + g.Icon + ".png?size=128" }
-									alt={ g.Name }
-									style="width: 64px; height: 64px; border-radius: 50%; margin-bottom: 0.5rem;"
-								/>
-							} else {
-								<div style="width: 64px; height: 64px; border-radius: 50%; background: var(--pico-muted-border-color); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; font-size: 1.5rem; color: var(--pico-muted-color);">
-									{ initialFor(g.Name) }
-								</div>
-							}
-							<h3>{ g.Name } <small><span class="badge">Admin</span></small></h3>
-						</article>
-					</a>
+					@guildTile(g, templ.SafeURL("/guild/"+g.ID), "Admin")
 				} else {
-					<a href={ templ.SafeURL("/guild/" + g.ID + "/posts") } style="text-decoration: none;">
-						<article style="text-align: center;">
-							if g.Icon != "" {
-								<img
-									src={ "https://cdn.discordapp.com/icons/" + g.ID + "/" + g.Icon + ".png?size=128" }
-									alt={ g.Name }
-									style="width: 64px; height: 64px; border-radius: 50%; margin-bottom: 0.5rem;"
-								/>
-							} else {
-								<div style="width: 64px; height: 64px; border-radius: 50%; background: var(--pico-muted-border-color); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; font-size: 1.5rem; color: var(--pico-muted-color);">
-									{ initialFor(g.Name) }
-								</div>
-							}
-							<h3>{ g.Name } <small><span class="badge">Mod</span></small></h3>
-						</article>
-					</a>
+					@guildTile(g, templ.SafeURL("/guild/"+g.ID+"/posts"), "Mod")
 				}
 			}
 		</div>
 	}
+}
+
+// guildTile is the shared icon/initial/name/badge tile used by Guilds. The
+// admin and post-mod entry points only differ in their link target and the
+// badge label; everything else (icon CDN URL, initial-fallback rendering, the
+// outer link/article styling) lives here so the two paths can't drift.
+templ guildTile(g GuildData, href templ.SafeURL, badge string) {
+	<a href={ href } style="text-decoration: none;">
+		<article style="text-align: center;">
+			if g.Icon != "" {
+				<img
+					src={ "https://cdn.discordapp.com/icons/" + g.ID + "/" + g.Icon + ".png?size=128" }
+					alt={ g.Name }
+					style="width: 64px; height: 64px; border-radius: 50%; margin-bottom: 0.5rem;"
+				/>
+			} else {
+				<div style="width: 64px; height: 64px; border-radius: 50%; background: var(--pico-muted-border-color); display: inline-flex; align-items: center; justify-content: center; margin-bottom: 0.5rem; font-size: 1.5rem; color: var(--pico-muted-color);">
+					{ initialFor(g.Name) }
+				</div>
+			}
+			<h3>{ g.Name } <small><span class="badge">{ badge }</span></small></h3>
+		</article>
+	</a>
 }
