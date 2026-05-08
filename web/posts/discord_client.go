@@ -35,14 +35,22 @@ func (d *liveDiscord) chunkToComponents(chunk []any) ([]discord.LayoutComponent,
 	return utils.BuildV2MessageNoTemplate(string(b), d.emojiMap)
 }
 
+// suppressMentions is the empty AllowedMentions config we attach to every
+// post send/edit. Markdown like `@everyone` or `<@&123>` in a text_display
+// would otherwise produce a real ping; the rest of the codebase consistently
+// opts out of mentions on bot-authored messages, and posts (which moderators
+// author and publish in arbitrary channels) need the same default.
+var suppressMentions = &discord.AllowedMentions{}
+
 func (d *liveDiscord) SendV2(channelID snowflake.ID, chunk []any) (snowflake.ID, error) {
 	comps, err := d.chunkToComponents(chunk)
 	if err != nil {
 		return 0, err
 	}
 	msg, err := d.client.Rest.CreateMessage(channelID, discord.MessageCreate{
-		Flags:      discord.MessageFlagIsComponentsV2,
-		Components: comps,
+		Flags:           discord.MessageFlagIsComponentsV2,
+		Components:      comps,
+		AllowedMentions: suppressMentions,
 	})
 	if err != nil {
 		return 0, err
@@ -55,7 +63,7 @@ func (d *liveDiscord) EditV2(channelID, messageID snowflake.ID, chunk []any) err
 	if err != nil {
 		return err
 	}
-	_, err = d.client.Rest.UpdateMessage(channelID, messageID, discord.NewMessageUpdateV2(comps))
+	_, err = d.client.Rest.UpdateMessage(channelID, messageID, discord.NewMessageUpdateV2(comps).WithAllowedMentions(suppressMentions))
 	return err
 }
 
