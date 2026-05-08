@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -8,6 +9,7 @@ import (
 
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
@@ -89,7 +91,17 @@ func handleGuilds(client *bot.Client) http.HandlerFunc {
 			}
 			g, err := client.Rest.GetGuild(gid, false)
 			if err != nil {
-				slog.Warn("guilds: GetGuild fallback failed", "guild_id", gid, "err", err)
+				// A 404 here means the bot no longer has access to the
+				// guild (kicked / left / banned) but Disgo still has the
+				// stale ID in its unready/unavailable set. That's an
+				// expected, recoverable state — debug rather than warn so
+				// it doesn't spam every /guilds hit. Anything else (rate
+				// limit, 5xx, auth failure) is worth surfacing.
+				if restStatusCode(err) == http.StatusNotFound {
+					slog.Debug("guilds: GetGuild fallback 404", "guild_id", gid)
+				} else {
+					slog.Warn("guilds: GetGuild fallback failed", "guild_id", gid, "err", err)
+				}
 				continue
 			}
 
@@ -97,10 +109,15 @@ func handleGuilds(client *bot.Client) http.HandlerFunc {
 			if !isAdmin {
 				m, err := client.Rest.GetMember(gid, session.UserID)
 				if err != nil {
-					// 404 is expected when the dashboard user simply isn't
-					// in this guild. Debug rather than warn so the log
-					// doesn't fill with noise from every /guilds hit.
-					slog.Debug("guilds: GetMember fallback failed", "guild_id", gid, "err", err)
+					// 404 here is expected when the dashboard user simply
+					// isn't a member of this guild. Other statuses (rate
+					// limit, 5xx, 403) indicate a real problem and should
+					// be visible.
+					if restStatusCode(err) == http.StatusNotFound {
+						slog.Debug("guilds: GetMember fallback 404", "guild_id", gid, "user_id", session.UserID)
+					} else {
+						slog.Warn("guilds: GetMember fallback failed", "guild_id", gid, "user_id", session.UserID, "err", err)
+					}
 					continue
 				}
 				if !stuckGuildIsAdmin(g.Roles, m.RoleIDs, gid) {
@@ -121,6 +138,18 @@ func handleGuilds(client *bot.Client) http.HandlerFunc {
 		nav := layouts.NavData{User: session}
 		renderSafe(w, r, pages.Guilds(nav, guilds))
 	}
+}
+
+// restStatusCode returns the HTTP status code from a disgo *rest.Error,
+// or 0 if err isn't a *rest.Error or has no associated response. Lets the
+// caller distinguish "expected 404" (e.g. user not in guild, bot kicked)
+// from "real problem" (rate limit, 5xx, auth) without unwrapping inline.
+func restStatusCode(err error) int {
+	var rerr *rest.Error
+	if errors.As(err, &rerr) && rerr.Response != nil {
+		return rerr.Response.StatusCode
+	}
+	return 0
 }
 
 // stuckGuildIsAdmin reports whether the dashboard user holds the
