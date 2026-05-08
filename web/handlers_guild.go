@@ -25,7 +25,10 @@ func handleGuilds(client *bot.Client) http.HandlerFunc {
 			isAdmin := isGuildAdmin(client, guild, session.UserID)
 			isMod := false
 			if !isAdmin {
-				isMod = canUsePostDashboard(client, guild, session.UserID, post_dashboard.CommandID(), post_dashboard.DefaultMemberPerm)
+				// Skip the admin check inside canUsePostDashboard — we already
+				// know the user isn't an admin, and the inner isGuildAdmin call
+				// would re-issue GetMember on a cache miss.
+				isMod = canUsePostDashboardForNonAdmin(client, guild, session.UserID, post_dashboard.CommandID(), post_dashboard.DefaultMemberPerm)
 			}
 			if !isAdmin && !isMod {
 				continue

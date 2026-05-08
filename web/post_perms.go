@@ -106,8 +106,11 @@ func (c *commandOverrideCache) invalidate(guildID snowflake.ID) {
 }
 
 // postDashboardOverrideCache is the package-global cache for the
-// /post-dashboard command's per-guild overrides. TTL is 5 minutes;
-// settings saves should call invalidate explicitly.
+// /post-dashboard command's per-guild overrides. TTL-only invalidation
+// (5 minutes): the bot has no UI to mutate Discord command-permission
+// overrides, so changes made via Discord's UI surface here only after
+// the TTL expires. The exposed invalidate hook exists for future
+// settings paths that might cause overrides to drift.
 var postDashboardOverrideCache = newCommandOverrideCache(5 * time.Minute)
 
 // canUsePostDashboard returns true if the user is allowed to invoke the
@@ -123,7 +126,15 @@ func canUsePostDashboard(client *bot.Client, guild discord.Guild, userID, postDa
 	if isGuildAdmin(client, guild, userID) {
 		return true
 	}
+	return canUsePostDashboardForNonAdmin(client, guild, userID, postDashboardCommandID, defaultMemberPerm)
+}
 
+// canUsePostDashboardForNonAdmin is the override-resolution path of
+// canUsePostDashboard with the admin short-circuit skipped. Callers that have
+// already established the user is not an admin should use this directly to
+// avoid the redundant isGuildAdmin lookup (which can trigger a second
+// GetMember REST call on cache miss).
+func canUsePostDashboardForNonAdmin(client *bot.Client, guild discord.Guild, userID, postDashboardCommandID snowflake.ID, defaultMemberPerm discord.Permissions) bool {
 	// If the command hasn't been registered yet (commandID == 0), nobody
 	// non-admin can use it.
 	if postDashboardCommandID == 0 {

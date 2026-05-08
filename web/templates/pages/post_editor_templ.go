@@ -232,11 +232,11 @@ func PostEditor(nav layouts.NavData, data PostEditorData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "><div class=\"grid\" style=\"grid-template-columns: 1fr 1fr;\"><div><h3>Editor</h3><label>Name <input type=\"text\" x-model=\"name\"></label> <label>Channel</label>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "><div class=\"grid\" style=\"grid-template-columns: 1fr 1fr;\"><div><h3>Editor</h3><label>Name <input type=\"text\" x-model=\"name\"></label>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = components.ChannelSelect("channel_id", "", data.Channels, data.Post.ChannelID.String()).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = components.ChannelSelect("channel_id", "Channel", data.Channels, data.Post.ChannelID.String()).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

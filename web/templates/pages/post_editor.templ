@@ -45,8 +45,7 @@ templ PostEditor(nav layouts.NavData, data PostEditorData) {
 						Name
 						<input type="text" x-model="name"/>
 					</label>
-					<label>Channel</label>
-					@components.ChannelSelect("channel_id", "", data.Channels, data.Post.ChannelID.String())
+					@components.ChannelSelect("channel_id", "Channel", data.Channels, data.Post.ChannelID.String())
 					<input type="hidden" x-model="channelId" name="channel_id_mirror"/>
 					@components.MessageEditor()
 				</div>
