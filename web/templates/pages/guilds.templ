@@ -7,11 +7,9 @@ import (
 )
 
 type GuildData struct {
-	ID        string
-	Name      string
-	Icon      string
-	IsAdmin   bool
-	IsPostMod bool
+	ID   string
+	Name string
+	Icon string
 }
 
 // initialFor returns the first non-whitespace rune of name as a string, or
@@ -28,26 +26,24 @@ templ Guilds(nav layouts.NavData, guilds []GuildData) {
 	@layouts.Base("Select Server", nav) {
 		<h2>Select a Server</h2>
 		if len(guilds) == 0 {
-			<p>No servers found where you have admin or moderator permissions.</p>
+			<p>
+				No servers found where you have administrator permissions.
+				If you only need to manage posts, use the <code>/post-dashboard</code> command in the relevant server instead.
+			</p>
 		}
 		<div class="grid">
 			for _, g := range guilds {
-				if g.IsAdmin {
-					@guildTile(g, templ.SafeURL("/guild/"+g.ID), "Admin")
-				} else {
-					@guildTile(g, templ.SafeURL("/guild/"+g.ID+"/posts"), "Mod")
-				}
+				@guildTile(g)
 			}
 		</div>
 	}
 }
 
-// guildTile is the shared icon/initial/name/badge tile used by Guilds. The
-// admin and post-mod entry points only differ in their link target and the
-// badge label; everything else (icon CDN URL, initial-fallback rendering, the
-// outer link/article styling) lives here so the two paths can't drift.
-templ guildTile(g GuildData, href templ.SafeURL, badge string) {
-	<a href={ href } style="text-decoration: none;">
+// guildTile renders one admin-server tile. The /guilds list is admin-only
+// (see handlers_guild.go for why); post-mods reach their dashboard via the
+// /post-dashboard slash command, which redirects past this page entirely.
+templ guildTile(g GuildData) {
+	<a href={ templ.SafeURL("/guild/" + g.ID) } style="text-decoration: none;">
 		<article style="text-align: center;">
 			if g.Icon != "" {
 				<img
@@ -60,7 +56,7 @@ templ guildTile(g GuildData, href templ.SafeURL, badge string) {
 					{ initialFor(g.Name) }
 				</div>
 			}
-			<h3>{ g.Name } <small><span class="badge">{ badge }</span></small></h3>
+			<h3>{ g.Name } <small><span class="badge">Admin</span></small></h3>
 		</article>
 	</a>
 }

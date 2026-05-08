@@ -15,11 +15,9 @@ import (
 )
 
 type GuildData struct {
-	ID        string
-	Name      string
-	Icon      string
-	IsAdmin   bool
-	IsPostMod bool
+	ID   string
+	Name string
+	Icon string
 }
 
 // initialFor returns the first non-whitespace rune of name as a string, or
@@ -70,7 +68,7 @@ func Guilds(nav layouts.NavData, guilds []GuildData) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if len(guilds) == 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<p>No servers found where you have admin or moderator permissions.</p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<p>No servers found where you have administrator permissions. If you only need to manage posts, use the <code>/post-dashboard</code> command in the relevant server instead.</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -80,16 +78,9 @@ func Guilds(nav layouts.NavData, guilds []GuildData) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			for _, g := range guilds {
-				if g.IsAdmin {
-					templ_7745c5c3_Err = guildTile(g, templ.SafeURL("/guild/"+g.ID), "Admin").Render(ctx, templ_7745c5c3_Buffer)
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
-				} else {
-					templ_7745c5c3_Err = guildTile(g, templ.SafeURL("/guild/"+g.ID+"/posts"), "Mod").Render(ctx, templ_7745c5c3_Buffer)
-					if templ_7745c5c3_Err != nil {
-						return templ_7745c5c3_Err
-					}
+				templ_7745c5c3_Err = guildTile(g).Render(ctx, templ_7745c5c3_Buffer)
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
 				}
 			}
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div>")
@@ -106,11 +97,10 @@ func Guilds(nav layouts.NavData, guilds []GuildData) templ.Component {
 	})
 }
 
-// guildTile is the shared icon/initial/name/badge tile used by Guilds. The
-// admin and post-mod entry points only differ in their link target and the
-// badge label; everything else (icon CDN URL, initial-fallback rendering, the
-// outer link/article styling) lives here so the two paths can't drift.
-func guildTile(g GuildData, href templ.SafeURL, badge string) templ.Component {
+// guildTile renders one admin-server tile. The /guilds list is admin-only
+// (see handlers_guild.go for why); post-mods reach their dashboard via the
+// /post-dashboard slash command, which redirects past this page entirely.
+func guildTile(g GuildData) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -136,9 +126,9 @@ func guildTile(g GuildData, href templ.SafeURL, badge string) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 templ.SafeURL
-		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(href)
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/guild/" + g.ID))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 50, Col: 15}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 46, Col: 42}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -156,7 +146,7 @@ func guildTile(g GuildData, href templ.SafeURL, badge string) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs("https://cdn.discordapp.com/icons/" + g.ID + "/" + g.Icon + ".png?size=128")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 54, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 50, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -169,7 +159,7 @@ func guildTile(g GuildData, href templ.SafeURL, badge string) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(g.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 55, Col: 17}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 51, Col: 17}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -187,7 +177,7 @@ func guildTile(g GuildData, href templ.SafeURL, badge string) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(initialFor(g.Name))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 60, Col: 25}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 56, Col: 25}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -205,26 +195,13 @@ func guildTile(g GuildData, href templ.SafeURL, badge string) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(g.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 63, Col: 15}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 59, Col: 15}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, " <small><span class=\"badge\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		var templ_7745c5c3_Var9 string
-		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(badge)
-		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 63, Col: 52}
-		}
-		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</span></small></h3></article></a>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, " <small><span class=\"badge\">Admin</span></small></h3></article></a>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
