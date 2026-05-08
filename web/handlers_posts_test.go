@@ -78,6 +78,15 @@ func TestValidatePostComponents(t *testing.T) {
 			name: "text_display at exactly 4000 chars is accepted",
 			in:   `[{"type":10,"content":"` + strings.Repeat("a", 4000) + `"}]`,
 		},
+		{
+			// text_display passes the splitter (known type, size OK) but
+			// disgo's typed unmarshaler rejects a non-string content. This
+			// is the case the splitter's structural check can't see —
+			// utils.ValidateV2Components catches it.
+			name:    "text_display with non-string content is rejected",
+			in:      `[{"type":10,"content":42}]`,
+			wantErr: "Discord schema check",
+		},
 	}
 
 	for _, tc := range cases {

@@ -15,6 +15,7 @@ import (
 
 	"github.com/NLLCommunity/heimdallr/interactions/post_dashboard"
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/utils"
 	"github.com/NLLCommunity/heimdallr/web/posts"
 	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
 	"github.com/NLLCommunity/heimdallr/web/templates/pages"
@@ -49,9 +50,22 @@ func modGate(w http.ResponseWriter, r *http.Request, client *bot.Client) (snowfl
 	return checkGuildPostMod(w, r, client, guildIDStr, post_dashboard.CommandID(), post_dashboard.DefaultMemberPerm)
 }
 
-// validatePostComponents parses the editor's components_json payload and runs
-// it through the splitter so structural problems surface at save time instead
-// of becoming "poisoned" rows that only blow up at preview/publish.
+// validatePostComponents runs the editor's components_json payload through
+// every check we'd otherwise only run at publish, so a bad payload can't
+// sit in the DB and only blow up later:
+//
+//   - JSON parses, top level is an array.
+//   - posts.Plan() — type allowlist (top-level + nested), per-message size
+//     limits, and the splitter logic itself.
+//   - utils.ValidateV2Components — the disgo unmarshal pipeline used at
+//     send time, which rejects field-level schema mismatches the splitter
+//     can't see (e.g. text_display.content is a number, or a button is
+//     missing required fields).
+//
+// Emoji name → ID resolution is intentionally not run here: the guild's
+// emoji cache may not be warm at save time, and unresolved custom emojis
+// don't break parsing — they just don't render. That's a publish-time
+// concern.
 func validatePostComponents(componentsJSON string) error {
 	var arr []any
 	if err := json.Unmarshal([]byte(componentsJSON), &arr); err != nil {
@@ -59,6 +73,9 @@ func validatePostComponents(componentsJSON string) error {
 	}
 	if _, err := posts.Plan(arr); err != nil {
 		return err
+	}
+	if err := utils.ValidateV2Components(arr); err != nil {
+		return fmt.Errorf("components fail Discord schema check: %w", err)
 	}
 	return nil
 }
