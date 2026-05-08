@@ -106,8 +106,8 @@ func validateComponent(v any) error {
 	if !ok {
 		return fmt.Errorf("component is not an object")
 	}
-	if textDisplayCharCount(obj) > maxTextDisplayCharsEach {
-		return fmt.Errorf("text_display content exceeds %d characters", maxTextDisplayCharsEach)
+	if textDisplayCharCount(obj) > maxTextDisplayCharsTotal {
+		return fmt.Errorf("component contains more than %d total text_display characters", maxTextDisplayCharsTotal)
 	}
 	if mediaItemCount(obj) > maxMediaItemsTotal {
 		return fmt.Errorf("component contains more than %d media items", maxMediaItemsTotal)

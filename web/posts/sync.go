@@ -36,7 +36,8 @@ type SyncPlan struct {
 // SyncResult tells the caller what changed on Discord:
 //   - Created: messages newly sent (caller must persist as PostMessage rows)
 //   - KeptCount: how many of `existing` were edited in place
-//   - DeletedCount: how many trailing existing rows were deleted
+//   - DeletedCount: how many of `existing` were deleted — trailing rows in
+//     the edit-and-trim case, all rows in the recreate/retarget cases
 //   - RecreatedAll: true when the engine deleted everything and re-sent
 //   - DeleteFailures: best-effort deletes that errored on Discord — typically
 //     because the message was already gone or permissions changed. Surfaced
@@ -71,6 +72,7 @@ func Sync(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (SyncResul
 		}
 		result, err := firstPublish(c, plan)
 		result.RecreatedAll = true
+		result.DeletedCount = len(existing)
 		result.DeleteFailures = failures
 		return result, err
 	}
@@ -102,7 +104,7 @@ func isRetargeted(target snowflake.ID, existing []ExistingMessage) bool {
 }
 
 func recreateAll(c DiscordClient, plan SyncPlan, existing []ExistingMessage) (SyncResult, error) {
-	out := SyncResult{RecreatedAll: true}
+	out := SyncResult{RecreatedAll: true, DeletedCount: len(existing)}
 	for _, e := range existing {
 		if err := c.Delete(e.ChannelID, e.MessageID); err != nil {
 			out.DeleteFailures = append(out.DeleteFailures, DeleteFailure{ChannelID: e.ChannelID, MessageID: e.MessageID, Err: err})

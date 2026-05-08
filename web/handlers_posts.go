@@ -27,6 +27,9 @@ import (
 // rows. TryLock + 409 surfaces contention to the user instead of silently
 // racing.
 //
+// Entries are removed by handlePostDelete since no future request will target
+// a deleted post; live posts retain a single entry for their lifetime.
+//
 // Single-process only: the dashboard runs as one bot, so a sync.Map is enough.
 // If we ever scale to multiple replicas, this needs to move to a row lock or
 // a distributed lock.
@@ -511,7 +514,15 @@ func handlePostDelete(client *bot.Client, limiter *keyedRateLimiter) http.Handle
 			http.Error(w, "post not found", http.StatusNotFound)
 			return
 		}
-		existing, _ := model.ListPostMessages(guildID, post.ID)
+		// Bail out before touching Discord if we can't read the message set —
+		// proceeding would silently orphan messages while still removing the
+		// post row, which is harder to recover from than a retryable 5xx.
+		existing, err := model.ListPostMessages(guildID, post.ID)
+		if err != nil {
+			slog.Error("ListPostMessages failed", "error", err, "post_id", post.ID)
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
 		dc := posts.NewLiveDiscord(client, guildID)
 		for _, e := range existing {
 			if derr := dc.Delete(e.ChannelID, e.MessageID); derr != nil {
@@ -528,6 +539,10 @@ func handlePostDelete(client *bot.Client, limiter *keyedRateLimiter) http.Handle
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
+		// No future requests can target this post, so the per-post mutex is
+		// dead weight; drop the sync.Map entry to keep the lock table from
+		// growing unboundedly across the bot's lifetime.
+		publishLocks.Delete(uint(postID))
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

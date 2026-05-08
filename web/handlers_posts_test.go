@@ -72,7 +72,7 @@ func TestValidatePostComponents(t *testing.T) {
 		{
 			name:    "single text_display over 4000 chars is rejected at validate time",
 			in:      `[{"type":10,"content":"` + strings.Repeat("a", 4001) + `"}]`,
-			wantErr: "exceeds 4000",
+			wantErr: "more than 4000",
 		},
 		{
 			name: "text_display at exactly 4000 chars is accepted",
