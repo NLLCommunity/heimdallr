@@ -109,12 +109,10 @@ func handleSandboxSend(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 			return
 		}
 
+		// checkGuildAdmin already enforced session presence; sessionFromContext
+		// is therefore non-nil here (authMiddleware injects the session before
+		// any /sandbox/* handler runs).
 		session := sessionFromContext(r.Context())
-		if session == nil {
-			// authMiddleware should have caught this; treat as 401-equivalent.
-			renderError(http.StatusUnauthorized, "Not signed in.")
-			return
-		}
 		if !limiter.getLimiter(session.UserID.String()).Allow() {
 			renderError(http.StatusTooManyRequests, "Rate limited. Please wait a moment before sending again.")
 			return
@@ -205,11 +203,8 @@ func handleSandboxLoad(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 			return
 		}
 
+		// session is non-nil after checkGuildAdmin succeeds — see handleSandboxSend.
 		session := sessionFromContext(r.Context())
-		if session == nil {
-			writeJSONError(http.StatusUnauthorized, "Not signed in.")
-			return
-		}
 		if !limiter.getLimiter(session.UserID.String()).Allow() {
 			writeJSONError(http.StatusTooManyRequests, "Rate limited. Please wait a moment before trying again.")
 			return
@@ -295,11 +290,8 @@ func handleSandboxEdit(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 			return
 		}
 
+		// session is non-nil after checkGuildAdmin succeeds — see handleSandboxSend.
 		session := sessionFromContext(r.Context())
-		if session == nil {
-			renderError(http.StatusUnauthorized, "Not signed in.")
-			return
-		}
 		if !limiter.getLimiter(session.UserID.String()).Allow() {
 			renderError(http.StatusTooManyRequests, "Rate limited. Please wait a moment before sending again.")
 			return

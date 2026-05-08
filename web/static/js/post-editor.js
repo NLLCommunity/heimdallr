@@ -267,6 +267,13 @@ document.addEventListener("alpine:init", () => {
         });
         if (controller.signal.aborted) return;
         if (resp.status === 401) return;
+        // Success path returns a templ partial (text/html). On 4xx/5xx the
+        // handler emits text/plain via http.Error; swapping that into the
+        // preview pane would replace the last good preview with a raw error
+        // string. Leave the previous content in place instead.
+        if (!resp.ok) return;
+        const ct = resp.headers.get("content-type") || "";
+        if (!ct.includes("text/html")) return;
         const html = await resp.text();
         const target = document.getElementById("split-preview");
         if (target) target.innerHTML = html;

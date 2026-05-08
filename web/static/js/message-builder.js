@@ -192,9 +192,24 @@ document.addEventListener('alpine:init', () => {
           window.location.assign('/login');
           return;
         }
-        const data = await resp.json().catch(() => ({}));
+        // The handler returns JSON on its own paths, but checkGuildAdmin /
+        // rate-limit middleware emit text/plain via http.Error. Branch on
+        // Content-Type so a 403 from those paths surfaces the actual reason
+        // instead of the generic JSON-parse fallback.
+        const ct = resp.headers.get('content-type') || '';
+        const isJSON = ct.includes('application/json');
+        const data = isJSON ? await resp.json().catch(() => null) : null;
         if (!resp.ok) {
-          this.loadError = data.error || 'Failed to load message.';
+          if (data && data.error) {
+            this.loadError = data.error;
+          } else {
+            const text = isJSON ? '' : (await resp.text().catch(() => ''));
+            this.loadError = text.trim() || 'Failed to load message.';
+          }
+          return;
+        }
+        if (!data) {
+          this.loadError = 'Unexpected response from server.';
           return;
         }
         this.loadedChannelId = data.channel_id || '';
