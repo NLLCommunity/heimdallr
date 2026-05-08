@@ -50,7 +50,7 @@ func AdminDashboardHandler(e *handler.CommandEvent) error {
 		)
 	}
 
-	code, err := model.CreateLoginCode(user.ID, user.Username, avatar)
+	code, err := model.CreateLoginCode(user.ID, user.Username, avatar, "admin", 0)
 	if err != nil {
 		return e.CreateMessage(
 			interactions.EphemeralMessageContent("Failed to generate login link. Please try again."),

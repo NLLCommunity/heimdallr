@@ -1,0 +1,20 @@
+package partials
+
+type PostSplitPreviewData struct {
+	Chunks []string // JSON-stringified chunks for display
+	Error  string
+}
+
+templ PostSplitPreview(data PostSplitPreviewData) {
+	if data.Error != "" {
+		<div class="alert alert-error">{ data.Error }</div>
+	} else {
+		<p><small>This post will publish as <strong>{ len(data.Chunks) }</strong> Discord message(s).</small></p>
+		for i, chunk := range data.Chunks {
+			<details>
+				<summary>Message { i + 1 }</summary>
+				<pre><code>{ chunk }</code></pre>
+			</details>
+		}
+	}
+}

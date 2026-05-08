@@ -141,6 +141,27 @@ func BuildV2Message(componentsJson string, data MessageTemplateData, emojiMap ma
 	return parseComponentsFromAny(arr)
 }
 
+// ValidateV2Components runs the parsed component array through the same
+// disgo-unmarshal pipeline that BuildV2Message{,NoTemplate} use at send time,
+// without emoji resolution. Save-time callers use this so payloads that would
+// only fail when serialized to Discord (e.g. a text_display whose content is
+// a number, or any field that disgo's typed unmarshaler rejects) surface at
+// save instead of at publish.
+//
+// Empty arrays are accepted: drafts use them, and the runtime senders refuse
+// to send an empty message on their own.
+//
+// Note: parseComponentsFromAny may mutate `arr` (flattenSections rewrites
+// `obj["components"]` for accessory-less sections). Callers that reuse `arr`
+// after validation should pass a copy.
+func ValidateV2Components(arr []any) error {
+	if len(arr) == 0 {
+		return nil
+	}
+	_, err := parseComponentsFromAny(arr)
+	return err
+}
+
 // BuildV2MessageNoTemplate is BuildV2Message minus mustache rendering — the
 // sandbox sends the admin's literal component JSON, not a template, so it
 // shouldn't pay the parse-render-marshal round-trip.

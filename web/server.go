@@ -69,6 +69,27 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 
 	mux.HandleFunc("GET /guild/{id}/sandbox", handleSandbox(client))
 	mux.HandleFunc("POST /guild/{id}/sandbox/send", handleSandboxSend(client, sandboxLimiter))
+	mux.HandleFunc("POST /guild/{id}/sandbox/load", handleSandboxLoad(client, sandboxLimiter))
+	mux.HandleFunc("POST /guild/{id}/sandbox/edit", handleSandboxEdit(client, sandboxLimiter))
+
+	// Per-user rate limiter for post publish/unpublish/delete. Save/list/
+	// editor/preview don't hit Discord, so they're left unlimited beyond the
+	// global body-limit + auth gate.
+	postsLimiter := newKeyedRateLimiter(
+		rate.Every(time.Minute/postsDiscordRatePerMinute),
+		postsDiscordBurst,
+	)
+
+	mux.HandleFunc("GET /guild/{id}/posts", handlePostsList(client))
+	mux.HandleFunc("GET /guild/{id}/posts/new", handlePostsNew(client))
+	mux.HandleFunc("POST /guild/{id}/posts", handlePostsCreate(client))
+	mux.HandleFunc("POST /guild/{id}/posts/preview", handlePostPreview(client))
+	mux.HandleFunc("GET /guild/{id}/posts/{postID}", handlePostEditor(client))
+	mux.HandleFunc("POST /guild/{id}/posts/{postID}", handlePostSave(client))
+	mux.HandleFunc("POST /guild/{id}/posts/{postID}/preview", handlePostPreview(client))
+	mux.HandleFunc("POST /guild/{id}/posts/{postID}/publish", handlePostPublish(client, postsLimiter))
+	mux.HandleFunc("POST /guild/{id}/posts/{postID}/unpublish", handlePostUnpublish(client, postsLimiter))
+	mux.HandleFunc("POST /guild/{id}/posts/{postID}/delete", handlePostDelete(client, postsLimiter))
 
 	// Static files.
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(getStaticFS())))
@@ -123,6 +144,7 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 				}
 				exchangeCodeLimiter.cleanup(rateLimiterTTL)
 				sandboxLimiter.cleanup(rateLimiterTTL)
+				postsLimiter.cleanup(rateLimiterTTL)
 			}
 		}
 	}()

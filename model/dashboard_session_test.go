@@ -10,11 +10,11 @@ import (
 
 func (suite *ModelTestSuite) TestExchangeLoginCode_Success() {
 	userID := snowflake.ID(111222333)
-	code, err := CreateLoginCode(userID, "alice", "avatar-hash")
+	code, err := CreateLoginCode(userID, "alice", "avatar-hash", "admin", 0)
 	require.NoError(suite.T(), err)
 	require.NotEmpty(suite.T(), code)
 
-	session, err := ExchangeLoginCode(code)
+	session, _, _, err := ExchangeLoginCode(code)
 	require.NoError(suite.T(), err)
 	require.NotNil(suite.T(), session)
 	assert.Equal(suite.T(), userID, session.UserID)
@@ -25,15 +25,15 @@ func (suite *ModelTestSuite) TestExchangeLoginCode_Success() {
 }
 
 func (suite *ModelTestSuite) TestExchangeLoginCode_IsOneTime() {
-	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "")
+	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "", "admin", 0)
 	require.NoError(suite.T(), err)
 
-	_, err = ExchangeLoginCode(code)
+	_, _, _, err = ExchangeLoginCode(code)
 	require.NoError(suite.T(), err)
 
 	// A login code must be single-use: the second exchange must fail and not
 	// produce a session, even if the original session is still valid.
-	_, err = ExchangeLoginCode(code)
+	_, _, _, err = ExchangeLoginCode(code)
 	assert.Error(suite.T(), err, "login code must be single-use")
 
 	var sessionCount int64
@@ -48,23 +48,24 @@ func (suite *ModelTestSuite) TestExchangeLoginCode_ExpiredCodeRejected() {
 		Code:      "expired-code-fixture",
 		UserID:    snowflake.ID(111222333),
 		Username:  "alice",
+		Target:    "admin",
 		ExpiresAt: time.Now().Add(-time.Minute),
 	}
 	require.NoError(suite.T(), DB.Create(&expired).Error)
 
-	_, err := ExchangeLoginCode(expired.Code)
+	_, _, _, err := ExchangeLoginCode(expired.Code)
 	assert.Error(suite.T(), err, "expired login code must be rejected")
 }
 
 func (suite *ModelTestSuite) TestExchangeLoginCode_UnknownCodeRejected() {
-	_, err := ExchangeLoginCode("does-not-exist")
+	_, _, _, err := ExchangeLoginCode("does-not-exist")
 	assert.Error(suite.T(), err)
 }
 
 func (suite *ModelTestSuite) TestGetSession_RequiresRawToken() {
-	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "")
+	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "", "admin", 0)
 	require.NoError(suite.T(), err)
-	session, err := ExchangeLoginCode(code)
+	session, _, _, err := ExchangeLoginCode(code)
 	require.NoError(suite.T(), err)
 
 	// The raw token (as it would arrive in the cookie) succeeds.
@@ -79,9 +80,9 @@ func (suite *ModelTestSuite) TestGetSession_RequiresRawToken() {
 }
 
 func (suite *ModelTestSuite) TestGetSession_DBStoresHashOnly() {
-	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "")
+	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "", "admin", 0)
 	require.NoError(suite.T(), err)
-	session, err := ExchangeLoginCode(code)
+	session, _, _, err := ExchangeLoginCode(code)
 	require.NoError(suite.T(), err)
 
 	var stored DashboardSession
@@ -109,9 +110,9 @@ func (suite *ModelTestSuite) TestGetSession_ExpiredSessionRejected() {
 }
 
 func (suite *ModelTestSuite) TestDeleteSession_RemovesByRawToken() {
-	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "")
+	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "", "admin", 0)
 	require.NoError(suite.T(), err)
-	session, err := ExchangeLoginCode(code)
+	session, _, _, err := ExchangeLoginCode(code)
 	require.NoError(suite.T(), err)
 
 	require.NoError(suite.T(), DeleteSession(session.Token))
@@ -123,10 +124,10 @@ func (suite *ModelTestSuite) TestDeleteSession_RemovesByRawToken() {
 func (suite *ModelTestSuite) TestCleanExpiredSessions() {
 	// Two expired records and one fresh one across both tables.
 	require.NoError(suite.T(), DB.Create(&DashboardLoginCode{
-		Code: "expired-code", ExpiresAt: time.Now().Add(-time.Minute),
+		Code: "expired-code", Target: "admin", ExpiresAt: time.Now().Add(-time.Minute),
 	}).Error)
 	require.NoError(suite.T(), DB.Create(&DashboardLoginCode{
-		Code: "fresh-code", ExpiresAt: time.Now().Add(time.Minute),
+		Code: "fresh-code", Target: "admin", ExpiresAt: time.Now().Add(time.Minute),
 	}).Error)
 	require.NoError(suite.T(), DB.Create(&DashboardSession{
 		Token: tokenHash("expired"), ExpiresAt: time.Now().Add(-time.Minute),

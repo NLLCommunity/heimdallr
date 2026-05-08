@@ -25,10 +25,17 @@ const (
 )
 
 type DashboardLoginCode struct {
-	Code      string `gorm:"primaryKey"`
-	UserID    snowflake.ID
-	Username  string
-	Avatar    string
+	Code     string `gorm:"primaryKey"`
+	UserID   snowflake.ID
+	Username string
+	Avatar   string
+	// Target is the dashboard the post-login redirect should land on.
+	// "admin" (default) → /guilds. "posts" → /guild/{GuildID}/posts.
+	Target string `gorm:"default:'admin'"`
+	// GuildID is the calling guild ID for slash commands that have one
+	// (e.g. /post-dashboard). Zero for /admin-dashboard, which lets the
+	// user pick a guild on the next page.
+	GuildID   snowflake.ID
 	ExpiresAt time.Time
 }
 
@@ -40,7 +47,10 @@ type DashboardSession struct {
 	ExpiresAt time.Time
 }
 
-func CreateLoginCode(userID snowflake.ID, username, avatar string) (string, error) {
+func CreateLoginCode(userID snowflake.ID, username, avatar, target string, guildID snowflake.ID) (string, error) {
+	if target == "" {
+		target = "admin"
+	}
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
@@ -52,6 +62,8 @@ func CreateLoginCode(userID snowflake.ID, username, avatar string) (string, erro
 		UserID:    userID,
 		Username:  username,
 		Avatar:    avatar,
+		Target:    target,
+		GuildID:   guildID,
 		ExpiresAt: time.Now().Add(loginCodeExpiry),
 	}
 	if err := DB.Create(&loginCode).Error; err != nil {
@@ -60,8 +72,14 @@ func CreateLoginCode(userID snowflake.ID, username, avatar string) (string, erro
 	return code, nil
 }
 
-func ExchangeLoginCode(code string) (*DashboardSession, error) {
+// ExchangeLoginCode atomically consumes the code and creates a session.
+// It also returns the redirect Target ("admin" | "posts") and GuildID
+// (zero when not applicable) that were stored on the code, so the caller
+// can route the user to the right landing page.
+func ExchangeLoginCode(code string) (*DashboardSession, string, snowflake.ID, error) {
 	var session *DashboardSession
+	var target string
+	var guildID snowflake.ID
 
 	err := DB.Transaction(func(tx *gorm.DB) error {
 		var loginCode DashboardLoginCode
@@ -79,6 +97,9 @@ func ExchangeLoginCode(code string) (*DashboardSession, error) {
 			return errors.New("invalid or expired login code")
 		}
 
+		target = loginCode.Target
+		guildID = loginCode.GuildID
+
 		b := make([]byte, 32)
 		if _, err := rand.Read(b); err != nil {
 			return err
@@ -86,7 +107,7 @@ func ExchangeLoginCode(code string) (*DashboardSession, error) {
 		rawToken := hex.EncodeToString(b)
 
 		dbSession := DashboardSession{
-			Token:     tokenHash(rawToken), // store hash, never the raw token
+			Token:     tokenHash(rawToken),
 			UserID:    loginCode.UserID,
 			Username:  loginCode.Username,
 			Avatar:    loginCode.Avatar,
@@ -108,9 +129,9 @@ func ExchangeLoginCode(code string) (*DashboardSession, error) {
 		return nil
 	})
 	if err != nil {
-		return nil, err
+		return nil, "", 0, err
 	}
-	return session, nil
+	return session, target, guildID, nil
 }
 
 func GetSession(token string) (*DashboardSession, error) {

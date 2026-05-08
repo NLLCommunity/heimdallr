@@ -1,0 +1,111 @@
+package pages
+
+import (
+	"strconv"
+
+	"github.com/disgoorg/snowflake/v2"
+
+	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/web/templates/components"
+	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
+)
+
+type PostEditorData struct {
+	GuildID  string
+	Post     model.Post
+	Channels []components.ChannelGroup
+}
+
+templ PostEditor(nav layouts.NavData, data PostEditorData) {
+	@layouts.Base(postEditorTitle(data.Post.ID), nav) {
+		if data.Post.ID == 0 {
+			<h2>New post</h2>
+		} else {
+			<h2>Edit post</h2>
+		}
+		<p><a href={ templ.SafeURL("/guild/" + data.GuildID + "/posts") }>← Back to posts</a></p>
+		<div
+			x-data="postEditor()"
+			data-initial={ data.Post.ComponentsJSON }
+			data-post-id={ strconv.FormatUint(uint64(data.Post.ID), 10) }
+			data-version={ strconv.FormatUint(uint64(data.Post.Version), 10) }
+			data-name={ data.Post.Name }
+			data-channel-id={ idStr(data.Post.ChannelID) }
+			data-save-url={ postSaveURL(data.GuildID, data.Post.ID) }
+			data-redirect-url-prefix={ "/guild/" + data.GuildID + "/posts/" }
+			data-preview-url={ postPreviewURL(data.GuildID, data.Post.ID) }
+			if data.Post.ID != 0 {
+				data-publish-url={ "/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) + "/publish" }
+				data-unpublish-url={ "/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) + "/unpublish" }
+				data-delete-url={ "/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) + "/delete" }
+			}
+		>
+			<div class="grid" style="grid-template-columns: 1fr 1fr;">
+				<div>
+					<h3>Editor</h3>
+					<label>
+						Name
+						<input type="text" x-model="name"/>
+					</label>
+					@components.ChannelSelect("channel_id", "Channel", data.Channels, idStr(data.Post.ChannelID))
+					<input type="hidden" x-model="channelId" name="channel_id_mirror"/>
+					@components.MessageEditor()
+				</div>
+				<div>
+					<h3>Actions</h3>
+					<form @submit.prevent="save()">
+						<button type="submit" :disabled="busy">Save</button>
+					</form>
+					if data.Post.ID != 0 {
+						<form @submit.prevent="publish()" style="margin-top: 0.5rem;">
+							<button type="submit" :disabled="busy || !channelId">Publish / Update on Discord</button>
+						</form>
+						<form @submit.prevent="unpublish()" style="margin-top: 0.5rem;">
+							<button type="submit" class="outline" :disabled="busy">Unpublish (delete from Discord)</button>
+						</form>
+						<form @submit.prevent="del()" style="margin-top: 0.5rem;">
+							<button type="submit" class="btn-danger" :disabled="busy">Delete post</button>
+						</form>
+					}
+					<div x-show="message" x-text="message" class="alert" style="margin-top: 1rem;"></div>
+					<h3 style="margin-top: 1rem;">Split preview</h3>
+					<div id="split-preview"></div>
+				</div>
+			</div>
+		</div>
+	}
+}
+
+func postSaveURL(guildID string, postID uint) string {
+	if postID == 0 {
+		return "/guild/" + guildID + "/posts"
+	}
+	return "/guild/" + guildID + "/posts/" + strconv.FormatUint(uint64(postID), 10)
+}
+
+func postPreviewURL(guildID string, postID uint) string {
+	if postID == 0 {
+		return "/guild/" + guildID + "/posts/preview"
+	}
+	return "/guild/" + guildID + "/posts/" + strconv.FormatUint(uint64(postID), 10) + "/preview"
+}
+
+// postEditorTitle picks the browser-tab title to match the in-page heading,
+// since "Edit post" is misleading for a post that doesn't exist yet.
+func postEditorTitle(postID uint) string {
+	if postID == 0 {
+		return "New post"
+	}
+	return "Edit post"
+}
+
+// idStr renders a snowflake ID as a string, returning "" for zero so an unset
+// channel ID doesn't surface as the literal "0" in form values or data
+// attributes (where it would be truthy in JS and parsed as a real ID by the
+// server). Mirrors the same-named helper in package web.
+func idStr(id snowflake.ID) string {
+	if id == 0 {
+		return ""
+	}
+	return id.String()
+}

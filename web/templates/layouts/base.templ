@@ -6,6 +6,13 @@ type NavData struct {
 	User      *model.DashboardSession
 	GuildID   string
 	GuildName string
+	IsAdmin   bool
+	IsPostMod bool
+	// ExtraScripts is a list of /static/js/ filenames to include in <head>
+	// alongside the always-loaded htmx/alpine/message-builder bundle. Used
+	// by pages that need a page-specific Alpine factory (e.g. post-editor.js)
+	// so it doesn't load on every request to /login, /guilds, /sandbox, etc.
+	ExtraScripts []string
 }
 
 templ Base(title string, nav NavData) {
@@ -23,6 +30,9 @@ templ Base(title string, nav NavData) {
 		<script src="/static/js/htmx.min.js"></script>
 		<script src="/static/js/htmx-config.js"></script>
 		<script src="/static/js/message-builder.js"></script>
+		for _, src := range nav.ExtraScripts {
+			<script src={ "/static/js/" + src }></script>
+		}
 		<script src="/static/js/form-tracker.js"></script>
 		<script defer src="/static/js/alpine.min.js"></script>
 	</head>
@@ -40,6 +50,16 @@ templ Navbar(nav NavData) {
 	<nav class="container">
 		<ul>
 			<li><strong>Heimdallr</strong></li>
+			if nav.GuildID != "" {
+				if nav.IsAdmin {
+					<li><a href={ templ.SafeURL("/guild/" + nav.GuildID) }>Settings</a></li>
+					<li><a href={ templ.SafeURL("/guild/" + nav.GuildID + "/sandbox") }>Sandbox</a></li>
+				}
+				if nav.IsPostMod {
+					<li><a href={ templ.SafeURL("/guild/" + nav.GuildID + "/posts") }>Posts</a></li>
+				}
+				<li><a href="/guilds">← All guilds</a></li>
+			}
 		</ul>
 		<ul>
 			if nav.GuildName != "" {

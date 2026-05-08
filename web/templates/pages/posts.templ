@@ -1,0 +1,49 @@
+package pages
+
+import (
+	"strconv"
+	"time"
+
+	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
+)
+
+type PostsData struct {
+	GuildID string
+	Posts   []model.PostListEntry
+}
+
+templ Posts(nav layouts.NavData, data PostsData) {
+	@layouts.Base("Posts", nav) {
+		<h2>Posts</h2>
+		<p style="margin-bottom: 1rem;">
+			<a href={ templ.SafeURL("/guild/" + data.GuildID + "/posts/new") } role="button">+ New post</a>
+		</p>
+		<table>
+			<thead>
+				<tr>
+					<th>Name</th>
+					<th>Status</th>
+					<th>Updated</th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, p := range data.Posts {
+					<tr>
+						<td>
+							<a href={ templ.SafeURL("/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(p.Post.ID), 10)) }>{ p.Post.Name }</a>
+						</td>
+						<td>
+							if p.MessageCount == 0 {
+								Draft
+							} else {
+								Published
+							}
+						</td>
+						<td>{ p.Post.UpdatedAt.Format(time.RFC3339) }</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	}
+}

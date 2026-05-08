@@ -13,6 +13,71 @@ import (
 	"golang.org/x/time/rate"
 )
 
+func TestRedirectToLogin_BrowserNavigationGets303(t *testing.T) {
+	req := httptest.NewRequest("GET", "/guild/123", nil)
+	rec := httptest.NewRecorder()
+	redirectToLogin(rec, req)
+	assert.Equal(t, http.StatusSeeOther, rec.Code)
+	assert.Equal(t, "/login", rec.Header().Get("Location"))
+}
+
+func TestRedirectToLogin_HTMXRequestGetsHXRedirect(t *testing.T) {
+	req := httptest.NewRequest("POST", "/guild/123/settings/mod-channel", nil)
+	req.Header.Set("HX-Request", "true")
+	rec := httptest.NewRecorder()
+	redirectToLogin(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "/login", rec.Header().Get("HX-Redirect"))
+	assert.Empty(t, rec.Header().Get("Location"),
+		"HX-Redirect path must not also issue a 3xx Location header (HTMX swallows 3xx silently)")
+}
+
+func TestRedirectToLogin_AJAXRequestGets401JSON(t *testing.T) {
+	cases := []struct {
+		name   string
+		header http.Header
+	}{
+		{
+			name:   "X-Requested-With: XMLHttpRequest",
+			header: http.Header{"X-Requested-With": {"XMLHttpRequest"}},
+		},
+		{
+			name:   "Accept: application/json",
+			header: http.Header{"Accept": {"application/json"}},
+		},
+		{
+			name:   "Accept includes application/json among others",
+			header: http.Header{"Accept": {"text/html, application/json;q=0.9"}},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest("POST", "/guild/123/posts/1", nil)
+			req.Header = tc.header
+			rec := httptest.NewRecorder()
+			redirectToLogin(rec, req)
+			assert.Equal(t, http.StatusUnauthorized, rec.Code)
+			assert.Contains(t, rec.Header().Get("Content-Type"), "application/json")
+			assert.Contains(t, rec.Body.String(), `"login_url":"/login"`,
+				"AJAX 401 body must point at the login URL so the JS can navigate")
+			assert.Empty(t, rec.Header().Get("Location"),
+				"AJAX path must not issue a 3xx Location — fetch() would silently follow it and the JS would mistake the login HTML for success")
+		})
+	}
+}
+
+func TestRedirectToLogin_HTMXBeatsAJAX(t *testing.T) {
+	// HTMX requests can also be sent with X-Requested-With (some setups), but
+	// HX-Request is the more specific signal — HTMX needs HX-Redirect, not 401.
+	req := httptest.NewRequest("POST", "/guild/123/settings/mod-channel", nil)
+	req.Header.Set("HX-Request", "true")
+	req.Header.Set("X-Requested-With", "XMLHttpRequest")
+	rec := httptest.NewRecorder()
+	redirectToLogin(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+	assert.Equal(t, "/login", rec.Header().Get("HX-Redirect"))
+}
+
 func TestAuthMiddleware_SkipsPublicPaths(t *testing.T) {
 	called := false
 	handler := authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

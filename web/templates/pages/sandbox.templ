@@ -14,18 +14,73 @@ templ Sandbox(nav layouts.NavData, data SandboxData) {
 	@layouts.Base("Message Sandbox", nav) {
 		<h2>Message Sandbox</h2>
 		<p><a href={ templ.SafeURL("/guild/" + data.GuildID) }>← Back to settings</a></p>
-		<div x-data="messageBuilder()" data-initial="[]">
+		<div
+			x-data="messageBuilder()"
+			data-initial="[]"
+			data-load-url={ "/guild/" + data.GuildID + "/sandbox/load" }
+		>
+			<article style="margin-bottom: 1rem;">
+				<header><strong>Load existing message</strong></header>
+				<form @submit.prevent="loadMessage()">
+					<fieldset role="group">
+						<input
+							type="text"
+							x-model="loadLink"
+							placeholder="https://discord.com/channels/.../.../..."
+						/>
+						<!-- @submit.prevent on the form already runs loadMessage(); a second @click handler here would fire it twice (and could diverge silently if either is later changed). -->
+						<button type="submit" :disabled="loading">Load</button>
+					</fieldset>
+					<div x-show="loadError" x-text="loadError" class="alert alert-error" role="alert" style="margin-top: 0.5rem;"></div>
+					<div x-show="mode !== 'create'" style="margin-top: 0.5rem;">
+						<small>
+							Editing
+							<span x-text="mode === 'edit-v1' ? 'V1 (content only)' : 'V2 (components)'"></span>
+							message
+							<code x-text="loadedMessageId"></code>
+							<button type="button" class="outline" @click="resetToCreate()" style="margin-left: 0.5rem;">New message</button>
+						</small>
+					</div>
+				</form>
+			</article>
 			<div class="grid" style="grid-template-columns: 1fr 1fr;">
 				<div>
 					<h3>Editor</h3>
-					@components.MessageEditor()
+					<div x-show="mode === 'edit-v1'">
+						<textarea x-model="v1Content" rows="12" placeholder="Message content"></textarea>
+					</div>
+					<div x-show="mode !== 'edit-v1'">
+						@components.MessageEditor()
+					</div>
 				</div>
 				<div>
-					<h3>Send to Channel</h3>
-					<form method="POST" action={ templ.SafeURL("/guild/" + data.GuildID + "/sandbox/send") } hx-post={ "/guild/" + data.GuildID + "/sandbox/send" } hx-target="#send-result" hx-swap="innerHTML">
+					<h3 x-text="mode === 'create' ? 'Send to Channel' : 'Update Message'"></h3>
+					<form
+						x-show="mode === 'create'"
+						method="POST"
+						action={ templ.SafeURL("/guild/" + data.GuildID + "/sandbox/send") }
+						hx-post={ "/guild/" + data.GuildID + "/sandbox/send" }
+						hx-target="#send-result"
+						hx-swap="innerHTML"
+					>
 						@components.ChannelSelect("channel_id", "Channel", data.Channels, "")
 						<input type="hidden" name="components_json" x-bind:value="JSON.stringify(serialize())"/>
 						<button type="submit">Send Message</button>
+					</form>
+					<form
+						x-show="mode !== 'create'"
+						method="POST"
+						action={ templ.SafeURL("/guild/" + data.GuildID + "/sandbox/edit") }
+						hx-post={ "/guild/" + data.GuildID + "/sandbox/edit" }
+						hx-target="#send-result"
+						hx-swap="innerHTML"
+					>
+						<input type="hidden" name="channel_id" x-bind:value="loadedChannelId"/>
+						<input type="hidden" name="message_id" x-bind:value="loadedMessageId"/>
+						<input type="hidden" name="is_v2" x-bind:value="mode === 'edit-v2' ? 'true' : 'false'"/>
+						<input type="hidden" name="components_json" x-bind:value="JSON.stringify(serialize())"/>
+						<input type="hidden" name="content" x-bind:value="v1Content"/>
+						<button type="submit">Update Message</button>
 					</form>
 					<div id="send-result"></div>
 				</div>

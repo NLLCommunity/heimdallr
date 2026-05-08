@@ -9,9 +9,13 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 // MessageEditor renders the full Alpine.js component editor UI.
-// It must be placed inside a `<div x-data="messageBuilder()" data-initial="...">`
-// context — the host element's `data-initial` attribute provides the
-// starting JSON (or `"[]"` for an empty editor).
+// It must be placed inside an Alpine x-data context that exposes the
+// editor API: a `components` array plus `addComponent`, `removeComponent`,
+// `moveUp`/`moveDown`, `addChild`/`removeChild`/`moveChildUp`/`moveChildDown`,
+// `addSectionText`/`removeSectionText`, and `setAccessoryType`. Both
+// `messageBuilder()` (sandbox, gatekeep settings) and `postEditor()`
+// (/posts editor) provide that surface; the host element's
+// `data-initial` attribute carries the starting JSON (or `"[]"`).
 func MessageEditor() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context

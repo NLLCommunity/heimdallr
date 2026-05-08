@@ -61,7 +61,7 @@ func handleCallbackPOST(allowedOrigin string, secureCookie bool) http.HandlerFun
 			return
 		}
 
-		session, err := model.ExchangeLoginCode(code)
+		session, target, guildID, err := model.ExchangeLoginCode(code)
 		if err != nil {
 			slog.Warn("invalid login code exchange", "error", err)
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
@@ -76,7 +76,12 @@ func handleCallbackPOST(allowedOrigin string, secureCookie bool) http.HandlerFun
 		// ever becomes per-session.
 		maxAge := int(time.Until(session.ExpiresAt).Seconds())
 		http.SetCookie(w, makeSessionCookie(session.Token, maxAge, secureCookie))
-		http.Redirect(w, r, "/guilds", http.StatusSeeOther)
+
+		dest := "/guilds"
+		if target == "posts" && guildID != 0 {
+			dest = "/guild/" + guildID.String() + "/posts"
+		}
+		http.Redirect(w, r, dest, http.StatusSeeOther)
 	}
 }
 
