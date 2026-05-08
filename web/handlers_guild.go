@@ -22,13 +22,23 @@ func handleGuilds(client *bot.Client) http.HandlerFunc {
 
 		var guilds []pages.GuildData
 		for guild := range client.Caches.Guilds() {
-			isAdmin := isGuildAdmin(client, guild, session.UserID)
+			// Owner shortcut avoids any member fetch — they're admin by
+			// definition and any member lookup for the iterated guild would
+			// pay a REST round-trip on cache miss.
+			isAdmin := guild.OwnerID == session.UserID
 			isMod := false
 			if !isAdmin {
-				// Skip the admin check inside canUsePostDashboard — we already
-				// know the user isn't an admin, and the inner isGuildAdmin call
-				// would re-issue GetMember on a cache miss.
-				isMod = canUsePostDashboardForNonAdmin(client, guild, session.UserID, post_dashboard.CommandID(), post_dashboard.DefaultMemberPerm)
+				// Single member fetch reused for both checks. If the user
+				// isn't a member of this guild at all, skip it: GetMember
+				// would 404 and both checks would short-circuit anyway.
+				member := guildMember(client, guild.ID, session.UserID)
+				if member == nil {
+					continue
+				}
+				isAdmin = isGuildAdminMember(client, guild, member)
+				if !isAdmin {
+					isMod = canUsePostDashboardForMember(client, guild, member, post_dashboard.CommandID(), post_dashboard.DefaultMemberPerm)
+				}
 			}
 			if !isAdmin && !isMod {
 				continue

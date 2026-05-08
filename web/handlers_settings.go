@@ -158,15 +158,18 @@ func handleDashboard(client *bot.Client) http.HandlerFunc {
 
 		// If the user is a post-mod but not an admin, send them to /posts
 		// rather than 403'ing — they have *some* access to this guild.
-		// canUsePostDashboardForNonAdmin (vs canUsePostDashboard) avoids a
-		// second isGuildAdmin lookup since the !isGuildAdmin guard already
-		// established that here.
+		// Owner-shortcut + a single guildMember lookup feeds both
+		// isGuildAdminMember and canUsePostDashboardForMember, so we don't
+		// pay two REST round-trips on cache miss.
 		if parsedID, err := snowflake.Parse(guildIDStr); err == nil {
 			if guild, ok := client.Caches.Guild(parsedID); ok && session != nil &&
-				!isGuildAdmin(client, guild, session.UserID) &&
-				canUsePostDashboardForNonAdmin(client, guild, session.UserID, post_dashboard.CommandID(), post_dashboard.DefaultMemberPerm) {
-				http.Redirect(w, r, "/guild/"+parsedID.String()+"/posts", http.StatusSeeOther)
-				return
+				guild.OwnerID != session.UserID {
+				if member := guildMember(client, parsedID, session.UserID); member != nil &&
+					!isGuildAdminMember(client, guild, member) &&
+					canUsePostDashboardForMember(client, guild, member, post_dashboard.CommandID(), post_dashboard.DefaultMemberPerm) {
+					http.Redirect(w, r, "/guild/"+parsedID.String()+"/posts", http.StatusSeeOther)
+					return
+				}
 			}
 		}
 

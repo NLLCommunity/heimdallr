@@ -113,6 +113,39 @@ func (c *commandOverrideCache) invalidate(guildID snowflake.ID) {
 // settings paths that might cause overrides to drift.
 var postDashboardOverrideCache = newCommandOverrideCache(5 * time.Minute)
 
+// guildMember returns the user's member record for the guild, hitting the
+// cache first and falling back to GetMember on miss. Returns nil when the
+// user isn't a member of the guild — REST 404s and transient errors are
+// indistinguishable here, but both mean "no access" for our purposes.
+//
+// Pulling this out of isGuildAdmin / canUsePostDashboard lets callers that
+// need both checks (handleGuilds, the /guild/{id} redirect) fetch the member
+// once and pass it into isGuildAdminMember + canUsePostDashboardForMember,
+// avoiding a second REST round-trip per guild on cache miss.
+func guildMember(client *bot.Client, guildID, userID snowflake.ID) *discord.Member {
+	if m, ok := client.Caches.Member(guildID, userID); ok {
+		return &m
+	}
+	m, err := client.Rest.GetMember(guildID, userID)
+	if err != nil {
+		return nil
+	}
+	return m
+}
+
+// isGuildAdminMember tests admin against an already-fetched member. The
+// owner shortcut still compares Member.User.ID rather than a raw userID so
+// callers don't need to plumb both through.
+func isGuildAdminMember(client *bot.Client, guild discord.Guild, member *discord.Member) bool {
+	if member == nil {
+		return false
+	}
+	if guild.OwnerID == member.User.ID {
+		return true
+	}
+	return client.Caches.MemberPermissions(*member).Has(discord.PermissionAdministrator)
+}
+
 // canUsePostDashboard returns true if the user is allowed to invoke the
 // /post-dashboard command in the guild — admins always pass. It mirrors
 // Discord's permission resolution: per-guild overrides on top of the
@@ -123,31 +156,28 @@ var postDashboardOverrideCache = newCommandOverrideCache(5 * time.Minute)
 // expose the moderator dashboard to someone whose permissions can't be
 // confirmed.
 func canUsePostDashboard(client *bot.Client, guild discord.Guild, userID, postDashboardCommandID snowflake.ID, defaultMemberPerm discord.Permissions) bool {
-	if isGuildAdmin(client, guild, userID) {
+	if guild.OwnerID == userID {
 		return true
 	}
-	return canUsePostDashboardForNonAdmin(client, guild, userID, postDashboardCommandID, defaultMemberPerm)
+	member := guildMember(client, guild.ID, userID)
+	if isGuildAdminMember(client, guild, member) {
+		return true
+	}
+	return canUsePostDashboardForMember(client, guild, member, postDashboardCommandID, defaultMemberPerm)
 }
 
-// canUsePostDashboardForNonAdmin is the override-resolution path of
-// canUsePostDashboard with the admin short-circuit skipped. Callers that have
-// already established the user is not an admin should use this directly to
-// avoid the redundant isGuildAdmin lookup (which can trigger a second
-// GetMember REST call on cache miss).
-func canUsePostDashboardForNonAdmin(client *bot.Client, guild discord.Guild, userID, postDashboardCommandID snowflake.ID, defaultMemberPerm discord.Permissions) bool {
+// canUsePostDashboardForMember resolves /post-dashboard overrides against an
+// already-fetched member. Callers that already needed the member for an admin
+// check should use this directly — canUsePostDashboard would otherwise re-do
+// the cache/REST lookup internally.
+func canUsePostDashboardForMember(client *bot.Client, guild discord.Guild, member *discord.Member, postDashboardCommandID snowflake.ID, defaultMemberPerm discord.Permissions) bool {
+	if member == nil {
+		return false
+	}
 	// If the command hasn't been registered yet (commandID == 0), nobody
 	// non-admin can use it.
 	if postDashboardCommandID == 0 {
 		return false
-	}
-
-	member, ok := client.Caches.Member(guild.ID, userID)
-	if !ok {
-		m, err := client.Rest.GetMember(guild.ID, userID)
-		if err != nil {
-			return false
-		}
-		member = *m
 	}
 
 	overrides, err := postDashboardOverrideCache.get(guild.ID, func() ([]discord.ApplicationCommandPermission, error) {
@@ -168,8 +198,8 @@ func canUsePostDashboardForNonAdmin(client *bot.Client, guild discord.Guild, use
 		return false
 	}
 
-	memberPerms := client.Caches.MemberPermissions(member)
+	memberPerms := client.Caches.MemberPermissions(*member)
 	defaultAllow := memberPerms.Has(defaultMemberPerm)
 
-	return resolveCommandPermission(overrides, userID, member.RoleIDs, guild.ID, defaultAllow)
+	return resolveCommandPermission(overrides, member.User.ID, member.RoleIDs, guild.ID, defaultAllow)
 }

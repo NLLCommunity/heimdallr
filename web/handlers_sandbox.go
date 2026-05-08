@@ -156,9 +156,14 @@ func handleSandboxSend(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 			return
 		}
 
+		// Empty AllowedMentions suppresses @everyone / role / user pings that
+		// would otherwise fire from text_display markdown — same default as
+		// every other bot-authored message in the codebase (interactions/*,
+		// listeners/*, and the post-publish path in web/posts).
 		_, err = client.Rest.CreateMessage(channelID, discord.MessageCreate{
-			Flags:      discord.MessageFlagIsComponentsV2,
-			Components: discordComponents,
+			Flags:           discord.MessageFlagIsComponentsV2,
+			Components:      discordComponents,
+			AllowedMentions: &discord.AllowedMentions{},
 		})
 		if err != nil {
 			slog.Error("failed to send Discord message", "error", err, "channel_id", channelID)
@@ -343,14 +348,17 @@ func handleSandboxEdit(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 				renderError(http.StatusBadRequest, "Invalid components JSON.")
 				return
 			}
-			update = discord.NewMessageUpdateV2(discordComponents)
+			// Edits replace AllowedMentions; without setting it explicitly,
+			// Discord re-evaluates mentions from the new content and pings
+			// anyone @-mentioned in the edited markdown.
+			update = discord.NewMessageUpdateV2(discordComponents).WithAllowedMentions(&discord.AllowedMentions{})
 		} else {
 			content := r.FormValue("content")
 			if utf8.RuneCountInString(content) > maxSandboxContentChars {
 				renderError(http.StatusRequestEntityTooLarge, "Message content too large.")
 				return
 			}
-			update = discord.NewMessageUpdate().WithContent(content)
+			update = discord.NewMessageUpdate().WithContent(content).WithAllowedMentions(&discord.AllowedMentions{})
 		}
 
 		if _, err := client.Rest.UpdateMessage(channelID, messageID, update); err != nil {
