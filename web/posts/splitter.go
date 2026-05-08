@@ -29,6 +29,33 @@ const (
 	typeContainer    = 17
 )
 
+// componentTypeNames lists every V2 component type the splitter recognizes.
+// Anything outside this set is rejected at save time so a malformed payload
+// can't sit in the DB and only blow up at publish.
+var componentTypeNames = map[int]string{
+	typeActionRow:    "action_row",
+	typeButton:       "button",
+	typeSection:      "section",
+	typeTextDisplay:  "text_display",
+	typeThumbnail:    "thumbnail",
+	typeMediaGallery: "media_gallery",
+	typeSeparator:    "separator",
+	typeContainer:    "container",
+}
+
+// topLevelComponentTypes is the subset of component types Discord allows at
+// the top level of a V2 message. Buttons and thumbnails only appear nested
+// (action_row children, section accessories), and rejecting them up-front is
+// cheaper and clearer than letting disgo's parser drop them silently.
+var topLevelComponentTypes = map[int]bool{
+	typeActionRow:    true,
+	typeSection:      true,
+	typeTextDisplay:  true,
+	typeMediaGallery: true,
+	typeSeparator:    true,
+	typeContainer:    true,
+}
+
 // componentCount returns the total number of components in a tree, counting
 // the node itself plus all nested children, plus accessories on sections.
 // Recurses into "components" arrays and "accessory" sub-objects.
@@ -97,15 +124,83 @@ func mediaItemCount(v any) int {
 	return total
 }
 
+// validateStructure checks the basic V2-component shape so malformed input
+// fails at save time instead of at publish:
+//
+//   - The root must be a JSON object with a numeric "type" field.
+//   - That type must be valid at the top level (no bare buttons/thumbnails).
+//   - Any nested object under "components" or as a section "accessory" must
+//     have a known type code.
+//
+// Position-specific rules deeper in the tree (an action_row may only contain
+// buttons; a section's accessory must be a thumbnail or button) are
+// intentionally not enforced here — disgo's parser already rejects those at
+// publish, and duplicating the rules here risks drift.
+func validateStructure(v any) error {
+	obj, ok := v.(map[string]any)
+	if !ok {
+		return fmt.Errorf("component is not a JSON object")
+	}
+	typeF, ok := obj["type"].(float64)
+	if !ok {
+		return fmt.Errorf(`component is missing a numeric "type" field`)
+	}
+	t := int(typeF)
+	if !topLevelComponentTypes[t] {
+		if name, known := componentTypeNames[t]; known {
+			return fmt.Errorf("type %d (%s) is not valid as a top-level component", t, name)
+		}
+		return fmt.Errorf("unknown component type %d", t)
+	}
+	return walkNestedTypes(obj)
+}
+
+// walkNestedTypes recurses through "components" arrays and "accessory"
+// objects, requiring each to carry a known type code. Used by validateStructure
+// after the top-level check has succeeded.
+func walkNestedTypes(obj map[string]any) error {
+	if children, ok := obj["components"].([]any); ok {
+		for _, c := range children {
+			childObj, ok := c.(map[string]any)
+			if !ok {
+				return fmt.Errorf("nested component is not a JSON object")
+			}
+			if err := requireKnownType(childObj, "nested component"); err != nil {
+				return err
+			}
+			if err := walkNestedTypes(childObj); err != nil {
+				return err
+			}
+		}
+	}
+	if acc, ok := obj["accessory"].(map[string]any); ok {
+		if err := requireKnownType(acc, "section accessory"); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func requireKnownType(obj map[string]any, label string) error {
+	typeF, ok := obj["type"].(float64)
+	if !ok {
+		return fmt.Errorf(`%s is missing a numeric "type" field`, label)
+	}
+	if _, known := componentTypeNames[int(typeF)]; !known {
+		return fmt.Errorf("unknown %s type %d", label, int(typeF))
+	}
+	return nil
+}
+
 // validateComponent rejects components that, in isolation, can never fit a
 // Discord message — used both at save time (early feedback) and at split
 // time (defense in depth). Callers that need full per-message limits enforced
 // should check fits() instead.
 func validateComponent(v any) error {
-	obj, ok := v.(map[string]any)
-	if !ok {
-		return fmt.Errorf("component is not an object")
+	if err := validateStructure(v); err != nil {
+		return err
 	}
+	obj := v.(map[string]any)
 	if textDisplayCharCount(obj) > maxTextDisplayCharsTotal {
 		return fmt.Errorf("component contains more than %d total text_display characters", maxTextDisplayCharsTotal)
 	}

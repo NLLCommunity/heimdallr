@@ -81,6 +81,41 @@ func TestValidateComponent_RejectsOversizedTextDisplay(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestValidateComponent_RejectsMissingType(t *testing.T) {
+	tx := parseAny(t, `{"content":"hi"}`)
+	err := validateComponent(tx)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "type")
+	}
+}
+
+func TestValidateComponent_RejectsUnknownType(t *testing.T) {
+	tx := parseAny(t, `{"type":999,"content":"hi"}`)
+	err := validateComponent(tx)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "999")
+	}
+}
+
+func TestValidateComponent_RejectsTopLevelButton(t *testing.T) {
+	// Buttons are only valid nested in an action_row or as a section
+	// accessory. A top-level button would be silently dropped by disgo at
+	// publish; reject at save instead.
+	tx := parseAny(t, `{"type":2,"label":"x","style":5,"url":"https://e.com"}`)
+	err := validateComponent(tx)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "top-level")
+	}
+}
+
+func TestValidateComponent_RejectsNestedUnknownType(t *testing.T) {
+	c := parseAny(t, `{"type":17,"components":[{"type":42,"content":"weird"}]}`)
+	err := validateComponent(c)
+	if assert.Error(t, err) {
+		assert.Contains(t, err.Error(), "42")
+	}
+}
+
 func TestValidateComponent_RejectsTooManyMediaInGallery(t *testing.T) {
 	items := make([]map[string]any, maxMediaItemsTotal+1)
 	for i := range items {
