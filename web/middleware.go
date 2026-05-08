@@ -62,7 +62,10 @@ func isAJAXRequest(r *http.Request) bool {
 	if strings.EqualFold(r.Header.Get("X-Requested-With"), "XMLHttpRequest") {
 		return true
 	}
-	accept := r.Header.Get("Accept")
+	// MIME types are case-insensitive (RFC 7231 §3.1.1.1) — clients sending
+	// "Application/JSON" must still get the JSON branch instead of being
+	// silently redirected to the login HTML.
+	accept := strings.ToLower(r.Header.Get("Accept"))
 	return strings.Contains(accept, "application/json")
 }
 

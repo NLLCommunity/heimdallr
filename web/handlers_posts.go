@@ -63,6 +63,15 @@ func validatePostComponents(componentsJSON string) error {
 	return nil
 }
 
+// channelInGuild reports whether channelID resolves to a known message channel
+// inside guildID. Used to keep cross-guild channel IDs out of the database and
+// to re-validate at publish time in case the bot lost access (or the row was
+// written before this check existed).
+func channelInGuild(client *bot.Client, guildID, channelID snowflake.ID) bool {
+	ch, ok := client.Caches.GuildMessageChannel(channelID)
+	return ok && ch.GuildID() == guildID
+}
+
 func handlePostsList(client *bot.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := sessionFromContext(r.Context())
@@ -153,6 +162,10 @@ func handlePostsCreate(client *bot.Client) http.HandlerFunc {
 				http.Error(w, "invalid channel ID", http.StatusBadRequest)
 				return
 			}
+			if !channelInGuild(client, guildID, id) {
+				http.Error(w, "channel not found in this guild", http.StatusBadRequest)
+				return
+			}
 			channelID = id
 		}
 
@@ -241,6 +254,10 @@ func handlePostSave(client *bot.Client) http.HandlerFunc {
 				http.Error(w, "invalid channel ID", http.StatusBadRequest)
 				return
 			}
+			if !channelInGuild(client, guildID, channelID) {
+				http.Error(w, "channel not found in this guild", http.StatusBadRequest)
+				return
+			}
 		}
 
 		updated, err := model.UpdatePostFields(guildID, uint(postID), uint(expectedVersion), name, componentsJSON, channelID, session.UserID)
@@ -288,7 +305,11 @@ func handlePostPreview(client *bot.Client) http.HandlerFunc {
 		}
 		strs := make([]string, len(chunks))
 		for i, c := range chunks {
-			b, _ := json.MarshalIndent(c, "", "  ")
+			b, err := json.MarshalIndent(c, "", "  ")
+			if err != nil {
+				renderSafe(w, r, partials.PostSplitPreview(partials.PostSplitPreviewData{Error: "Failed to render preview chunk: " + err.Error()}))
+				return
+			}
 			strs[i] = string(b)
 		}
 		renderSafe(w, r, partials.PostSplitPreview(partials.PostSplitPreviewData{Chunks: strs}))
@@ -325,6 +346,14 @@ func handlePostPublish(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 		}
 		if post.ChannelID == 0 {
 			http.Error(w, "select a channel before publishing", http.StatusBadRequest)
+			return
+		}
+		// Re-validate at publish time. Save-time validation should already
+		// have caught cross-guild IDs, but legacy rows or a bot that lost
+		// access to the channel would otherwise have us send/edit/delete
+		// outside this guild.
+		if !channelInGuild(client, guildID, post.ChannelID) {
+			http.Error(w, "channel not found in this guild; pick another channel and re-save", http.StatusBadRequest)
 			return
 		}
 

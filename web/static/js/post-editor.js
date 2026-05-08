@@ -179,6 +179,11 @@ document.addEventListener("alpine:init", () => {
           this.version = data.version;
         }
         this.message = "Saved.";
+      } catch (e) {
+        // fetch() rejects on network failures (offline, DNS, TLS, CORS); without
+        // this catch the rejection bubbles to an unhandled rejection and the
+        // user sees no feedback at all.
+        this.message = "Network error — check your connection and try again.";
       } finally {
         this.busy = false;
       }
@@ -196,20 +201,24 @@ document.addEventListener("alpine:init", () => {
         )
       )
         return;
-      const resp = await fetch(this.deleteUrl, {
-        method: "POST",
-        headers: { "X-Requested-With": "XMLHttpRequest" },
-      });
-      if (resp.status === 401) {
-        window.location.assign("/login");
-        return;
-      }
-      if (resp.ok) {
-        window.location.assign(
-          this.deleteUrl.replace(/\/posts\/\d+\/delete$/, "/posts"),
-        );
-      } else {
-        this.message = (await resp.text()) || "Delete failed.";
+      try {
+        const resp = await fetch(this.deleteUrl, {
+          method: "POST",
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        });
+        if (resp.status === 401) {
+          window.location.assign("/login");
+          return;
+        }
+        if (resp.ok) {
+          window.location.assign(
+            this.deleteUrl.replace(/\/posts\/\d+\/delete$/, "/posts"),
+          );
+        } else {
+          this.message = (await resp.text()) || "Delete failed.";
+        }
+      } catch (e) {
+        this.message = "Network error — check your connection and try again.";
       }
     },
     async _postAction(url, okMsg) {
@@ -229,6 +238,10 @@ document.addEventListener("alpine:init", () => {
           return;
         }
         this.message = okMsg;
+      } catch (e) {
+        // Same rationale as save(): fetch network errors must surface to the
+        // user instead of becoming an unhandled rejection.
+        this.message = "Network error — check your connection and try again.";
       } finally {
         this.busy = false;
       }
