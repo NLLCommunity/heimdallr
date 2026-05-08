@@ -3,6 +3,8 @@ package pages
 import (
 	"strconv"
 
+	"github.com/disgoorg/snowflake/v2"
+
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/web/templates/components"
 	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
@@ -28,7 +30,7 @@ templ PostEditor(nav layouts.NavData, data PostEditorData) {
 			data-post-id={ strconv.FormatUint(uint64(data.Post.ID), 10) }
 			data-version={ strconv.FormatUint(uint64(data.Post.Version), 10) }
 			data-name={ data.Post.Name }
-			data-channel-id={ data.Post.ChannelID.String() }
+			data-channel-id={ idStr(data.Post.ChannelID) }
 			data-save-url={ postSaveURL(data.GuildID, data.Post.ID) }
 			data-redirect-url-prefix={ "/guild/" + data.GuildID + "/posts/" }
 			data-preview-url={ postPreviewURL(data.GuildID, data.Post.ID) }
@@ -45,7 +47,7 @@ templ PostEditor(nav layouts.NavData, data PostEditorData) {
 						Name
 						<input type="text" x-model="name"/>
 					</label>
-					@components.ChannelSelect("channel_id", "Channel", data.Channels, data.Post.ChannelID.String())
+					@components.ChannelSelect("channel_id", "Channel", data.Channels, idStr(data.Post.ChannelID))
 					<input type="hidden" x-model="channelId" name="channel_id_mirror"/>
 					@components.MessageEditor()
 				</div>
@@ -86,4 +88,15 @@ func postPreviewURL(guildID string, postID uint) string {
 		return "/guild/" + guildID + "/posts/preview"
 	}
 	return "/guild/" + guildID + "/posts/" + strconv.FormatUint(uint64(postID), 10) + "/preview"
+}
+
+// idStr renders a snowflake ID as a string, returning "" for zero so an unset
+// channel ID doesn't surface as the literal "0" in form values or data
+// attributes (where it would be truthy in JS and parsed as a real ID by the
+// server). Mirrors the same-named helper in package web.
+func idStr(id snowflake.ID) string {
+	if id == 0 {
+		return ""
+	}
+	return id.String()
 }
