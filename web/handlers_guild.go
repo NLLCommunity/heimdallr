@@ -84,8 +84,20 @@ func handleGuilds(client *bot.Client) http.HandlerFunc {
 			appendGuild(guild.ID, guild.Name, guild.Icon)
 		}
 
-		stuckIDs := append(client.Caches.UnreadyGuildIDs(), client.Caches.UnavailableGuildIDs()...)
-		for _, gid := range stuckIDs {
+		// Dedupe stuck IDs up front. The two source slices can overlap
+		// (e.g. a guild that became unavailable while still flagged
+		// unready), and the cache loop above may have already added the
+		// same ID. Without this, a duplicate would re-issue GetGuild +
+		// GetMember calls on every iteration, since `seen` is only written
+		// after a successful admin match below.
+		stuck := make(map[snowflake.ID]struct{})
+		for _, id := range client.Caches.UnreadyGuildIDs() {
+			stuck[id] = struct{}{}
+		}
+		for _, id := range client.Caches.UnavailableGuildIDs() {
+			stuck[id] = struct{}{}
+		}
+		for gid := range stuck {
 			if _, dup := seen[gid]; dup {
 				continue
 			}
