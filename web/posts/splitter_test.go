@@ -72,7 +72,7 @@ func TestValidateComponent_OkForSmallText(t *testing.T) {
 }
 
 func TestValidateComponent_RejectsOversizedTextDisplay(t *testing.T) {
-	big := make([]byte, maxTextDisplayCharsEach+1)
+	big := make([]byte, maxTextDisplayCharsTotal+1)
 	for i := range big {
 		big[i] = 'x'
 	}
@@ -189,7 +189,7 @@ func TestPlan_SplitsOnComponentCountLimit(t *testing.T) {
 }
 
 func TestPlan_RejectsSingleOversizedComponent(t *testing.T) {
-	big := make([]byte, maxTextDisplayCharsEach+1)
+	big := make([]byte, maxTextDisplayCharsTotal+1)
 	for i := range big {
 		big[i] = 'x'
 	}

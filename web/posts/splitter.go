@@ -10,11 +10,17 @@ import (
 
 // Discord per-message caps for V2 component messages. Update if Discord
 // publishes new limits.
+//
+// maxTextDisplayCharsTotal is enforced both per-message (in fits) and
+// per-component (in validateComponent, as a fits-on-its-own sanity check).
+// Discord additionally caps each individual text_display at 4000 chars; that
+// cap is currently subsumed by the per-component total because both equal
+// 4000, so a separate constant would be redundant. Reintroduce one here if
+// Discord ever raises the per-message total but keeps the per-leaf 4000.
 const (
 	maxComponentsPerMessage  = 40
 	maxTextDisplayCharsTotal = 4000
 	maxMediaItemsTotal       = 10
-	maxTextDisplayCharsEach  = 4000 // single text_display max content length
 )
 
 // Discord component type codes (mirrors message-builder.js).
