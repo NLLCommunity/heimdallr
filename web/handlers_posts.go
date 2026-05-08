@@ -392,6 +392,10 @@ func handlePostPublish(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 			http.Error(w, fmt.Sprintf("cannot publish: %v", err), http.StatusBadRequest)
 			return
 		}
+		if len(chunks) == 0 {
+			http.Error(w, "post has no content to publish; add a component, or use Unpublish to remove existing messages", http.StatusBadRequest)
+			return
+		}
 
 		existing, err := model.ListPostMessages(guildID, post.ID)
 		if err != nil {
