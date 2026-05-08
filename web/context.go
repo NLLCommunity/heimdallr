@@ -116,29 +116,45 @@ func idStr(id snowflake.ID) string {
 // /post-dashboard command's permission check. Mirrors checkGuildAdmin's
 // error semantics. The caller passes the cached command ID + default perm
 // so this helper doesn't need a global registry of slash commands.
-func checkGuildPostMod(w http.ResponseWriter, r *http.Request, client *bot.Client, guildIDStr string, postDashboardCmdID snowflake.ID, defaultPerm discord.Permissions) (snowflake.ID, bool) {
+//
+// Also returns isAdmin so callers populating nav data don't have to re-run
+// isGuildAdmin (which would repeat the member fetch this function already
+// performed, costing a second REST round-trip on cache miss).
+func checkGuildPostMod(w http.ResponseWriter, r *http.Request, client *bot.Client, guildIDStr string, postDashboardCmdID snowflake.ID, defaultPerm discord.Permissions) (guildID snowflake.ID, isAdmin, ok bool) {
 	session := sessionFromContext(r.Context())
 	if session == nil {
 		redirectToLogin(w, r)
-		return 0, false
+		return 0, false, false
 	}
 
 	guildID, err := snowflake.Parse(guildIDStr)
 	if err != nil {
 		http.Error(w, "invalid guild ID", http.StatusBadRequest)
-		return 0, false
+		return 0, false, false
 	}
 
-	guild, ok := client.Caches.Guild(guildID)
-	if !ok {
+	guild, cached := client.Caches.Guild(guildID)
+	if !cached {
 		http.Error(w, "bot is not in this guild", http.StatusForbidden)
-		return 0, false
+		return 0, false, false
 	}
 
-	if !canUsePostDashboard(client, guild, session.UserID, postDashboardCmdID, defaultPerm) {
-		http.Error(w, "you do not have permission to access the post dashboard in this guild", http.StatusForbidden)
-		return 0, false
+	// Owner short-circuit avoids the member fetch entirely for the common
+	// guild-owner case.
+	if guild.OwnerID == session.UserID {
+		return guildID, true, true
 	}
 
-	return guildID, true
+	// Single member fetch feeds both the admin check and the post-mod
+	// override resolver — matches the pattern in handleDashboard.
+	member := guildMember(client, guildID, session.UserID)
+	if isGuildAdminMember(client, guild, member) {
+		return guildID, true, true
+	}
+	if canUsePostDashboardForMember(client, guild, member, postDashboardCmdID, defaultPerm) {
+		return guildID, false, true
+	}
+
+	http.Error(w, "you do not have permission to access the post dashboard in this guild", http.StatusForbidden)
+	return 0, false, false
 }

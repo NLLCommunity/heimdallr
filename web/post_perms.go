@@ -118,10 +118,10 @@ var postDashboardOverrideCache = newCommandOverrideCache(5 * time.Minute)
 // user isn't a member of the guild — REST 404s and transient errors are
 // indistinguishable here, but both mean "no access" for our purposes.
 //
-// Pulling this out of isGuildAdmin / canUsePostDashboard lets callers that
-// need both checks (handleGuilds, the /guild/{id} redirect) fetch the member
-// once and pass it into isGuildAdminMember + canUsePostDashboardForMember,
-// avoiding a second REST round-trip per guild on cache miss.
+// Callers that need both an admin check and a post-mod check (handleDashboard,
+// checkGuildPostMod) fetch the member once and pass it into isGuildAdminMember
+// + canUsePostDashboardForMember, avoiding a second REST round-trip per guild
+// on cache miss.
 func guildMember(client *bot.Client, guildID, userID snowflake.ID) *discord.Member {
 	if m, ok := client.Caches.Member(guildID, userID); ok {
 		return &m
@@ -146,30 +146,15 @@ func isGuildAdminMember(client *bot.Client, guild discord.Guild, member *discord
 	return client.Caches.MemberPermissions(*member).Has(discord.PermissionAdministrator)
 }
 
-// canUsePostDashboard returns true if the user is allowed to invoke the
-// /post-dashboard command in the guild — admins always pass. It mirrors
-// Discord's permission resolution: per-guild overrides on top of the
-// command's default permission, with admin short-circuit.
-//
-// On any Discord-side error fetching overrides, the function returns false
-// (fail-closed) — better to deny mod-only access on a transient error than
-// expose the moderator dashboard to someone whose permissions can't be
-// confirmed.
-func canUsePostDashboard(client *bot.Client, guild discord.Guild, userID, postDashboardCommandID snowflake.ID, defaultMemberPerm discord.Permissions) bool {
-	if guild.OwnerID == userID {
-		return true
-	}
-	member := guildMember(client, guild.ID, userID)
-	if isGuildAdminMember(client, guild, member) {
-		return true
-	}
-	return canUsePostDashboardForMember(client, guild, member, postDashboardCommandID, defaultMemberPerm)
-}
-
 // canUsePostDashboardForMember resolves /post-dashboard overrides against an
-// already-fetched member. Callers that already needed the member for an admin
-// check should use this directly — canUsePostDashboard would otherwise re-do
-// the cache/REST lookup internally.
+// already-fetched member. Mirrors Discord's permission resolution: per-guild
+// overrides on top of the command's default permission. Admin/owner
+// short-circuits live at the call site so the member fetch is shared with
+// the admin check (see checkGuildPostMod, handleDashboard).
+//
+// On any Discord-side error fetching overrides, returns false (fail-closed) —
+// better to deny mod-only access on a transient error than to expose the
+// moderator dashboard to someone whose permissions can't be confirmed.
 func canUsePostDashboardForMember(client *bot.Client, guild discord.Guild, member *discord.Member, postDashboardCommandID snowflake.ID, defaultMemberPerm discord.Permissions) bool {
 	if member == nil {
 		return false

@@ -266,7 +266,7 @@ func PostEditor(nav layouts.NavData, data PostEditorData) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = layouts.Base("Edit post", nav).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = layouts.Base(postEditorTitle(data.Post.ID), nav).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -286,6 +286,15 @@ func postPreviewURL(guildID string, postID uint) string {
 		return "/guild/" + guildID + "/posts/preview"
 	}
 	return "/guild/" + guildID + "/posts/" + strconv.FormatUint(uint64(postID), 10) + "/preview"
+}
+
+// postEditorTitle picks the browser-tab title to match the in-page heading,
+// since "Edit post" is misleading for a post that doesn't exist yet.
+func postEditorTitle(postID uint) string {
+	if postID == 0 {
+		return "New post"
+	}
+	return "Edit post"
 }
 
 // idStr renders a snowflake ID as a string, returning "" for zero so an unset

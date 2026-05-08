@@ -43,9 +43,10 @@ func acquirePublishLock(postID uint) (*sync.Mutex, bool) {
 }
 
 // modGate runs the post-mod permission check using the captured slash command ID.
-// Returns parsed guildID and true on success; writes the error response and
-// returns false otherwise.
-func modGate(w http.ResponseWriter, r *http.Request, client *bot.Client) (snowflake.ID, bool) {
+// Returns parsed guildID, whether the user is also a guild admin (for nav data),
+// and true on success; writes the error response and returns false otherwise.
+// Surfacing isAdmin lets handlers populate NavData without a second member fetch.
+func modGate(w http.ResponseWriter, r *http.Request, client *bot.Client) (guildID snowflake.ID, isAdmin, ok bool) {
 	guildIDStr := r.PathValue("id")
 	return checkGuildPostMod(w, r, client, guildIDStr, post_dashboard.CommandID(), post_dashboard.DefaultMemberPerm)
 }
@@ -92,7 +93,7 @@ func channelInGuild(client *bot.Client, guildID, channelID snowflake.ID) bool {
 func handlePostsList(client *bot.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := sessionFromContext(r.Context())
-		guildID, ok := modGate(w, r, client)
+		guildID, isAdmin, ok := modGate(w, r, client)
 		if !ok {
 			return
 		}
@@ -109,7 +110,7 @@ func handlePostsList(client *bot.Client) http.HandlerFunc {
 			User:      session,
 			GuildID:   guildID.String(),
 			GuildName: guild.Name,
-			IsAdmin:   isGuildAdmin(client, guild, session.UserID),
+			IsAdmin:   isAdmin,
 			IsPostMod: true,
 		}
 
@@ -126,7 +127,7 @@ func handlePostsList(client *bot.Client) http.HandlerFunc {
 func handlePostsNew(client *bot.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := sessionFromContext(r.Context())
-		guildID, ok := modGate(w, r, client)
+		guildID, isAdmin, ok := modGate(w, r, client)
 		if !ok {
 			return
 		}
@@ -136,7 +137,7 @@ func handlePostsNew(client *bot.Client) http.HandlerFunc {
 			User:         session,
 			GuildID:      guildID.String(),
 			GuildName:    guild.Name,
-			IsAdmin:      isGuildAdmin(client, guild, session.UserID),
+			IsAdmin:      isAdmin,
 			IsPostMod:    true,
 			ExtraScripts: []string{"post-editor.js"},
 		}
@@ -151,7 +152,7 @@ func handlePostsNew(client *bot.Client) http.HandlerFunc {
 func handlePostsCreate(client *bot.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := sessionFromContext(r.Context())
-		guildID, ok := modGate(w, r, client)
+		guildID, _, ok := modGate(w, r, client)
 		if !ok {
 			return
 		}
@@ -205,7 +206,7 @@ func handlePostsCreate(client *bot.Client) http.HandlerFunc {
 func handlePostEditor(client *bot.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := sessionFromContext(r.Context())
-		guildID, ok := modGate(w, r, client)
+		guildID, isAdmin, ok := modGate(w, r, client)
 		if !ok {
 			return
 		}
@@ -225,7 +226,7 @@ func handlePostEditor(client *bot.Client) http.HandlerFunc {
 			User:         session,
 			GuildID:      guildID.String(),
 			GuildName:    guild.Name,
-			IsAdmin:      isGuildAdmin(client, guild, session.UserID),
+			IsAdmin:      isAdmin,
 			IsPostMod:    true,
 			ExtraScripts: []string{"post-editor.js"},
 		}
@@ -240,7 +241,7 @@ func handlePostEditor(client *bot.Client) http.HandlerFunc {
 func handlePostSave(client *bot.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := sessionFromContext(r.Context())
-		guildID, ok := modGate(w, r, client)
+		guildID, _, ok := modGate(w, r, client)
 		if !ok {
 			return
 		}
@@ -308,7 +309,7 @@ func handlePostSave(client *bot.Client) http.HandlerFunc {
 
 func handlePostPreview(client *bot.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		_, ok := modGate(w, r, client)
+		_, _, ok := modGate(w, r, client)
 		if !ok {
 			return
 		}
@@ -343,7 +344,7 @@ func handlePostPreview(client *bot.Client) http.HandlerFunc {
 func handlePostPublish(client *bot.Client, limiter *keyedRateLimiter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := sessionFromContext(r.Context())
-		guildID, ok := modGate(w, r, client)
+		guildID, _, ok := modGate(w, r, client)
 		if !ok {
 			return
 		}
@@ -490,7 +491,7 @@ func handlePostPublish(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 func handlePostUnpublish(client *bot.Client, limiter *keyedRateLimiter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := sessionFromContext(r.Context())
-		guildID, ok := modGate(w, r, client)
+		guildID, _, ok := modGate(w, r, client)
 		if !ok {
 			return
 		}
@@ -543,7 +544,7 @@ func handlePostUnpublish(client *bot.Client, limiter *keyedRateLimiter) http.Han
 func handlePostDelete(client *bot.Client, limiter *keyedRateLimiter) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := sessionFromContext(r.Context())
-		guildID, ok := modGate(w, r, client)
+		guildID, _, ok := modGate(w, r, client)
 		if !ok {
 			return
 		}

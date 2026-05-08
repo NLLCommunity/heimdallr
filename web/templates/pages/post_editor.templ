@@ -17,7 +17,7 @@ type PostEditorData struct {
 }
 
 templ PostEditor(nav layouts.NavData, data PostEditorData) {
-	@layouts.Base("Edit post", nav) {
+	@layouts.Base(postEditorTitle(data.Post.ID), nav) {
 		if data.Post.ID == 0 {
 			<h2>New post</h2>
 		} else {
@@ -88,6 +88,15 @@ func postPreviewURL(guildID string, postID uint) string {
 		return "/guild/" + guildID + "/posts/preview"
 	}
 	return "/guild/" + guildID + "/posts/" + strconv.FormatUint(uint64(postID), 10) + "/preview"
+}
+
+// postEditorTitle picks the browser-tab title to match the in-page heading,
+// since "Edit post" is misleading for a post that doesn't exist yet.
+func postEditorTitle(postID uint) string {
+	if postID == 0 {
+		return "New post"
+	}
+	return "Edit post"
 }
 
 // idStr renders a snowflake ID as a string, returning "" for zero so an unset
