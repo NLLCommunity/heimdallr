@@ -1,0 +1,150 @@
+package pages
+
+import (
+	"strconv"
+
+	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
+	"github.com/NLLCommunity/heimdallr/web/templates/partials"
+)
+
+// AuditLogData carries everything the audit log page renders. Filters and
+// pagination state are mirrored from the URL query string so the form
+// preserves the user's selection on submit.
+type AuditLogData struct {
+	GuildID  string
+	Enabled  bool
+	Filters  AuditLogFilters
+	Rows     []partials.AuditLogRow
+	Total    int64
+	Page     int
+	PageSize int
+	// EventOptions is the list of event types to populate in the dropdown.
+	// Sourced from the audit package's catalog so the page doesn't need its
+	// own list to keep in sync.
+	EventOptions []AuditLogEventOption
+}
+
+type AuditLogFilters struct {
+	Category  string
+	EventType string
+	Actor     string
+	Target    string
+	From      string // YYYY-MM-DD
+	To        string
+}
+
+type AuditLogEventOption struct {
+	Value    string
+	Label    string
+	Category string
+}
+
+templ AuditLog(nav layouts.NavData, data AuditLogData) {
+	@layouts.Base("Audit Log", nav) {
+		<h2>Audit Log</h2>
+		if !data.Enabled {
+			<article>
+				<p>
+					Audit logging is disabled for this guild.
+					<a href={ templ.SafeURL("/guild/" + data.GuildID) }>Enable it in settings</a> to start recording events.
+				</p>
+			</article>
+		} else {
+			@auditLogFilterForm(data)
+			<div id="auditlog-table">
+				@partials.AuditLogTable(partials.AuditLogTableData{
+					GuildID:  data.GuildID,
+					Rows:     data.Rows,
+					Total:    data.Total,
+					Page:     data.Page,
+					PageSize: data.PageSize,
+				})
+			</div>
+		}
+	}
+}
+
+templ auditLogFilterForm(data AuditLogData) {
+	<form
+		hx-get={ "/guild/" + data.GuildID + "/auditlog" }
+		hx-target="#auditlog-table"
+		hx-push-url="true"
+		style="margin-bottom: 1rem;"
+	>
+		<div class="grid">
+			<label>
+				Category
+				<select name="category">
+					<option value="" selected?={ data.Filters.Category == "" }>All</option>
+					<option value="message" selected?={ data.Filters.Category == "message" }>Message</option>
+					<option value="member" selected?={ data.Filters.Category == "member" }>Member</option>
+					<option value="guild" selected?={ data.Filters.Category == "guild" }>Guild / Bot</option>
+				</select>
+			</label>
+			<label>
+				Event
+				<select name="event_type">
+					<option value="" selected?={ data.Filters.EventType == "" }>All</option>
+					for _, e := range data.EventOptions {
+						<option value={ e.Value } selected?={ data.Filters.EventType == e.Value }>
+							{ e.Label }
+						</option>
+					}
+				</select>
+			</label>
+		</div>
+		<div class="grid">
+			<label>
+				Actor
+				<input type="text" name="actor" value={ data.Filters.Actor } placeholder="@username or snowflake"/>
+			</label>
+			<label>
+				Target
+				<input type="text" name="target" value={ data.Filters.Target } placeholder="@user, #channel, or snowflake"/>
+			</label>
+		</div>
+		<div class="grid">
+			<label>
+				From
+				<input type="date" name="from" value={ data.Filters.From }/>
+			</label>
+			<label>
+				To
+				<input type="date" name="to" value={ data.Filters.To }/>
+			</label>
+		</div>
+		<div class="form-actions">
+			<button type="submit">Apply</button>
+			<button
+				type="button"
+				class="outline secondary"
+				onclick={ templ.JSFuncCall("window.location.assign", "/guild/"+data.GuildID+"/auditlog") }
+			>Reset</button>
+		</div>
+	</form>
+}
+
+// AuditLogPageURL renders a permalink for a specific page within the
+// current filter state. Used by the table partial's pagination links.
+func AuditLogPageURL(guildID string, filters AuditLogFilters, page int) string {
+	q := "page=" + strconv.Itoa(page)
+	if filters.Category != "" {
+		q += "&category=" + filters.Category
+	}
+	if filters.EventType != "" {
+		q += "&event_type=" + filters.EventType
+	}
+	if filters.Actor != "" {
+		q += "&actor=" + filters.Actor
+	}
+	if filters.Target != "" {
+		q += "&target=" + filters.Target
+	}
+	if filters.From != "" {
+		q += "&from=" + filters.From
+	}
+	if filters.To != "" {
+		q += "&to=" + filters.To
+	}
+	return "/guild/" + guildID + "/auditlog?" + q
+}

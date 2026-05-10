@@ -64,6 +64,9 @@ func AdminModChannelHandler(e *handler.CommandEvent) error {
 	if err != nil {
 		return err
 	}
+	logSettingsCommandUpdate(guild.ID, e.User(), "mod_channel", map[string]any{
+		"moderator_channel": settings.ModeratorChannel.String(),
+	})
 
 	return e.CreateMessage(
 		interactions.EphemeralMessageContent(message),

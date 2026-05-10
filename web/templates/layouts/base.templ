@@ -53,6 +53,7 @@ templ Navbar(nav NavData) {
 			if nav.GuildID != "" {
 				if nav.IsAdmin {
 					<li><a href={ templ.SafeURL("/guild/" + nav.GuildID) }>Settings</a></li>
+					<li><a href={ templ.SafeURL("/guild/" + nav.GuildID + "/auditlog") }>Audit Log</a></li>
 					<li><a href={ templ.SafeURL("/guild/" + nav.GuildID + "/sandbox") }>Sandbox</a></li>
 				}
 				if nav.IsPostMod {

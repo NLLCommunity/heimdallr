@@ -22,3 +22,14 @@ trusted_proxies = []
 base_url = "http://localhost:8484" # Web dashboard URL
 # In production, terminate TLS at a reverse proxy (e.g. nginx, Caddy)
 # in front of the web dashboard and set base_url to an https:// URL.
+
+[audit_log]
+# Maximum retention windows allowed per category, in days. Per-guild
+# settings may set values up to (but not above) these; 0 means "no
+# limit / forever" and guilds can only choose 0 if the bot value is 0.
+message_retention_days = 14 # message.edit / message.delete
+member_retention_days = 90  # member.join / member.leave / member.update
+guild_retention_days = 0    # guild.* and bot/web actions — kept forever by default
+# How often the pruner runs. The pruner also runs once at boot to catch
+# up after downtime.
+prune_interval_hours = 6

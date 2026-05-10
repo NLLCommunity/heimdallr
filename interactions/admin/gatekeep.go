@@ -122,6 +122,12 @@ func AdminGatekeepHandler(e *handler.CommandEvent) error {
 	if err != nil {
 		return err
 	}
+	logSettingsCommandUpdate(guild.ID, e.User(), "gatekeep", map[string]any{
+		"enabled":                  settings.GatekeepEnabled,
+		"pending_role":             settings.GatekeepPendingRole.String(),
+		"approved_role":            settings.GatekeepApprovedRole.String(),
+		"add_pending_role_on_join": settings.GatekeepAddPendingRoleOnJoin,
+	})
 
 	return e.CreateMessage(interactions.EphemeralMessageContent(message))
 }

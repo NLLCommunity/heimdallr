@@ -49,6 +49,9 @@ func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
 		if err != nil {
 			return err
 		}
+		logSettingsCommandUpdate(guild.ID, e.User(), "gatekeep", map[string]any{
+			"approved_message_v2": settings.GatekeepApprovedMessageV2,
+		})
 		return e.CreateMessage(interactions.EphemeralMessageContent("Gatekeep approved message has been reset."))
 	}
 
@@ -136,6 +139,9 @@ func AdminGatekeepMessageModalHandler(e *handler.ModalEvent) error {
 	if err != nil {
 		return err
 	}
+	logSettingsCommandUpdate(guild.ID, e.User(), "gatekeep", map[string]any{
+		"approved_message_v2": settings.GatekeepApprovedMessageV2,
+	})
 
 	return e.CreateMessage(interactions.EphemeralMessageContent("Gatekeep approved message updated."))
 }

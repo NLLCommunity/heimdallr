@@ -280,6 +280,9 @@ func allSettingsSections(guildID string, settings *model.GuildSettings, ms *mode
 		}).Render(ctx, w); err != nil {
 			return err
 		}
+		if err := partials.SettingsAuditLog(buildAuditLogSettingsData(guildID, settings)).Render(ctx, w); err != nil {
+			return err
+		}
 		return nil
 	})
 }
@@ -326,6 +329,8 @@ func handleSaveModChannel(client *bot.Client) http.HandlerFunc {
 			renderModChannelError("Failed to save settings.")
 			return
 		}
+		logSettingsUpdate(sessionFromContext(r.Context()), guildID, "mod_channel",
+			map[string]any{"moderator_channel": idStr(settings.ModeratorChannel)})
 
 		renderSafe(w, r, partials.SettingsModChannel(partials.ModChannelData{
 			GuildID:          guildIDStr,
@@ -385,6 +390,11 @@ func handleSaveInfractions(client *bot.Client) http.HandlerFunc {
 			renderInfractionsError("Failed to save settings.")
 			return
 		}
+		logSettingsUpdate(sessionFromContext(r.Context()), guildID, "infractions", map[string]any{
+			"half_life_days":               settings.InfractionHalfLifeDays,
+			"notify_on_warned_user_join":   settings.NotifyOnWarnedUserJoin,
+			"notify_warn_severity_threshold": settings.NotifyWarnSeverityThreshold,
+		})
 
 		renderSafe(w, r, partials.SettingsInfractions(partials.InfractionsData{
 			GuildID:                     guildIDStr,
@@ -445,6 +455,11 @@ func handleSaveAntiSpam(client *bot.Client) http.HandlerFunc {
 			renderAntiSpamError("Failed to save settings.")
 			return
 		}
+		logSettingsUpdate(sessionFromContext(r.Context()), guildID, "anti_spam", map[string]any{
+			"enabled":          settings.AntiSpamEnabled,
+			"count":            settings.AntiSpamCount,
+			"cooldown_seconds": settings.AntiSpamCooldownSeconds,
+		})
 
 		renderSafe(w, r, partials.SettingsAntiSpam(partials.AntiSpamData{
 			GuildID:         guildIDStr,
@@ -489,6 +504,10 @@ func handleSaveBanFooter(client *bot.Client) http.HandlerFunc {
 			}))
 			return
 		}
+		logSettingsUpdate(sessionFromContext(r.Context()), guildID, "ban_footer", map[string]any{
+			"footer":      settings.BanFooter,
+			"always_send": settings.AlwaysSendBanFooter,
+		})
 
 		renderSafe(w, r, partials.SettingsBanFooter(partials.BanFooterData{
 			GuildID:     guildIDStr,
@@ -555,6 +574,11 @@ func handleSaveModmail(client *bot.Client) http.HandlerFunc {
 			renderModmailError("Failed to save settings.")
 			return
 		}
+		logSettingsUpdate(sessionFromContext(r.Context()), guildID, "modmail", map[string]any{
+			"report_threads_channel":      idStr(ms.ReportThreadsChannel),
+			"report_notification_channel": idStr(ms.ReportNotificationChannel),
+			"report_ping_role":            idStr(ms.ReportPingRole),
+		})
 
 		renderSafe(w, r, partials.SettingsModmail(partials.ModmailData{
 			GuildID:                   guildIDStr,
@@ -642,6 +666,13 @@ func handleSaveGatekeep(client *bot.Client) http.HandlerFunc {
 			renderGatekeepError("Failed to save settings.")
 			return
 		}
+		logSettingsUpdate(sessionFromContext(r.Context()), guildID, "gatekeep", map[string]any{
+			"enabled":                  settings.GatekeepEnabled,
+			"pending_role":             idStr(settings.GatekeepPendingRole),
+			"approved_role":            idStr(settings.GatekeepApprovedRole),
+			"add_pending_role_on_join": settings.GatekeepAddPendingRoleOnJoin,
+			"approved_message_v2":      settings.GatekeepApprovedMessageV2,
+		})
 
 		renderSafe(w, r, partials.SettingsGatekeep(partials.GatekeepData{
 			GuildID:               guildIDStr,
@@ -740,6 +771,13 @@ func handleSaveJoinLeave(client *bot.Client) http.HandlerFunc {
 			renderJoinLeaveError("Failed to save settings.")
 			return
 		}
+		logSettingsUpdate(sessionFromContext(r.Context()), guildID, "join_leave", map[string]any{
+			"join_message_enabled":  settings.JoinMessageEnabled,
+			"leave_message_enabled": settings.LeaveMessageEnabled,
+			"join_message_v2":       settings.JoinMessageV2,
+			"leave_message_v2":      settings.LeaveMessageV2,
+			"join_leave_channel":    idStr(settings.JoinLeaveChannel),
+		})
 
 		renderSafe(w, r, partials.SettingsJoinLeave(partials.JoinLeaveData{
 			GuildID:             guildIDStr,

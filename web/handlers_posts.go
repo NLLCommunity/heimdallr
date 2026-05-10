@@ -13,6 +13,7 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 	"gorm.io/gorm"
 
+	"github.com/NLLCommunity/heimdallr/audit"
 	"github.com/NLLCommunity/heimdallr/interactions/post_dashboard"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
@@ -194,6 +195,7 @@ func handlePostsCreate(client *bot.Client) http.HandlerFunc {
 			http.Error(w, "failed to create post", http.StatusInternalServerError)
 			return
 		}
+		logPostUpdate(session, guildID, audit.EventWebPostCreate, post.ID, post.Name)
 
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_ = json.NewEncoder(w).Encode(map[string]uint{
@@ -298,6 +300,7 @@ func handlePostSave(client *bot.Client) http.HandlerFunc {
 			http.Error(w, "failed to save post", http.StatusInternalServerError)
 			return
 		}
+		logPostUpdate(sessionFromContext(r.Context()), guildID, audit.EventWebPostUpdate, updated.ID, updated.Name)
 
 		// Return the bumped version so the client can keep editing without
 		// reloading. Without this, the next save would 409 with a stale
@@ -597,6 +600,7 @@ func handlePostDelete(client *bot.Client, limiter *keyedRateLimiter) http.Handle
 			http.Error(w, "internal error", http.StatusInternalServerError)
 			return
 		}
+		logPostUpdate(sessionFromContext(r.Context()), guildID, audit.EventWebPostDelete, post.ID, post.Name)
 		// No future requests can target this post, so the per-post mutex is
 		// dead weight; drop the sync.Map entry to keep the lock table from
 		// growing unboundedly across the bot's lifetime.

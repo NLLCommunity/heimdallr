@@ -63,6 +63,9 @@ func AdminJoinMessageHandler(e *handler.CommandEvent) error {
 		if err != nil {
 			return err
 		}
+		logSettingsCommandUpdate(guild.ID, e.User(), "join_leave", map[string]any{
+			"join_message_v2": settings.JoinMessageV2,
+		})
 		return e.CreateMessage(interactions.EphemeralMessageContent("Join message has been reset."))
 	}
 
@@ -152,6 +155,9 @@ func AdminJoinMessageModalHandler(e *handler.ModalEvent) error {
 	if err != nil {
 		return err
 	}
+	logSettingsCommandUpdate(guild.ID, e.User(), "join_leave", map[string]any{
+		"join_message_v2": settings.JoinMessageV2,
+	})
 
 	return e.CreateMessage(interactions.EphemeralMessageContent("Join message updated."))
 }
@@ -180,6 +186,9 @@ func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
 		if err != nil {
 			return err
 		}
+		logSettingsCommandUpdate(guild.ID, e.User(), "join_leave", map[string]any{
+			"leave_message_v2": settings.LeaveMessageV2,
+		})
 		return e.CreateMessage(interactions.EphemeralMessageContent("Leave message has been reset."))
 	}
 
@@ -269,6 +278,9 @@ func AdminLeaveMessageModalHandler(e *handler.ModalEvent) error {
 	if err != nil {
 		return err
 	}
+	logSettingsCommandUpdate(guild.ID, e.User(), "join_leave", map[string]any{
+		"leave_message_v2": settings.LeaveMessageV2,
+	})
 
 	return e.CreateMessage(interactions.EphemeralMessageContent("Leave message updated."))
 }

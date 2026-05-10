@@ -1,0 +1,108 @@
+package partials
+
+import (
+	"strconv"
+
+	"github.com/NLLCommunity/heimdallr/web/templates/components"
+)
+
+// AuditLogSettingsData renders the audit log section of the dashboard.
+// Retention values are passed in as the per-guild override (or "" when
+// the guild is using the bot defaults). MaxRetention* fields display the
+// bot-operator ceiling so users see what the cap is.
+type AuditLogSettingsData struct {
+	GuildID string
+
+	Enabled bool
+
+	MessageRetentionDaysOverride string // user-entered or current value, "" = use default
+	MemberRetentionDaysOverride  string
+	GuildRetentionDaysOverride   string
+
+	// Bot-level ceilings; 0 = unlimited / forever.
+	MaxMessageRetentionDays uint
+	MaxMemberRetentionDays  uint
+	MaxGuildRetentionDays   uint
+
+	// Effective (resolved) retention after applying the override against
+	// the ceiling. Shown to users so the input value isn't ambiguous.
+	EffectiveMessageRetentionDays string
+	EffectiveMemberRetentionDays  string
+	EffectiveGuildRetentionDays   string
+
+	SaveSuccess bool
+	SaveError   string
+}
+
+templ SettingsAuditLog(data AuditLogSettingsData) {
+	<section id="audit-log">
+		<h3>Audit Log</h3>
+		<p>
+			Records moderation events (member joins/leaves, message edits and deletes,
+			bans, dashboard changes) to a searchable log visible
+			<a href={ templ.SafeURL("/guild/" + data.GuildID + "/auditlog") }>here</a>.
+			Without the bot having the
+			<em>View Audit Log</em> Discord permission in this server, moderator
+			attribution for some events will be missing.
+		</p>
+		<form
+			method="POST"
+			action={ templ.SafeURL("/guild/" + data.GuildID + "/settings/audit-log") }
+			hx-post={ "/guild/" + data.GuildID + "/settings/audit-log" }
+			hx-target="#audit-log"
+			hx-swap="outerHTML"
+			x-data="formTracker()" @input="checkDirty()" @change="checkDirty()"
+		>
+			if data.SaveSuccess {
+				@components.SaveSuccessMarker()
+			}
+			if data.SaveError != "" {
+				@components.AlertError(data.SaveError)
+			}
+
+			@components.ToggleField("enabled", "Enable audit log",
+				"When off, no entries are recorded. Existing rows remain until pruned.",
+				data.Enabled)
+
+			@auditRetentionField("message_retention_days", "Message retention (days)",
+				data.MessageRetentionDaysOverride, data.MaxMessageRetentionDays, data.EffectiveMessageRetentionDays)
+
+			@auditRetentionField("member_retention_days", "Member event retention (days)",
+				data.MemberRetentionDaysOverride, data.MaxMemberRetentionDays, data.EffectiveMemberRetentionDays)
+
+			@auditRetentionField("guild_retention_days", "Guild & bot event retention (days)",
+				data.GuildRetentionDaysOverride, data.MaxGuildRetentionDays, data.EffectiveGuildRetentionDays)
+
+			@components.SaveButton()
+		</form>
+	</section>
+}
+
+templ auditRetentionField(name, label, value string, max uint, effective string) {
+	<label>
+		{ label }
+		<input
+			type="number"
+			name={ name }
+			value={ value }
+			min="0"
+			placeholder="Use default"
+		/>
+		<small>
+			{ retentionHelp(max, effective) }
+		</small>
+	</label>
+}
+
+func retentionHelp(max uint, effective string) string {
+	out := ""
+	if max == 0 {
+		out = "Bot ceiling: unlimited."
+	} else {
+		out = "Bot ceiling: " + strconv.FormatUint(uint64(max), 10) + " days. Leave blank or 0 to use default."
+	}
+	if effective != "" {
+		out += " Currently: " + effective + "."
+	}
+	return out
+}

@@ -21,6 +21,7 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/spf13/viper"
 
+	"github.com/NLLCommunity/heimdallr/audit"
 	_ "github.com/NLLCommunity/heimdallr/config"
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/interactions/admin"
@@ -128,8 +129,16 @@ func main() {
 		bot.WithEventListenerFunc(listeners.OnUserJoin),
 		bot.WithEventListenerFunc(listeners.OnUserLeave),
 		bot.WithEventListenerFunc(listeners.OnMemberBan),
-		bot.WithEventListenerFunc(listeners.OnAuditLog),
+		bot.WithEventListenerFunc(listeners.OnAuditLogKick),
 		bot.WithEventListenerFunc(listeners.OnAntispamMessageCreate),
+		bot.WithEventListenerFunc(listeners.OnAuditMemberJoin),
+		bot.WithEventListenerFunc(listeners.OnAuditMemberLeave),
+		bot.WithEventListenerFunc(listeners.OnAuditMemberUpdate),
+		bot.WithEventListenerFunc(listeners.OnAuditMessageUpdate),
+		bot.WithEventListenerFunc(listeners.OnAuditMessageDelete),
+		bot.WithEventListenerFunc(listeners.OnAuditMemberBan),
+		bot.WithEventListenerFunc(listeners.OnAuditGuildUnban),
+		bot.WithEventListenerFunc(listeners.OnAuditNativeEnrichment),
 		bot.WithGatewayConfigOpts(gateway.WithIntents(intents)),
 		bot.WithCacheConfigOpts(
 			cache.WithCaches(cache.FlagsAll),
@@ -178,6 +187,7 @@ func main() {
 
 	removeTempBansTask := scheduled_tasks.RemoveTempBansScheduledTask(client)
 	removeStalePrunesTask := scheduled_tasks.RemoveStalePendingPrunes()
+	pruneAuditLogTask := scheduled_tasks.PruneAuditLogScheduledTask()
 
 	webCtx, cancelWeb := context.WithCancel(context.Background())
 	defer cancelWeb()
@@ -195,6 +205,11 @@ func main() {
 	slog.Info("Shutdown signal received")
 	removeTempBansTask.Stop()
 	removeStalePrunesTask.Stop()
+	pruneAuditLogTask.Stop()
+	// Commit any audit log entries still in the pending-enrichment buffer
+	// before the process exits. Best-effort: failures inside FlushPending
+	// are logged at warn but don't block shutdown.
+	audit.FlushPending()
 	cancelWeb()
 	<-webDone
 }
