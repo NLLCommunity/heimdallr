@@ -18,7 +18,7 @@ func (suite *ModelTestSuite) seedAuditEntries() (snowflake.ID, []uint) {
 	now := time.Now().UTC()
 	entries := []AuditLogEntry{
 		{GuildID: guildID, Category: "message", EventType: "message.delete", ActorID: &actor, ActorKind: "user", TargetID: &target, TargetKind: "message", Source: "gateway", CreatedAt: now.Add(-30 * time.Minute)},
-		{GuildID: guildID, Category: "member", EventType: "member.join", ActorID: &target, ActorKind: "user", TargetID: &target, TargetKind: "user", Source: "gateway", CreatedAt: now.Add(-20 * time.Minute)},
+		{GuildID: guildID, Category: "member", EventType: "member.nick_change", ActorID: &target, ActorKind: "user", TargetID: &target, TargetKind: "user", Source: "gateway", CreatedAt: now.Add(-20 * time.Minute)},
 		{GuildID: guildID, Category: "guild", EventType: "guild.ban", ActorID: &actor, ActorKind: "user", TargetID: &otherUser, TargetKind: "user", Source: "gateway", CreatedAt: now.Add(-10 * time.Minute)},
 		{GuildID: snowflake.ID(456), Category: "guild", EventType: "guild.ban", ActorID: &actor, ActorKind: "user", TargetID: &otherUser, TargetKind: "user", Source: "gateway", CreatedAt: now},
 	}
@@ -78,7 +78,7 @@ func (suite *ModelTestSuite) TestListAuditLogEntries_FilterActorQuery() {
 		Details: `{"actor_username":"myrkvi","target_username":"someoneElse"}`,
 	}).Error)
 	require.NoError(suite.T(), suite.db.Create(&AuditLogEntry{
-		GuildID: guildID, Category: "member", EventType: "member.join",
+		GuildID: guildID, Category: "member", EventType: "member.nick_change",
 		ActorID: &other, ActorKind: "user",
 		TargetID: &other, TargetKind: "user", Source: "gateway",
 		Details: `{"actor_username":"someoneElse","target_username":"someoneElse"}`,

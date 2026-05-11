@@ -10,63 +10,6 @@ import (
 	"github.com/NLLCommunity/heimdallr/audit"
 )
 
-// OnAuditMemberJoin records a member.join entry. Runs alongside the existing
-// OnUserJoin / OnGatekeepUserJoin / OnWarnedUserJoin listeners — they handle
-// notification flow, this one only persists to the audit log.
-func OnAuditMemberJoin(e *events.GuildMemberJoin) {
-	user := e.Member.User
-	target := user.ID
-	// actor == target for joins; record both fields so the viewer doesn't
-	// have to fall back across columns and risk swapping them.
-	details := map[string]any{
-		"actor_username":  user.Username,
-		"target_username": user.Username,
-	}
-	if !user.CreatedAt().IsZero() {
-		details["account_created_at"] = user.CreatedAt()
-	}
-	audit.Log(audit.Entry{
-		GuildID:    e.GuildID,
-		EventType:  audit.EventMemberJoin,
-		ActorID:    &target,
-		ActorKind:  audit.ActorUser,
-		TargetID:   &target,
-		TargetKind: audit.TargetUser,
-		Source:     audit.SourceGateway,
-		Details:    details,
-	})
-}
-
-// OnAuditMemberLeave records a member.leave entry as pending so the native
-// audit log enrichment listener can convert it into a guild.kick if Discord
-// reports a moderator-initiated kick.
-func OnAuditMemberLeave(e *events.GuildMemberLeave) {
-	user := e.User
-	target := user.ID
-	// Leaves that aren't promoted to kicks (no enrichment) have actor ==
-	// target. Record both fields. If a kick native entry arrives, this
-	// pending entry is cancelled entirely so the actor_username never
-	// gets used in that branch.
-	details := map[string]any{
-		"actor_username":  user.Username,
-		"target_username": user.Username,
-	}
-	audit.LogPending(audit.Entry{
-		GuildID:    e.GuildID,
-		EventType:  audit.EventMemberLeave,
-		ActorID:    &target,
-		ActorKind:  audit.ActorUser,
-		TargetID:   &target,
-		TargetKind: audit.TargetUser,
-		Source:     audit.SourceGateway,
-		Details:    details,
-		// Reason left empty — leaves don't have one, but if a kick native
-		// audit log entry arrives within the TTL window the enrichment
-		// listener will cancel this pending entry and write a guild.kick
-		// row instead.
-	}, []audit.EnrichField{audit.EnrichActor})
-}
-
 // OnAuditMemberUpdate writes one audit log entry per kind of change in a
 // GuildMemberUpdate event — timeout add/clear, role change, nick change.
 // Splitting these into distinct event types lets the viewer filter on

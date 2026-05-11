@@ -38,8 +38,6 @@ const (
 	EventMessageEdit   EventType = "message.edit"
 	EventMessageDelete EventType = "message.delete"
 
-	EventMemberJoin  EventType = "member.join"
-	EventMemberLeave EventType = "member.leave"
 	// EventMemberUpdate is retained for filter compatibility with rows
 	// written before the split into per-change types below. New entries
 	// use the more specific event types so the viewer can filter on
@@ -105,7 +103,7 @@ func EventCategory(t EventType) Category {
 	switch t {
 	case EventMessageEdit, EventMessageDelete:
 		return CategoryMessage
-	case EventMemberJoin, EventMemberLeave, EventMemberUpdate,
+	case EventMemberUpdate,
 		EventMemberNickChange, EventMemberRoleChange,
 		EventMemberTimeoutAdd, EventMemberTimeoutClear:
 		return CategoryMember
@@ -136,8 +134,9 @@ type Entry struct {
 }
 
 // Log writes the entry immediately. Use this for events that need no
-// enrichment from Discord's native audit log — member join/leave, bot
-// command actions, web dashboard actions.
+// enrichment from Discord's native audit log — kicks/prunes read from
+// the native audit log itself, bot command actions, web dashboard
+// actions.
 //
 // Failures are logged at warn but never returned: an audit-log write
 // failure must not break the calling moderation flow.

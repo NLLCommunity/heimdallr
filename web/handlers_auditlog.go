@@ -588,8 +588,6 @@ func auditLogEventOptions() []pages.AuditLogEventOption {
 	return []pages.AuditLogEventOption{
 		{Value: string(audit.EventMessageEdit), Label: "Message edited", Category: string(audit.CategoryMessage)},
 		{Value: string(audit.EventMessageDelete), Label: "Message deleted", Category: string(audit.CategoryMessage)},
-		{Value: string(audit.EventMemberJoin), Label: "Member joined", Category: string(audit.CategoryMember)},
-		{Value: string(audit.EventMemberLeave), Label: "Member left", Category: string(audit.CategoryMember)},
 		{Value: string(audit.EventMemberNickChange), Label: "Nickname changed", Category: string(audit.CategoryMember)},
 		{Value: string(audit.EventMemberRoleChange), Label: "Roles changed", Category: string(audit.CategoryMember)},
 		{Value: string(audit.EventMemberTimeoutAdd), Label: "Member timed out", Category: string(audit.CategoryMember)},

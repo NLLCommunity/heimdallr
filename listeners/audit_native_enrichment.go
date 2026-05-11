@@ -81,13 +81,8 @@ func OnAuditNativeEnrichment(e *events.GuildAuditLogEntryCreate) {
 			// a useless row.
 			return
 		}
-		// A kick fires both a GuildMemberLeave (from gateway) and this
-		// native entry, in either order. Suppress handles both:
-		//   - gateway-first: cancels the already-pending leave
-		//   - native-first: blocks the leave that arrives shortly after
 		id := *entry.TargetID
 		target := &id
-		audit.Suppress(guildID, audit.EventMemberLeave, id)
 
 		details := map[string]any{}
 		// Capture usernames at write time. The target is by definition no
@@ -115,11 +110,10 @@ func OnAuditNativeEnrichment(e *events.GuildAuditLogEntryCreate) {
 
 	case discord.AuditLogEventMemberPrune:
 		// Prune fires one native audit log entry for the whole batch
-		// (TargetID is nil) plus per-member gateway leave events. We
-		// emit a single guild.prune row capturing the moderator and
-		// batch metadata; the leaves remain as ordinary member.leave
-		// rows. Cancelling/suppressing them is not possible since the
-		// native entry doesn't tell us which members were pruned.
+		// (TargetID is nil) plus per-member gateway leave events. The
+		// gateway leaves are not logged — the audit log only records the
+		// single guild.prune row here, capturing the moderator and
+		// batch metadata.
 		details := map[string]any{}
 		if entry.Options != nil {
 			if entry.Options.MembersRemoved != nil && *entry.Options.MembersRemoved != "" {

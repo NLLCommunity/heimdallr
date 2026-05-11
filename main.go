@@ -131,8 +131,6 @@ func main() {
 		bot.WithEventListenerFunc(listeners.OnMemberBan),
 		bot.WithEventListenerFunc(listeners.OnAuditLogKick),
 		bot.WithEventListenerFunc(listeners.OnAntispamMessageCreate),
-		bot.WithEventListenerFunc(listeners.OnAuditMemberJoin),
-		bot.WithEventListenerFunc(listeners.OnAuditMemberLeave),
 		bot.WithEventListenerFunc(listeners.OnAuditMemberUpdate),
 		bot.WithEventListenerFunc(listeners.OnAuditMessageUpdate),
 		bot.WithEventListenerFunc(listeners.OnAuditMessageDelete),
