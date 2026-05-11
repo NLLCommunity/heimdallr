@@ -83,8 +83,15 @@ func handleSaveAuditLog(client *bot.Client) http.HandlerFunc {
 		}
 		settings, err := model.GetGuildSettings(guildID)
 		if err != nil {
+			// Surface config-derived ceilings even when the guild row is
+			// unreadable, so the help text doesn't misleadingly imply
+			// "kept forever" (ceiling=0) on every category.
 			renderSafe(w, r, partials.SettingsAuditLog(partials.AuditLogSettingsData{
-				GuildID: guildIDStr, SaveError: "Failed to load settings.",
+				GuildID:                 guildIDStr,
+				SaveError:               "Failed to load settings.",
+				MaxMessageRetentionDays: uintFromConfig("audit_log.message_retention_days"),
+				MaxMemberRetentionDays:  uintFromConfig("audit_log.member_retention_days"),
+				MaxGuildRetentionDays:   uintFromConfig("audit_log.guild_retention_days"),
 			}))
 			return
 		}

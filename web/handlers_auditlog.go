@@ -510,7 +510,10 @@ func buildAuditLogFilter(client *bot.Client, guildID snowflake.ID, f pages.Audit
 // Snowflake input returns (ids=[id], text="") — exact match only, since
 // the user clearly wants that specific ID.
 func resolveActorQuery(client *bot.Client, guildID snowflake.ID, query string) (ids []snowflake.ID, text string) {
-	query = strings.TrimSpace(strings.TrimPrefix(query, "@"))
+	// Trim whitespace before stripping the @ — " @user" should be treated
+	// the same as "@user", and TrimPrefix only matches at the very start.
+	query = strings.TrimPrefix(strings.TrimSpace(query), "@")
+	query = strings.TrimSpace(query)
 	if query == "" {
 		return nil, ""
 	}
@@ -531,6 +534,9 @@ func resolveActorQuery(client *bot.Client, guildID snowflake.ID, query string) (
 //
 // Leading "#" or "@" scopes the search; bare input matches both kinds.
 func resolveTargetQuery(client *bot.Client, guildID snowflake.ID, query string) (ids []snowflake.ID, channelIDs []snowflake.ID, text string) {
+	// Normalise whitespace before deciding scope so " #general" still
+	// reads as a channel-only query, then strip the scoping prefix.
+	query = strings.TrimSpace(query)
 	wantUser := !strings.HasPrefix(query, "#")
 	wantChannel := !strings.HasPrefix(query, "@")
 	query = strings.TrimSpace(strings.TrimPrefix(strings.TrimPrefix(query, "@"), "#"))
@@ -615,9 +621,15 @@ var auditLogEventOptionList = []pages.AuditLogEventOption{
 }
 
 var auditLogEventLabels = func() map[string]string {
-	m := make(map[string]string, len(auditLogEventOptionList))
+	m := make(map[string]string, len(auditLogEventOptionList)+1)
 	for _, opt := range auditLogEventOptionList {
 		m[opt.Value] = opt.Label
 	}
+	// Legacy event type — kept out of the filter dropdown (the listener
+	// now writes per-change types) but still possible on old DB rows, so
+	// it gets a readable label rather than falling through to the raw
+	// "member.update" string. refineMemberUpdateLabel may further refine
+	// this when the details payload identifies the specific change.
+	m[string(audit.EventMemberUpdate)] = "Member updated"
 	return m
 }()

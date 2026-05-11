@@ -134,6 +134,7 @@ templ auditLogPagination(data AuditLogTableData) {
 			if data.Page > 1 {
 				<li>
 					<a
+						href={ templ.SafeURL("/guild/" + data.GuildID + "/auditlog?page=" + strconv.Itoa(data.Page-1)) }
 						hx-get={ "/guild/" + data.GuildID + "/auditlog?page=" + strconv.Itoa(data.Page-1) }
 						hx-target="#auditlog-table"
 						hx-include="form"
@@ -144,6 +145,7 @@ templ auditLogPagination(data AuditLogTableData) {
 			if int64(data.Page*data.PageSize) < data.Total {
 				<li>
 					<a
+						href={ templ.SafeURL("/guild/" + data.GuildID + "/auditlog?page=" + strconv.Itoa(data.Page+1)) }
 						hx-get={ "/guild/" + data.GuildID + "/auditlog?page=" + strconv.Itoa(data.Page+1) }
 						hx-target="#auditlog-table"
 						hx-include="form"
