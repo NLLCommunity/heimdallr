@@ -245,6 +245,65 @@ func TestTryEnrich_NativeBeforeGateway(t *testing.T) {
 	assert.Equal(t, "timeout", row.Reason)
 }
 
+// MatchFirst enrichments are one-shot: once a matching gateway entry has
+// been enriched, the enrichment must NOT linger in the buffer to latch
+// onto the next unrelated gateway event for the same (guild, event,
+// target). Concretely: a moderator changes a member's nick, then within
+// the TTL window that same member changes their own nick. The second
+// row must not be attributed to the moderator.
+func TestTryEnrich_MatchFirstDoesNotBleedIntoNextEntry(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1400)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(14001)
+	moderator := snowflake.ID(14002)
+
+	// 1st action: gateway arrives, native enrichment fills in the actor.
+	LogPending(Entry{
+		GuildID:    guildID,
+		EventType:  EventMemberNickChange,
+		ActorKind:  ActorUnknown,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+	}, []EnrichField{EnrichActor, EnrichReason})
+
+	enriched := TryEnrich(guildID, EventMemberNickChange, &target, &moderator, ActorUser, "modUser", "policy", MatchFirst)
+	assert.Equal(t, 1, enriched, "first gateway event should be enriched")
+
+	// 2nd action — same target, same event type — fires within the TTL
+	// window. It has no associated native audit entry (the user changed
+	// their own nick), so it must commit unenriched.
+	selfActor := target
+	LogPending(Entry{
+		GuildID:    guildID,
+		EventType:  EventMemberNickChange,
+		ActorID:    &selfActor,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+	}, []EnrichField{EnrichActor, EnrichReason})
+
+	// Wait past TTL so the second pending entry flushes.
+	time.Sleep(pendingTTL + 200*time.Millisecond)
+
+	assert.EqualValues(t, 2, countRows(t, guildID))
+
+	var rows []model.AuditLogEntry
+	require.NoError(t, model.DB.Where("guild_id = ?", guildID).Order("created_at ASC").Find(&rows).Error)
+	require.Len(t, rows, 2)
+
+	require.NotNil(t, rows[0].ActorID)
+	assert.Equal(t, moderator, *rows[0].ActorID, "first row attributed to moderator")
+	assert.Equal(t, "policy", rows[0].Reason)
+
+	require.NotNil(t, rows[1].ActorID)
+	assert.Equal(t, target, *rows[1].ActorID, "second row must NOT be attributed to moderator — it's a self-action")
+	assert.Equal(t, "", rows[1].Reason, "second row must NOT inherit moderator's reason")
+}
+
 // Sanity: shouldLog returns false when the toggle is off.
 func TestLog_NoopWhenDisabled(t *testing.T) {
 	setupTestDB(t)

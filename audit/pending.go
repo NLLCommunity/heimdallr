@@ -214,22 +214,30 @@ func TryEnrich(
 		pendingBuffer.entries[key] = remaining
 	}
 
-	// Always store the enrichment so any in-flight gateway entry that
-	// hasn't yet hit LogPending can still pick it up. For MatchFirst, the
-	// enrichment expires once consumed by LogPending; for MatchAll it's
-	// sticky for the full TTL so every member of a bulk burst is covered.
-	en := &pendingEnrichment{
-		targetID:      copySnowflake(targetID),
-		actorID:       copySnowflake(actorID),
-		actorKind:     actorKind,
-		actorUsername: actorUsername,
-		reason:        reason,
-		match:         match,
+	// Buffer the enrichment for late-arriving gateway entries only when:
+	//   - nothing matched right now (native-first race — wait for the
+	//     gateway entry to land within TTL), or
+	//   - this is a MatchAll burst that should sweep every gateway entry
+	//     of the same key over the TTL window (e.g. bulk message delete).
+	//
+	// For MatchFirst with at least one match the action is already fully
+	// attributed. Leaving a stale enrichment in the buffer would silently
+	// latch onto the next, unrelated gateway event for the same
+	// (guild, eventType, target) within pendingTTL and misattribute it.
+	if len(matched) == 0 || match == MatchAll {
+		en := &pendingEnrichment{
+			targetID:      copySnowflake(targetID),
+			actorID:       copySnowflake(actorID),
+			actorKind:     actorKind,
+			actorUsername: actorUsername,
+			reason:        reason,
+			match:         match,
+		}
+		en.timer = time.AfterFunc(pendingTTL, func() {
+			expireEnrichment(key, en)
+		})
+		pendingBuffer.enrichments[key] = append(pendingBuffer.enrichments[key], en)
 	}
-	en.timer = time.AfterFunc(pendingTTL, func() {
-		expireEnrichment(key, en)
-	})
-	pendingBuffer.enrichments[key] = append(pendingBuffer.enrichments[key], en)
 	pendingBuffer.mu.Unlock()
 
 	for _, pe := range matched {
