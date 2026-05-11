@@ -65,12 +65,28 @@ func pruneAuditLog(ctx context.Context) {
 		}
 	}
 
+	totalDeleted := totals[string(audit.CategoryMessage)] +
+		totals[string(audit.CategoryMember)] +
+		totals[string(audit.CategoryGuild)]
+
 	slog.Info("audit pruner finished",
 		"guilds", len(guildIDs),
 		"deleted_message", totals[string(audit.CategoryMessage)],
 		"deleted_member", totals[string(audit.CategoryMember)],
 		"deleted_guild", totals[string(audit.CategoryGuild)],
 	)
+
+	// After a delete burst the WAL holds the freed pages until SQLite's
+	// auto-checkpoint (every ~1000 pages). On low-traffic bots that
+	// threshold isn't crossed for hours, leaving the WAL bloated; force
+	// a TRUNCATE checkpoint here so the WAL returns to zero bytes. The
+	// main DB file's freed pages stay on the internal freelist (reused
+	// by future writes); reclaiming those to the OS would require VACUUM.
+	if totalDeleted > 0 {
+		if err := model.DB.WithContext(ctx).Exec("PRAGMA wal_checkpoint(TRUNCATE)").Error; err != nil {
+			slog.Warn("audit pruner: WAL checkpoint failed", "err", err)
+		}
+	}
 }
 
 type categoryRetention struct {

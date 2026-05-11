@@ -217,6 +217,12 @@ func main() {
 	audit.FlushPending()
 	cancelWeb()
 	<-webDone
+	// All writers stopped; refresh the SQLite query planner stats per the
+	// upstream recommendation for connection close. No-op when nothing
+	// has changed since the last run, so cheap to call unconditionally.
+	if err := model.DB.Exec("PRAGMA optimize").Error; err != nil {
+		slog.Warn("PRAGMA optimize at shutdown failed", "err", err)
+	}
 	// Now that the web server has drained, the REST client can go.
 	// client.Close also calls Gateway.Close, which is idempotent.
 	client.Close(context.Background())
