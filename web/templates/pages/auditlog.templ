@@ -1,8 +1,6 @@
 package pages
 
 import (
-	"strconv"
-
 	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
 	"github.com/NLLCommunity/heimdallr/web/templates/partials"
 )
@@ -124,27 +122,3 @@ templ auditLogFilterForm(data AuditLogData) {
 	</form>
 }
 
-// AuditLogPageURL renders a permalink for a specific page within the
-// current filter state. Used by the table partial's pagination links.
-func AuditLogPageURL(guildID string, filters AuditLogFilters, page int) string {
-	q := "page=" + strconv.Itoa(page)
-	if filters.Category != "" {
-		q += "&category=" + filters.Category
-	}
-	if filters.EventType != "" {
-		q += "&event_type=" + filters.EventType
-	}
-	if filters.Actor != "" {
-		q += "&actor=" + filters.Actor
-	}
-	if filters.Target != "" {
-		q += "&target=" + filters.Target
-	}
-	if filters.From != "" {
-		q += "&from=" + filters.From
-	}
-	if filters.To != "" {
-		q += "&to=" + filters.To
-	}
-	return "/guild/" + guildID + "/auditlog?" + q
-}

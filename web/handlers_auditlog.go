@@ -309,6 +309,12 @@ func formatSettingsValue(client *bot.Client, guildID snowflake.ID, key string, r
 		if v == "" {
 			return "(default)"
 		}
+		// The settings handlers serialize a cleared snowflake field as "0"
+		// (rather than ""), so render that as (none) instead of letting it
+		// fall through to ResolveChannelName which would emit "channel:0".
+		if v == "0" && (strings.HasSuffix(key, "_channel") || strings.HasSuffix(key, "_role")) {
+			return "(none)"
+		}
 		if strings.HasSuffix(key, "_channel") {
 			if id, err := snowflake.Parse(v); err == nil {
 				return "#" + audit.ResolveChannelName(client, id)
@@ -394,31 +400,28 @@ func eventLabel(t string) string {
 	return t
 }
 
-// refineMemberUpdateLabel returns a more specific label for member.update
-// based on which keys are present in the stored details JSON. Falls back
-// to the generic label when nothing matches — a member.update with no
-// trackable change is suppressed at the listener anyway.
+// refineMemberUpdateLabel returns a more specific label for legacy
+// member.update rows by inspecting which keys are in the stored details
+// JSON. Current listeners write split event types (member.nick_change,
+// member.role_change, member.timeout_add, member.timeout_clear), so the
+// only member.update rows that reach this function are either pre-split
+// historical rows or the fallback emitted when memberUpdateEnrichmentTargets
+// doesn't recognise any change key — neither path writes timeout fields.
 func refineMemberUpdateLabel(fallback, detailsJSON string) string {
 	if detailsJSON == "" {
 		return fallback
 	}
 	var d struct {
-		NickBefore     *string `json:"nick_before"`
-		NickAfter      *string `json:"nick_after"`
-		RolesAdded     []any   `json:"roles_added"`
-		RolesRemoved   []any   `json:"roles_removed"`
-		TimeoutUntil   any     `json:"timeout_until"`
-		TimeoutCleared *bool   `json:"timeout_cleared"`
+		NickBefore   *string `json:"nick_before"`
+		NickAfter    *string `json:"nick_after"`
+		RolesAdded   []any   `json:"roles_added"`
+		RolesRemoved []any   `json:"roles_removed"`
 	}
 	if err := json.Unmarshal([]byte(detailsJSON), &d); err != nil {
 		return fallback
 	}
 
 	switch {
-	case d.TimeoutCleared != nil && *d.TimeoutCleared:
-		return "Timeout cleared"
-	case d.TimeoutUntil != nil:
-		return "Member timed out"
 	case len(d.RolesAdded) > 0 && len(d.RolesRemoved) > 0:
 		return "Roles changed"
 	case len(d.RolesAdded) > 0:
@@ -447,7 +450,9 @@ func parseAuditLogFilters(r *http.Request) pages.AuditLogFilters {
 		From:      strings.TrimSpace(q.Get("from")),
 		To:        strings.TrimSpace(q.Get("to")),
 	}
-	if filters.From == "" && filters.Actor == "" && filters.Target == "" && filters.EventType == "" {
+	if filters.From == "" && filters.To == "" &&
+		filters.Actor == "" && filters.Target == "" &&
+		filters.EventType == "" && filters.Category == "" {
 		filters.From = time.Now().Add(-auditLogDefaultLookback).UTC().Format("2006-01-02")
 	}
 	return filters

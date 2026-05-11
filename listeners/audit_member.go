@@ -29,18 +29,12 @@ func OnAuditMemberUpdate(e *events.GuildMemberUpdate) {
 	// state. If the member wasn't cached (common after a bot restart, or
 	// for guilds large enough that disgo hasn't chunked every member
 	// yet), OldMember is the zero value: empty role list, nil timeout,
-	// and a zero User.ID we can use to detect this case.
-	//
-	// The shape of "zero vs new" gives different results per field:
-	//   - Nick: nil → new gives "— → new", which is the correct
-	//     rendering for either a nick added OR a nick changed-from-
-	//     unknown. Safe to emit.
-	//   - Roles: zero list vs current list reports every role as newly
-	//     added. False positive. Skip on cache miss.
-	//   - Timeout: nil vs current (often a stale, already-expired
-	//     value) reports a fresh timeout. False positive. Skip on
-	//     cache miss.
-	cacheMiss := old.User.ID == 0
+	// nil nick, zero User.ID. Every field diff against that produces a
+	// false "X changed from nothing to current value" entry, so bail
+	// out entirely rather than try to salvage any per-field comparison.
+	if old.User.ID == 0 {
+		return
+	}
 
 	emit := func(eventType audit.EventType, details map[string]any) {
 		details["target_username"] = username
@@ -60,12 +54,6 @@ func OnAuditMemberUpdate(e *events.GuildMemberUpdate) {
 			"nick_before": derefString(old.Nick),
 			"nick_after":  derefString(new.Nick),
 		})
-	}
-
-	if cacheMiss {
-		// Role and timeout diffs against a zero-value OldMember produce
-		// false positives. Stop after the nick diff, which is safe.
-		return
 	}
 
 	if !slices.Equal(old.RoleIDs, new.RoleIDs) {

@@ -77,7 +77,7 @@ func main() {
 		return
 	}
 
-	_, err := model.InitDB(viper.GetString("bot.db") + "?_journal_mode=WAL")
+	_, err := model.InitDB(viper.GetString("bot.db") + "?_journal_mode=WAL&_pragma=analysis_limit(400)")
 	if err != nil {
 		panic(fmt.Errorf("failed to initialize database: %w", err))
 	}

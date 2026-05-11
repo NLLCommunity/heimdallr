@@ -76,15 +76,27 @@ func pruneAuditLog(ctx context.Context) {
 		"deleted_guild", totals[string(audit.CategoryGuild)],
 	)
 
+	if failed := audit.DrainCommitFailures(); failed > 0 {
+		slog.Warn("audit log dropped writes since last prune cycle — DB likely degraded",
+			"dropped_events", failed)
+	}
+
 	// After a delete burst the WAL holds the freed pages until SQLite's
 	// auto-checkpoint (every ~1000 pages). On low-traffic bots that
 	// threshold isn't crossed for hours, leaving the WAL bloated; force
 	// a TRUNCATE checkpoint here so the WAL returns to zero bytes. The
 	// main DB file's freed pages stay on the internal freelist (reused
 	// by future writes); reclaiming those to the OS would require VACUUM.
+	//
+	// Also refresh query-planner stats: a large delete invalidates the
+	// row-count histograms ANALYZE built earlier. analysis_limit is set
+	// on every connection via the DSN, so optimize stays bounded.
 	if totalDeleted > 0 {
 		if err := model.DB.WithContext(ctx).Exec("PRAGMA wal_checkpoint(TRUNCATE)").Error; err != nil {
 			slog.Warn("audit pruner: WAL checkpoint failed", "err", err)
+		}
+		if err := model.DB.WithContext(ctx).Exec("PRAGMA optimize").Error; err != nil {
+			slog.Warn("audit pruner: PRAGMA optimize failed", "err", err)
 		}
 	}
 }

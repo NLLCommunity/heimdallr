@@ -16,6 +16,13 @@ import (
 //   - writes a fresh row for events Discord only reports through the
 //     native audit log (member kicks, prune-driven removals).
 //
+// Scope is deliberately limited to moderation-relevant action types:
+// message delete/bulk-delete, ban/unban, member update (timeout, nick,
+// role), kick, and prune. Discord's native audit log also reports voice
+// channel moves/disconnects, channel/role/webhook create/delete/update,
+// and similar — these are intentionally not surfaced; the audit log
+// feature targets moderation activity, not full server-config history.
+//
 // The existing OnAuditLogKick listener (in audit_log_kick.go) is left
 // untouched — it owns the moderator-channel kick notification flow.
 // disgo allows multiple listeners on the same event, so the two coexist.

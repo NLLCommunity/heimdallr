@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/disgoorg/snowflake/v2"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -103,4 +104,40 @@ func (suite *ScheduledTasksTestSuite) TestGetExpiredTempBansFlow() {
 	require.NoError(suite.T(), err)
 	assert.Len(suite.T(), remainingBans, 1)
 	assert.Equal(suite.T(), snowflake.ID(333333333), remainingBans[0].UserID)
+}
+
+func TestEffectiveRetentionDays(t *testing.T) {
+	uintPtr := func(v uint) *uint { return &v }
+
+	cases := []struct {
+		name     string
+		ceiling  int
+		override *uint
+		wantDays uint
+		wantOK   bool
+	}{
+		{"nil override + ceiling=0 → forever", 0, nil, 0, false},
+		{"nil override + finite ceiling → ceiling", 30, nil, 30, true},
+		{"negative ceiling clamps to 0 + nil override → forever", -5, nil, 0, false},
+
+		{"override=0 + ceiling=0 → forever (both opt for forever)", 0, uintPtr(0), 0, false},
+		{"override=14 + ceiling=0 → 14 (guild opts in to finite)", 0, uintPtr(14), 14, true},
+
+		{"override=0 + finite ceiling → ceiling (0 disallowed against ceiling)", 30, uintPtr(0), 30, true},
+		{"override under ceiling → override", 30, uintPtr(14), 14, true},
+		{"override over ceiling → capped to ceiling", 30, uintPtr(60), 30, true},
+		{"override equals ceiling → override (no off-by-one)", 30, uintPtr(30), 30, true},
+	}
+
+	const key = "test.audit_log.retention_days"
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			viper.Set(key, tc.ceiling)
+			t.Cleanup(func() { viper.Set(key, 0) })
+
+			days, ok := EffectiveRetentionDays(key, tc.override)
+			assert.Equal(t, tc.wantDays, days, "days")
+			assert.Equal(t, tc.wantOK, ok, "ok")
+		})
+	}
 }

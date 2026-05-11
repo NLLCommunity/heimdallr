@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/disgoorg/snowflake/v2"
@@ -208,6 +209,20 @@ func InvalidateShouldLogCache(guildID snowflake.ID) {
 	shouldLogCacheMu.Unlock()
 }
 
+// commitFailures counts audit row writes that errored since the last
+// DrainCommitFailures call. Sustained failures (schema regression, disk
+// full, locked DB) would otherwise be invisible aside from per-event
+// warn logs that are easy to lose in volume.
+var commitFailures atomic.Int64
+
+// DrainCommitFailures returns the failure count accumulated since the
+// last call and resets the counter. Wire this to a periodic task so a
+// non-zero return surfaces as a single aggregated warning instead of
+// being buried in the per-event noise.
+func DrainCommitFailures() int64 {
+	return commitFailures.Swap(0)
+}
+
 // commit serializes details and writes the row. Errors are logged at warn
 // rather than returned for the same fail-soft reason as Log.
 func commit(entry Entry) {
@@ -229,6 +244,7 @@ func commit(entry Entry) {
 		Details:    detailsJSON,
 	}
 	if err := model.DB.Create(row).Error; err != nil {
+		commitFailures.Add(1)
 		slog.Warn("audit: failed to write entry",
 			"err", err,
 			"event", entry.EventType,
