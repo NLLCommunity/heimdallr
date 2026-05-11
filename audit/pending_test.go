@@ -3,6 +3,7 @@ package audit
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -24,6 +25,12 @@ func setupTestDB(t *testing.T) {
 	if _, err := model.InitDB(dbPath); err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
+	// Tests share the package-level shouldLog cache; reset it so a prior
+	// test's enabled-toggle value can't leak into one that runs against a
+	// fresh DB with the same guild_id.
+	shouldLogCacheMu.Lock()
+	shouldLogCache = map[snowflake.ID]shouldLogCacheEntry{}
+	shouldLogCacheMu.Unlock()
 	t.Cleanup(func() { _ = os.Remove(dbPath) })
 }
 
@@ -35,6 +42,9 @@ func guildEnabled(t *testing.T, guildID snowflake.ID) {
 	require.NoError(t, err)
 	settings.AuditLogEnabled = true
 	require.NoError(t, model.SetGuildSettings(settings))
+	// Match the production code path: web handler invalidates the cache
+	// after a settings save so the new toggle takes effect immediately.
+	InvalidateShouldLogCache(guildID)
 }
 
 func countRows(t *testing.T, guildID snowflake.ID) int64 {
@@ -235,6 +245,183 @@ func TestTryEnrich_NativeBeforeGateway(t *testing.T) {
 	require.NotNil(t, row.ActorID)
 	assert.Equal(t, moderator, *row.ActorID, "actor must be enriched even when native arrived first")
 	assert.Equal(t, "timeout", row.Reason)
+}
+
+// Native-first kick race: the native audit log entry arrives before the
+// gateway member.leave event. Without the suppress mechanism the kick row
+// is written, then the leave commits 1.5s later, producing two rows for
+// one departure. Suppress must drop the late-arriving leave.
+func TestSuppress_NativeBeforeGateway_DropsLeave(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1200)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(12001)
+	moderator := snowflake.ID(13001)
+
+	// Native enrichment listener fires first: no pending leave to cancel,
+	// so it sets up a suppression and writes the kick row.
+	Suppress(guildID, EventMemberLeave, target)
+	Log(Entry{
+		GuildID:    guildID,
+		EventType:  EventGuildKick,
+		ActorID:    &moderator,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+	})
+
+	// Gateway member.leave fires a moment later — must be dropped.
+	LogPending(Entry{
+		GuildID:    guildID,
+		EventType:  EventMemberLeave,
+		ActorID:    &target,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+	}, []EnrichField{EnrichActor})
+
+	// Wait past TTL to be sure nothing late-commits.
+	time.Sleep(pendingTTL + 200*time.Millisecond)
+
+	// Exactly one row: the kick.
+	assert.EqualValues(t, 1, countRows(t, guildID))
+
+	var row model.AuditLogEntry
+	require.NoError(t, model.DB.Where("guild_id = ?", guildID).First(&row).Error)
+	assert.Equal(t, string(EventGuildKick), row.EventType)
+}
+
+// Gateway-first kick: leave is already pending when Suppress fires. Suppress
+// must cancel the pending entry so it never commits.
+func TestSuppress_GatewayBeforeNative_CancelsPending(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1202)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(15001)
+	moderator := snowflake.ID(15002)
+
+	LogPending(Entry{
+		GuildID:    guildID,
+		EventType:  EventMemberLeave,
+		ActorID:    &target,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+	}, []EnrichField{EnrichActor})
+
+	Suppress(guildID, EventMemberLeave, target)
+	Log(Entry{
+		GuildID:    guildID,
+		EventType:  EventGuildKick,
+		ActorID:    &moderator,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+	})
+
+	time.Sleep(pendingTTL + 200*time.Millisecond)
+
+	assert.EqualValues(t, 1, countRows(t, guildID))
+	var row model.AuditLogEntry
+	require.NoError(t, model.DB.Where("guild_id = ?", guildID).First(&row).Error)
+	assert.Equal(t, string(EventGuildKick), row.EventType)
+}
+
+// Suppression must expire after TTL so we don't drop legitimate leaves
+// that happen to share a target ID minutes later.
+func TestSuppress_ExpiresAfterTTL(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1203)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(16001)
+	Suppress(guildID, EventMemberLeave, target)
+
+	// Wait for the suppression to expire.
+	time.Sleep(pendingTTL + 200*time.Millisecond)
+
+	// Now a leave should NOT be suppressed.
+	LogPending(Entry{
+		GuildID:    guildID,
+		EventType:  EventMemberLeave,
+		ActorID:    &target,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+	}, []EnrichField{EnrichActor})
+
+	time.Sleep(pendingTTL + 200*time.Millisecond)
+	assert.EqualValues(t, 1, countRows(t, guildID), "leave fired after suppression expired should commit")
+}
+
+// Concurrent kick race: Suppress and the gateway leave fire from
+// different goroutines, repeatedly. With the unified pendingBuffer.mu
+// covering both consume-then-append (LogPending) and cancel-then-add
+// (Suppress), the two paths are serialized and exactly one row — the
+// kick — must commit per iteration regardless of interleaving.
+//
+// Run under -race to surface any data-race regression. Without the
+// unified lock, an unlucky interleaving lets a leave commit alongside
+// the kick.
+func TestSuppress_ConcurrentWithLogPending(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1300)
+	guildEnabled(t, guildID)
+
+	const iterations = 200
+	moderator := snowflake.ID(18000)
+	var wg sync.WaitGroup
+	for i := range iterations {
+		target := snowflake.ID(19000 + i)
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			LogPending(Entry{
+				GuildID:    guildID,
+				EventType:  EventMemberLeave,
+				ActorID:    &target,
+				ActorKind:  ActorUser,
+				TargetID:   &target,
+				TargetKind: TargetUser,
+				Source:     SourceGateway,
+			}, []EnrichField{EnrichActor})
+		}()
+		go func() {
+			defer wg.Done()
+			Suppress(guildID, EventMemberLeave, target)
+			Log(Entry{
+				GuildID:    guildID,
+				EventType:  EventGuildKick,
+				ActorID:    &moderator,
+				ActorKind:  ActorUser,
+				TargetID:   &target,
+				TargetKind: TargetUser,
+				Source:     SourceGateway,
+			})
+		}()
+	}
+	wg.Wait()
+
+	// Let any TTL-bound stragglers fire so a missed suppression would
+	// commit its leave and be visible in the count below.
+	time.Sleep(pendingTTL + 300*time.Millisecond)
+
+	var kickCount, leaveCount int64
+	require.NoError(t, model.DB.Model(&model.AuditLogEntry{}).
+		Where("guild_id = ? AND event_type = ?", guildID, string(EventGuildKick)).
+		Count(&kickCount).Error)
+	require.NoError(t, model.DB.Model(&model.AuditLogEntry{}).
+		Where("guild_id = ? AND event_type = ?", guildID, string(EventMemberLeave)).
+		Count(&leaveCount).Error)
+	assert.EqualValues(t, iterations, kickCount, "every iteration must commit exactly one kick")
+	assert.EqualValues(t, 0, leaveCount, "no leave row should commit when the kick suppression races with it")
 }
 
 // Sanity: shouldLog returns false when the toggle is off.

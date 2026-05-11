@@ -8,8 +8,9 @@ import (
 )
 
 // OnAuditMessageUpdate records a message edit. The OldMessage on the event
-// reflects whatever disgo had cached — when there's a cache miss we record
-// before_content as empty rather than failing.
+// reflects whatever disgo had cached — when the message isn't cached we
+// skip the edit entirely rather than fabricate a misleading
+// "" → new content entry.
 //
 // Self-edits don't have a meaningful "actor different from the author"
 // case, so this is committed via Log (no enrichment expected). Discord
@@ -18,6 +19,14 @@ func OnAuditMessageUpdate(e *events.GuildMessageUpdate) {
 	msg := e.Message
 	authorID := msg.Author.ID
 	messageID := e.MessageID
+
+	if e.OldMessage.ID == 0 {
+		// Cache miss: OldMessage is the zero value, so we can't compare
+		// before/after content. Skip rather than write "" → new content,
+		// which would look identical to a real edit-from-empty in the
+		// viewer.
+		return
+	}
 
 	beforeContent := e.OldMessage.Content
 	afterContent := msg.Content

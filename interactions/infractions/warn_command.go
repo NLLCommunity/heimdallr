@@ -137,9 +137,11 @@ func WarnHandler(e *handler.CommandEvent) error {
 		Source:     audit.SourceCommand,
 		Reason:     inf.Reason,
 		Details: map[string]any{
-			"infraction_id": inf.Sqid(),
-			"weight":        inf.Weight,
-			"silent":        inf.Silent,
+			"infraction_id":   inf.Sqid(),
+			"weight":          inf.Weight,
+			"silent":          inf.Silent,
+			"actor_username":  e.User().Username,
+			"target_username": user.Username,
 		},
 	})
 

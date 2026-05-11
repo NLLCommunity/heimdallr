@@ -194,6 +194,18 @@ func summariseDetail(client *bot.Client, guildID snowflake.ID, eventType, detail
 			return "severity " + strconv.FormatFloat(w, 'f', -1, 64), nil
 		}
 
+	case string(audit.EventGuildPrune):
+		removed := stringField(d, "members_removed")
+		days := stringField(d, "delete_member_days")
+		switch {
+		case removed != "" && days != "":
+			return removed + " removed (inactive ≥ " + days + " days)", nil
+		case removed != "":
+			return removed + " removed", nil
+		case days != "":
+			return "inactive ≥ " + days + " days", nil
+		}
+
 	case string(audit.EventWebSettingsUpdate):
 		return formatSettingsUpdate(client, guildID, d)
 
@@ -585,6 +597,7 @@ func auditLogEventOptions() []pages.AuditLogEventOption {
 		{Value: string(audit.EventGuildBan), Label: "Member banned", Category: string(audit.CategoryGuild)},
 		{Value: string(audit.EventGuildUnban), Label: "Member unbanned", Category: string(audit.CategoryGuild)},
 		{Value: string(audit.EventGuildKick), Label: "Member kicked", Category: string(audit.CategoryGuild)},
+		{Value: string(audit.EventGuildPrune), Label: "Members pruned", Category: string(audit.CategoryGuild)},
 		{Value: string(audit.EventBotWarn), Label: "Bot warning issued", Category: string(audit.CategoryGuild)},
 		{Value: string(audit.EventWebSettingsUpdate), Label: "Settings updated", Category: string(audit.CategoryGuild)},
 		{Value: string(audit.EventWebPostCreate), Label: "Post created", Category: string(audit.CategoryGuild)},

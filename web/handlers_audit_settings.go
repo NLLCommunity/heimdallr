@@ -9,6 +9,7 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/spf13/viper"
 
+	"github.com/NLLCommunity/heimdallr/audit"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/scheduled_tasks"
 	"github.com/NLLCommunity/heimdallr/web/templates/partials"
@@ -120,11 +121,14 @@ func handleSaveAuditLog(client *bot.Client) http.HandlerFunc {
 			renderErr("Failed to save settings.")
 			return
 		}
+		// Clear the cached AuditLogEnabled flag so the new value takes
+		// effect on the very next gateway event without waiting for TTL.
+		audit.InvalidateShouldLogCache(guildID)
 		logSettingsUpdate(sessionFromContext(r.Context()), guildID, "audit_log", map[string]any{
-			"enabled":                   settings.AuditLogEnabled,
-			"message_retention_days":    ptrUintToString(settings.AuditMessageRetentionDays),
-			"member_retention_days":     ptrUintToString(settings.AuditMemberRetentionDays),
-			"guild_retention_days":      ptrUintToString(settings.AuditGuildRetentionDays),
+			"enabled":                settings.AuditLogEnabled,
+			"message_retention_days": ptrUintToString(settings.AuditMessageRetentionDays),
+			"member_retention_days":  ptrUintToString(settings.AuditMemberRetentionDays),
+			"guild_retention_days":   ptrUintToString(settings.AuditGuildRetentionDays),
 		})
 
 		data := buildAuditLogSettingsData(guildIDStr, settings)

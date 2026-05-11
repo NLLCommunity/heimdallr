@@ -391,8 +391,8 @@ func handleSaveInfractions(client *bot.Client) http.HandlerFunc {
 			return
 		}
 		logSettingsUpdate(sessionFromContext(r.Context()), guildID, "infractions", map[string]any{
-			"half_life_days":               settings.InfractionHalfLifeDays,
-			"notify_on_warned_user_join":   settings.NotifyOnWarnedUserJoin,
+			"half_life_days":                 settings.InfractionHalfLifeDays,
+			"notify_on_warned_user_join":     settings.NotifyOnWarnedUserJoin,
 			"notify_warn_severity_threshold": settings.NotifyWarnSeverityThreshold,
 		})
 

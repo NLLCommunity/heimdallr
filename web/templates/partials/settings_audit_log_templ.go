@@ -235,9 +235,9 @@ func auditRetentionField(name, label, value string, max uint, effective string) 
 func retentionHelp(max uint, effective string) string {
 	out := ""
 	if max == 0 {
-		out = "Bot ceiling: unlimited."
+		out = "Bot ceiling: unlimited. Leave blank to use default, or 0 to keep forever."
 	} else {
-		out = "Bot ceiling: " + strconv.FormatUint(uint64(max), 10) + " days. Leave blank or 0 to use default."
+		out = "Bot ceiling: " + strconv.FormatUint(uint64(max), 10) + " days. Leave blank to use default."
 	}
 	if effective != "" {
 		out += " Currently: " + effective + "."

@@ -13,6 +13,8 @@ package audit
 import (
 	"encoding/json"
 	"log/slog"
+	"sync"
+	"time"
 
 	"github.com/disgoorg/snowflake/v2"
 
@@ -36,8 +38,8 @@ const (
 	EventMessageEdit   EventType = "message.edit"
 	EventMessageDelete EventType = "message.delete"
 
-	EventMemberJoin EventType = "member.join"
-	EventMemberLeave  EventType = "member.leave"
+	EventMemberJoin  EventType = "member.join"
+	EventMemberLeave EventType = "member.leave"
 	// EventMemberUpdate is retained for filter compatibility with rows
 	// written before the split into per-change types below. New entries
 	// use the more specific event types so the viewer can filter on
@@ -51,10 +53,9 @@ const (
 	EventGuildBan   EventType = "guild.ban"
 	EventGuildUnban EventType = "guild.unban"
 	EventGuildKick  EventType = "guild.kick"
+	EventGuildPrune EventType = "guild.prune"
 
-	EventBotWarn       EventType = "bot.warn"
-	EventBotInfraction EventType = "bot.infraction"
-	EventBotTimeout    EventType = "bot.timeout"
+	EventBotWarn EventType = "bot.warn"
 
 	EventWebSettingsUpdate EventType = "web.settings.update"
 	EventWebPostCreate     EventType = "web.post.create"
@@ -108,8 +109,8 @@ func EventCategory(t EventType) Category {
 		EventMemberNickChange, EventMemberRoleChange,
 		EventMemberTimeoutAdd, EventMemberTimeoutClear:
 		return CategoryMember
-	case EventGuildBan, EventGuildUnban, EventGuildKick,
-		EventBotWarn, EventBotInfraction, EventBotTimeout,
+	case EventGuildBan, EventGuildUnban, EventGuildKick, EventGuildPrune,
+		EventBotWarn,
 		EventWebSettingsUpdate, EventWebPostCreate, EventWebPostUpdate, EventWebPostDelete:
 		return CategoryGuild
 	}
@@ -154,16 +155,58 @@ func Log(entry Entry) {
 	commit(entry)
 }
 
+// shouldLogCacheTTL is the lifetime of a cached AuditLogEnabled value.
+// The toggle is consulted on every gateway event (message edits, member
+// updates, etc.) so an uncached DB read for each one is wasteful in busy
+// guilds. The toggle changes infrequently, so a short TTL is sufficient;
+// SetGuildSettings call sites that need instant effect call
+// InvalidateShouldLogCache after a successful save.
+const shouldLogCacheTTL = 30 * time.Second
+
+type shouldLogCacheEntry struct {
+	enabled bool
+	expires time.Time
+}
+
+var (
+	shouldLogCacheMu sync.RWMutex
+	shouldLogCache   = map[snowflake.ID]shouldLogCacheEntry{}
+)
+
 // shouldLog checks the per-guild master toggle. Returns false on settings
 // read errors — failing closed is safer than logging when we can't confirm
 // the guild has opted in.
 func shouldLog(guildID snowflake.ID) bool {
+	now := time.Now()
+	shouldLogCacheMu.RLock()
+	c, hit := shouldLogCache[guildID]
+	shouldLogCacheMu.RUnlock()
+	if hit && c.expires.After(now) {
+		return c.enabled
+	}
+
 	settings, err := model.GetGuildSettings(guildID)
 	if err != nil {
 		slog.Warn("audit: failed to read guild settings", "err", err, "guild_id", guildID)
 		return false
 	}
+	shouldLogCacheMu.Lock()
+	shouldLogCache[guildID] = shouldLogCacheEntry{
+		enabled: settings.AuditLogEnabled,
+		expires: now.Add(shouldLogCacheTTL),
+	}
+	shouldLogCacheMu.Unlock()
 	return settings.AuditLogEnabled
+}
+
+// InvalidateShouldLogCache clears the cached AuditLogEnabled flag for a
+// guild. Web/command handlers that modify the toggle must call this after
+// a successful save so the new value takes effect on the very next event
+// instead of after the cache TTL.
+func InvalidateShouldLogCache(guildID snowflake.ID) {
+	shouldLogCacheMu.Lock()
+	delete(shouldLogCache, guildID)
+	shouldLogCacheMu.Unlock()
 }
 
 // commit serializes details and writes the row. Errors are logged at warn

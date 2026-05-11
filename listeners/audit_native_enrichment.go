@@ -26,9 +26,7 @@ func OnAuditNativeEnrichment(e *events.GuildAuditLogEntryCreate) {
 	actorID := entry.UserID
 	actorPtr := &actorID
 	// Resolve the moderator's username via the disgo cache, falling back
-	// to a REST fetch on miss so the viewer renders @username instead of
-	// the raw snowflake when the cache is cold. Latency cost is a single
-	// network round-trip on cache miss, paid once per audit log entry.
+	// to a REST GetMember on miss.
 	actorUsername := audit.ResolveMemberUsernameOrFetch(e.Client(), guildID, actorID)
 	reason := ""
 	if entry.Reason != nil {
@@ -77,44 +75,30 @@ func OnAuditNativeEnrichment(e *events.GuildAuditLogEntryCreate) {
 			audit.TryEnrich(guildID, ev, target, actorPtr, audit.ActorUser, actorUsername, reason, audit.MatchFirst)
 		}
 
-	case discord.AuditLogEventMemberKick, discord.AuditLogEventMemberPrune:
-		if entry.TargetID == nil && entry.ActionType == discord.AuditLogEventMemberKick {
+	case discord.AuditLogEventMemberKick:
+		if entry.TargetID == nil {
 			// Kick should always have a target; bail rather than write
 			// a useless row.
 			return
 		}
 		// A kick fires both a GuildMemberLeave (from gateway) and this
-		// native entry. Drop the pending leave so we don't record both
-		// rows for the same departure. Prune is treated the same way:
-		// disgo emits a leave for each pruned member.
-		var target *snowflake.ID
-		if entry.TargetID != nil {
-			id := *entry.TargetID
-			target = &id
-			audit.CancelPending(guildID, audit.EventMemberLeave, target)
-		}
+		// native entry, in either order. Suppress handles both:
+		//   - gateway-first: cancels the already-pending leave
+		//   - native-first: blocks the leave that arrives shortly after
+		id := *entry.TargetID
+		target := &id
+		audit.Suppress(guildID, audit.EventMemberLeave, id)
 
 		details := map[string]any{}
-		if entry.ActionType == discord.AuditLogEventMemberPrune && entry.Options != nil {
-			if entry.Options.MembersRemoved != nil && *entry.Options.MembersRemoved != "" {
-				details["members_removed"] = *entry.Options.MembersRemoved
-			}
-			if entry.Options.DeleteMemberDays != nil && *entry.Options.DeleteMemberDays != "" {
-				details["delete_member_days"] = *entry.Options.DeleteMemberDays
-			}
-		}
-		// Capture usernames at write time. Use the REST-fallback resolver
-		// so a kicked member who's just been removed from the cache still
-		// resolves — the user-visible audit log row is the only place
-		// these names will surface, and a REST round-trip per kick is
-		// cheap enough (kicks are rare).
+		// Capture usernames at write time. The target is by definition no
+		// longer a guild member at this point, so GetMember would 404;
+		// use the user-level resolver that falls back to Rest.GetUser.
+		// One REST round-trip per kick is cheap — kicks are rare.
 		if actorUsername != "" {
 			details["actor_username"] = actorUsername
 		}
-		if target != nil {
-			if name := audit.ResolveMemberUsernameOrFetch(e.Client(), guildID, *target); name != "" {
-				details["target_username"] = name
-			}
+		if name := audit.ResolveUserUsernameOrFetch(e.Client(), guildID, *target); name != "" {
+			details["target_username"] = name
 		}
 
 		audit.Log(audit.Entry{
@@ -124,6 +108,37 @@ func OnAuditNativeEnrichment(e *events.GuildAuditLogEntryCreate) {
 			ActorKind:  audit.ActorUser,
 			TargetID:   target,
 			TargetKind: audit.TargetUser,
+			Source:     audit.SourceGateway,
+			Reason:     reason,
+			Details:    details,
+		})
+
+	case discord.AuditLogEventMemberPrune:
+		// Prune fires one native audit log entry for the whole batch
+		// (TargetID is nil) plus per-member gateway leave events. We
+		// emit a single guild.prune row capturing the moderator and
+		// batch metadata; the leaves remain as ordinary member.leave
+		// rows. Cancelling/suppressing them is not possible since the
+		// native entry doesn't tell us which members were pruned.
+		details := map[string]any{}
+		if entry.Options != nil {
+			if entry.Options.MembersRemoved != nil && *entry.Options.MembersRemoved != "" {
+				details["members_removed"] = *entry.Options.MembersRemoved
+			}
+			if entry.Options.DeleteMemberDays != nil && *entry.Options.DeleteMemberDays != "" {
+				details["delete_member_days"] = *entry.Options.DeleteMemberDays
+			}
+		}
+		if actorUsername != "" {
+			details["actor_username"] = actorUsername
+		}
+
+		audit.Log(audit.Entry{
+			GuildID:    guildID,
+			EventType:  audit.EventGuildPrune,
+			ActorID:    actorPtr,
+			ActorKind:  audit.ActorUser,
+			TargetKind: audit.TargetNone,
 			Source:     audit.SourceGateway,
 			Reason:     reason,
 			Details:    details,

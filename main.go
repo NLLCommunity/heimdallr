@@ -148,7 +148,6 @@ func main() {
 	if err != nil {
 		panic(fmt.Errorf("failed to create disgo client: %w", err))
 	}
-	defer client.Close(context.Background())
 
 	var devGuilds []snowflake.ID
 	if viper.GetBool("dev_mode.enabled") {
@@ -206,12 +205,21 @@ func main() {
 	removeTempBansTask.Stop()
 	removeStalePrunesTask.Stop()
 	pruneAuditLogTask.Stop()
+	// Close ONLY the gateway first so listeners stop firing and can't
+	// refill the audit buffer after the flush below. We deliberately keep
+	// the REST client and caches alive: in-flight web requests still need
+	// them to render audit log pages, channel names, etc. — closing the
+	// whole client here would surface as REST errors mid-response.
+	client.Gateway.Close(context.Background())
 	// Commit any audit log entries still in the pending-enrichment buffer
 	// before the process exits. Best-effort: failures inside FlushPending
 	// are logged at warn but don't block shutdown.
 	audit.FlushPending()
 	cancelWeb()
 	<-webDone
+	// Now that the web server has drained, the REST client can go.
+	// client.Close also calls Gateway.Close, which is idempotent.
+	client.Close(context.Background())
 }
 
 func getLogLevel(level string) slog.Level {

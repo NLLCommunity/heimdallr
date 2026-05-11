@@ -34,11 +34,11 @@ func ResolveChannelName(client *bot.Client, channelID snowflake.ID) string {
 //
 // Audit listeners must stay fast and the snowflake ID is always recorded
 // anyway, so missing names are not load-bearing.
-func ResolveMemberUsername(client *bot.Client, guildID, userID snowflake.ID) string {
+func ResolveMemberUsername(client *bot.Client, guildID, userID snowflake.ID) (username string, ok bool) {
 	if member, ok := client.Caches.Member(guildID, userID); ok {
-		return member.User.Username
+		return member.User.Username, true
 	}
-	return ""
+	return "", false
 }
 
 // ResolveMemberUsernameOrFetch is ResolveMemberUsername with a REST
@@ -54,7 +54,7 @@ func ResolveMemberUsername(client *bot.Client, guildID, userID snowflake.ID) str
 // Returns "" only when both the cache and the REST call fail (e.g. the
 // user is no longer a guild member and was never cached).
 func ResolveMemberUsernameOrFetch(client *bot.Client, guildID, userID snowflake.ID) string {
-	if name := ResolveMemberUsername(client, guildID, userID); name != "" {
+	if name, ok := ResolveMemberUsername(client, guildID, userID); ok {
 		return name
 	}
 	member, err := client.Rest.GetMember(guildID, userID)
@@ -67,6 +67,30 @@ func ResolveMemberUsernameOrFetch(client *bot.Client, guildID, userID snowflake.
 		mc.Put(guildID, userID, *member)
 	}
 	return member.User.Username
+}
+
+// ResolveUserUsernameOrFetch resolves a user's @handle via the disgo
+// member cache (in case they're still cached as a guild member),
+// falling back to a REST GetUser call that works regardless of guild
+// membership.
+//
+// Use this for kick / ban target resolution: by the time the native
+// audit log entry fires, Discord has already removed the user from the
+// guild, so Rest.GetMember 404s and ResolveMemberUsernameOrFetch
+// returns "". GetUser still works because the user account itself
+// exists independently of guild membership.
+//
+// Returns "" only when both lookups fail (deleted Discord account, or
+// REST error).
+func ResolveUserUsernameOrFetch(client *bot.Client, guildID, userID snowflake.ID) string {
+	if name, ok := ResolveMemberUsername(client, guildID, userID); ok {
+		return name
+	}
+	user, err := client.Rest.GetUser(userID)
+	if err != nil || user == nil {
+		return ""
+	}
+	return user.Username
 }
 
 // FormatActor returns a human-readable label for the actor side of an
@@ -180,7 +204,7 @@ func FormatTarget(
 // username (or vice versa) would silently produce wrong attribution. For
 // events where actor == target, the listener stores both fields.
 func resolveUsername(client *bot.Client, guildID, userID snowflake.ID, detailsJSON, detailsField string) string {
-	if name := ResolveMemberUsername(client, guildID, userID); name != "" {
+	if name, ok := ResolveMemberUsername(client, guildID, userID); ok {
 		return name
 	}
 	return usernameFromDetails(detailsJSON, detailsField)

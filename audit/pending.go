@@ -7,11 +7,11 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 )
 
-// pendingTTL is how long the pending and enrichment buffers hold entries
-// waiting for their counterpart. Discord's native audit log entries
-// normally arrive within a few hundred ms of the corresponding gateway
-// event in either direction; 1.5s gives generous slack for ordering jitter
-// without making moderation actions feel laggy in the viewer.
+// pendingTTL is how long the pending, enrichment, and suppression buffers
+// hold entries waiting for their counterpart. Discord's native audit log
+// entries normally arrive within a few hundred ms of the corresponding
+// gateway event in either direction; 1.5s gives generous slack for ordering
+// jitter without making moderation actions feel laggy in the viewer.
 const pendingTTL = 1500 * time.Millisecond
 
 // EnrichField names the fields that TryEnrich is permitted to fill.
@@ -69,22 +69,47 @@ type pendingEnrichment struct {
 	mu            sync.Mutex
 }
 
+// suppression marks a (guild, event, target) tuple as one whose next
+// matching LogPending call must be silently dropped. Used by the kick
+// path to handle the native-arrives-before-gateway race: cancelling
+// already-buffered pending entries alone only catches the gateway-first
+// case, since the leave hasn't yet been buffered when the native kick
+// arrives in the other ordering.
+type suppression struct {
+	targetID snowflake.ID
+	timer    *time.Timer
+	consumed bool
+	mu       sync.Mutex
+}
+
+// pendingBuffer holds all three race-handling maps under a single mutex
+// so consume-then-append (in LogPending) and cancel-then-add-suppression
+// (in Suppress) are mutually exclusive. A two-mutex design leaves a
+// narrow window where LogPending can observe no suppression, then a
+// concurrent Suppress can cancel-nothing-and-add-suppression, then
+// LogPending appends a pending entry that the suppression should have
+// caught — producing the duplicate row this whole machinery exists to
+// prevent.
 var pendingBuffer = struct {
-	mu          sync.Mutex
-	entries     map[pendingKey][]*pendingEntry
-	enrichments map[pendingKey][]*pendingEnrichment
+	mu           sync.Mutex
+	entries      map[pendingKey][]*pendingEntry
+	enrichments  map[pendingKey][]*pendingEnrichment
+	suppressions map[pendingKey][]*suppression
 }{
-	entries:     map[pendingKey][]*pendingEntry{},
-	enrichments: map[pendingKey][]*pendingEnrichment{},
+	entries:      map[pendingKey][]*pendingEntry{},
+	enrichments:  map[pendingKey][]*pendingEnrichment{},
+	suppressions: map[pendingKey][]*suppression{},
 }
 
 // LogPending holds the entry briefly so a matching native audit log entry
 // can attribute the actor / reason. Use this for gateway events with a
 // possible Discord native audit log counterpart.
 //
-// If a matching enrichment is already waiting in the buffer (native arrived
-// before gateway), it's applied and the entry commits immediately.
-// Otherwise the entry sits in the pending buffer for pendingTTL.
+// Resolution order, all under a single pendingBuffer.mu critical section
+// so concurrent producers can't interleave between the checks:
+//  1. Matching suppression → drop the entry silently (kick race).
+//  2. Matching enrichment → apply it and commit immediately.
+//  3. Otherwise → register as pending; commit after pendingTTL.
 func LogPending(entry Entry, enrichable []EnrichField) {
 	if entry.Category == "" {
 		entry.Category = EventCategory(entry.EventType)
@@ -104,29 +129,35 @@ func LogPending(entry Entry, enrichable []EnrichField) {
 	key := pendingKey{guildID: entry.GuildID, eventType: entry.EventType}
 
 	pendingBuffer.mu.Lock()
-	enrichments := pendingBuffer.enrichments[key]
-	var matched *pendingEnrichment
-	var remaining []*pendingEnrichment
-	for _, en := range enrichments {
-		// Wildcard enrichments (bulk-delete) match any pending entry;
-		// targeted ones must match the entry's TargetID exactly.
-		if matched == nil && enrichmentTargetMatches(en, entry.TargetID) {
-			matched = en
-			if en.match == MatchAll {
-				// Sticky enrichment: keep it in the buffer so subsequent
-				// pending entries for the same bulk event also get
-				// enriched until TTL expires.
-				remaining = append(remaining, en)
-			}
-			continue
+
+	if s := findAndRemoveSuppressionLocked(key, entry.TargetID); s != nil {
+		pendingBuffer.mu.Unlock()
+		// Mark consumed and stop the TTL timer outside the buffer lock —
+		// preserves the buffer.mu-then-inner-mu ordering convention.
+		s.mu.Lock()
+		s.consumed = true
+		s.timer.Stop()
+		s.mu.Unlock()
+		return
+	}
+
+	matched := findAndRemoveEnrichmentLocked(key, entry.TargetID)
+
+	var pe *pendingEntry
+	if matched == nil {
+		pe = &pendingEntry{
+			entry:      entry,
+			enrichable: allowed,
 		}
-		remaining = append(remaining, en)
+		// Timer is created under the lock so its callback can find pe in
+		// the buffer once we release. The callback acquires the same lock
+		// and is therefore serialized against this section.
+		pe.timer = time.AfterFunc(pendingTTL, func() {
+			flushOne(pe)
+		})
+		pendingBuffer.entries[key] = append(pendingBuffer.entries[key], pe)
 	}
-	if len(remaining) == 0 {
-		delete(pendingBuffer.enrichments, key)
-	} else {
-		pendingBuffer.enrichments[key] = remaining
-	}
+
 	pendingBuffer.mu.Unlock()
 
 	if matched != nil {
@@ -140,20 +171,56 @@ func LogPending(entry Entry, enrichable []EnrichField) {
 		}
 		matched.mu.Unlock()
 		commit(entry)
-		return
 	}
+}
 
-	pe := &pendingEntry{
-		entry:      entry,
-		enrichable: allowed,
+// findAndRemoveSuppressionLocked returns the first matching suppression
+// for key and target, removing it from the buffer. MUST be called with
+// pendingBuffer.mu held.
+func findAndRemoveSuppressionLocked(key pendingKey, target *snowflake.ID) *suppression {
+	list := pendingBuffer.suppressions[key]
+	if len(list) == 0 {
+		return nil
 	}
-	pe.timer = time.AfterFunc(pendingTTL, func() {
-		flushOne(pe)
-	})
+	for i, s := range list {
+		if target != nil && s.targetID == *target {
+			pendingBuffer.suppressions[key] = append(list[:i], list[i+1:]...)
+			if len(pendingBuffer.suppressions[key]) == 0 {
+				delete(pendingBuffer.suppressions, key)
+			}
+			return s
+		}
+	}
+	return nil
+}
 
-	pendingBuffer.mu.Lock()
-	pendingBuffer.entries[key] = append(pendingBuffer.entries[key], pe)
-	pendingBuffer.mu.Unlock()
+// findAndRemoveEnrichmentLocked returns a matching enrichment for key and
+// target, removing it from the buffer (except for sticky MatchAll
+// enrichments, which stay until TTL). MUST be called with
+// pendingBuffer.mu held.
+func findAndRemoveEnrichmentLocked(key pendingKey, target *snowflake.ID) *pendingEnrichment {
+	enrichments := pendingBuffer.enrichments[key]
+	if len(enrichments) == 0 {
+		return nil
+	}
+	var matched *pendingEnrichment
+	var remaining []*pendingEnrichment
+	for _, en := range enrichments {
+		if matched == nil && enrichmentTargetMatches(en, target) {
+			matched = en
+			if en.match == MatchAll {
+				remaining = append(remaining, en)
+			}
+			continue
+		}
+		remaining = append(remaining, en)
+	}
+	if len(remaining) == 0 {
+		delete(pendingBuffer.enrichments, key)
+	} else {
+		pendingBuffer.enrichments[key] = remaining
+	}
+	return matched
 }
 
 // TryEnrich attaches actor / reason fields to pending entries that match
@@ -250,19 +317,39 @@ func setDetail(entry *Entry, key string, value any) {
 	entry.Details[key] = value
 }
 
-// CancelPending removes a pending entry without committing. Used by the
-// kick path: when a native MemberKick audit entry arrives, the
-// corresponding pending member.leave entry is dropped to avoid recording
-// the same departure as both a leave and a kick.
+// CancelPending removes a pending entry without committing. Returns the
+// number of pending entries cancelled. Public for callers that need to
+// drop an in-flight entry without setting up a TTL-bound suppression
+// (e.g. a follow-up gateway event that obviates the pending one).
 //
-// Returns the number of pending entries cancelled.
+// For the kick race, prefer Suppress: CancelPending only catches the
+// gateway-first ordering, not the native-first one.
 func CancelPending(guildID snowflake.ID, eventType EventType, targetID *snowflake.ID) int {
 	key := pendingKey{guildID: guildID, eventType: eventType}
 	pendingBuffer.mu.Lock()
+	cancelled := cancelMatchingPendingLocked(key, targetID)
+	pendingBuffer.mu.Unlock()
+
+	for _, pe := range cancelled {
+		pe.mu.Lock()
+		if !pe.committed {
+			pe.committed = true
+			pe.timer.Stop()
+		}
+		pe.mu.Unlock()
+	}
+	return len(cancelled)
+}
+
+// cancelMatchingPendingLocked removes pending entries matching the target
+// from the buffer and returns them. MUST be called with pendingBuffer.mu
+// held. Callers are responsible for marking the returned entries
+// committed under their own mu (release the buffer lock first to keep
+// buffer.mu-before-pe.mu ordering).
+func cancelMatchingPendingLocked(key pendingKey, targetID *snowflake.ID) []*pendingEntry {
 	pending := pendingBuffer.entries[key]
 	if len(pending) == 0 {
-		pendingBuffer.mu.Unlock()
-		return 0
+		return nil
 	}
 	var cancelled []*pendingEntry
 	var remaining []*pendingEntry
@@ -278,6 +365,36 @@ func CancelPending(guildID snowflake.ID, eventType EventType, targetID *snowflak
 	} else {
 		pendingBuffer.entries[key] = remaining
 	}
+	return cancelled
+}
+
+// Suppress prevents the next matching LogPending call for
+// (guildID, eventType, targetID) from buffering or committing an entry,
+// AND cancels any pending entry already in the buffer. Used by the kick
+// path so exactly one row (the kick) is recorded regardless of whether
+// the gateway leave arrives before or after the native audit log entry.
+//
+// The cancel and the suppression-add happen atomically under
+// pendingBuffer.mu so a concurrent LogPending cannot land its pending
+// entry in between (otherwise the leave would commit unsuppressed).
+//
+// The suppression expires after pendingTTL if never consumed, so it
+// can't accidentally swallow legitimate future leaves of the same user.
+//
+// targetID is required (no wildcard); a wildcard would silently drop the
+// next leave of any user in the guild, which has no current use case and
+// is a footgun.
+func Suppress(guildID snowflake.ID, eventType EventType, targetID snowflake.ID) {
+	key := pendingKey{guildID: guildID, eventType: eventType}
+
+	s := &suppression{targetID: targetID}
+
+	pendingBuffer.mu.Lock()
+	cancelled := cancelMatchingPendingLocked(key, &targetID)
+	s.timer = time.AfterFunc(pendingTTL, func() {
+		expireSuppression(key, s)
+	})
+	pendingBuffer.suppressions[key] = append(pendingBuffer.suppressions[key], s)
 	pendingBuffer.mu.Unlock()
 
 	for _, pe := range cancelled {
@@ -288,19 +405,46 @@ func CancelPending(guildID snowflake.ID, eventType EventType, targetID *snowflak
 		}
 		pe.mu.Unlock()
 	}
-	return len(cancelled)
+}
+
+// expireSuppression removes a suppression from the buffer when its TTL
+// fires without being consumed. Idempotent — a concurrent consume is a
+// no-op here.
+func expireSuppression(key pendingKey, s *suppression) {
+	s.mu.Lock()
+	if s.consumed {
+		s.mu.Unlock()
+		return
+	}
+	s.consumed = true
+	s.mu.Unlock()
+
+	pendingBuffer.mu.Lock()
+	list := pendingBuffer.suppressions[key]
+	for i, item := range list {
+		if item == s {
+			pendingBuffer.suppressions[key] = append(list[:i], list[i+1:]...)
+			if len(pendingBuffer.suppressions[key]) == 0 {
+				delete(pendingBuffer.suppressions, key)
+			}
+			break
+		}
+	}
+	pendingBuffer.mu.Unlock()
 }
 
 // FlushPending immediately commits every entry currently in the buffer
-// and drops all unconsumed enrichments. Wire this to bot shutdown so
-// in-flight entries are not lost when the process exits before their
-// TTL fires.
+// and drops all unconsumed enrichments / suppressions. Wire this to bot
+// shutdown so in-flight entries are not lost when the process exits
+// before their TTL fires.
 func FlushPending() {
 	pendingBuffer.mu.Lock()
 	allEntries := pendingBuffer.entries
 	pendingBuffer.entries = map[pendingKey][]*pendingEntry{}
 	allEnrichments := pendingBuffer.enrichments
 	pendingBuffer.enrichments = map[pendingKey][]*pendingEnrichment{}
+	allSuppressions := pendingBuffer.suppressions
+	pendingBuffer.suppressions = map[pendingKey][]*suppression{}
 	pendingBuffer.mu.Unlock()
 
 	for _, pending := range allEntries {
@@ -322,6 +466,14 @@ func FlushPending() {
 			en.expired = true
 			en.timer.Stop()
 			en.mu.Unlock()
+		}
+	}
+	for _, list := range allSuppressions {
+		for _, s := range list {
+			s.mu.Lock()
+			s.consumed = true
+			s.timer.Stop()
+			s.mu.Unlock()
 		}
 	}
 }
