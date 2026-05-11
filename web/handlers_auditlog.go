@@ -297,9 +297,15 @@ func humanizeFieldName(key string) string {
 
 // formatSettingsValue renders a setting's stored value for display.
 // Booleans become On/Off, channel/role IDs resolve to readable names via
-// the cache, empty strings fall back to "(default)" since the per-guild
-// settings handlers store cleared overrides as "".
+// the cache. Cleared channel/role fields render as "(none)" — the web
+// dashboard serializes a cleared snowflake as "" via idStr() while
+// command-side updates emit "0", so both shapes funnel to the same label.
+// True override-style fields (retention days, etc.) keep "(default)" for
+// empty values; an explicit "0" for those fields renders as the literal
+// "0" since it can mean a legitimate user choice (e.g. retention=forever
+// when the bot ceiling is also 0).
 func formatSettingsValue(client *bot.Client, guildID snowflake.ID, key string, raw any) string {
+	isSnowflakeKey := strings.HasSuffix(key, "_channel") || strings.HasSuffix(key, "_role")
 	switch v := raw.(type) {
 	case bool:
 		if v {
@@ -308,12 +314,12 @@ func formatSettingsValue(client *bot.Client, guildID snowflake.ID, key string, r
 		return "Off"
 	case string:
 		if v == "" {
+			if isSnowflakeKey {
+				return "(none)"
+			}
 			return "(default)"
 		}
-		// The settings handlers serialize a cleared snowflake field as "0"
-		// (rather than ""), so render that as (none) instead of letting it
-		// fall through to ResolveChannelName which would emit "channel:0".
-		if v == "0" && (strings.HasSuffix(key, "_channel") || strings.HasSuffix(key, "_role")) {
+		if v == "0" && isSnowflakeKey {
 			return "(none)"
 		}
 		if strings.HasSuffix(key, "_channel") {
@@ -333,6 +339,9 @@ func formatSettingsValue(client *bot.Client, guildID snowflake.ID, key string, r
 		}
 		return strconv.FormatFloat(v, 'f', -1, 64)
 	case nil:
+		if isSnowflakeKey {
+			return "(none)"
+		}
 		return "(default)"
 	}
 	return fmt.Sprintf("%v", raw)

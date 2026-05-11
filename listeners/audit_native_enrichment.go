@@ -148,10 +148,16 @@ func OnAuditNativeEnrichment(e *events.GuildAuditLogEntryCreate) {
 }
 
 // memberUpdateEnrichmentTargets inspects a Discord audit log entry's
-// Changes array and returns the audit log event types that should be
-// enriched. A single MemberUpdate native entry can carry multiple changes
-// (e.g. mod sets nick AND adds timeout in one click), so this returns
-// a slice rather than picking one.
+// Changes array and returns the distinct audit log event types that
+// should be enriched. A single MemberUpdate native entry can carry
+// multiple changes (e.g. mod sets nick AND adds timeout in one click),
+// so this returns a slice rather than picking one.
+//
+// Duplicates are filtered: a native entry that adds AND removes roles in
+// one operation only enriches EventMemberRoleChange once. Without this,
+// the second TryEnrich(MatchFirst) call would find no pending entry and
+// buffer a stray enrichment that could misattribute the next unrelated
+// gateway event for the same key within pendingTTL.
 //
 // Returns the legacy EventMemberUpdate as a fallback when none of the
 // known keys are present, so unrecognised member changes still get an
@@ -159,20 +165,28 @@ func OnAuditNativeEnrichment(e *events.GuildAuditLogEntryCreate) {
 // audit-log change key.
 func memberUpdateEnrichmentTargets(changes []discord.AuditLogChange) []audit.EventType {
 	var out []audit.EventType
+	seen := map[audit.EventType]bool{}
+	add := func(ev audit.EventType) {
+		if seen[ev] {
+			return
+		}
+		seen[ev] = true
+		out = append(out, ev)
+	}
 	for _, c := range changes {
 		switch c.Key {
 		case discord.AuditLogChangeKeyCommunicationDisabledUntil:
 			// Distinguish add vs clear by inspecting the new value. A
 			// JSON null new_value means the timeout was lifted.
 			if isNullJSON(c.NewValue) {
-				out = append(out, audit.EventMemberTimeoutClear)
+				add(audit.EventMemberTimeoutClear)
 			} else {
-				out = append(out, audit.EventMemberTimeoutAdd)
+				add(audit.EventMemberTimeoutAdd)
 			}
 		case discord.AuditLogChangeKeyNick:
-			out = append(out, audit.EventMemberNickChange)
+			add(audit.EventMemberNickChange)
 		case discord.AuditLogChangeKeyRoleAdd, discord.AuditLogChangeKeyRoleRemove:
-			out = append(out, audit.EventMemberRoleChange)
+			add(audit.EventMemberRoleChange)
 		}
 	}
 	if len(out) == 0 {

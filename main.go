@@ -77,9 +77,21 @@ func main() {
 		return
 	}
 
-	_, err := model.InitDB(viper.GetString("bot.db") + "?_journal_mode=WAL&_pragma=analysis_limit(400)")
+	// glebarez/sqlite only honours pragmas passed via the `_pragma` DSN
+	// parameter — `_journal_mode=WAL` (the older nokia-style form) is
+	// silently dropped, leaving the DB in rollback-journal mode. Verified
+	// empirically: the wal_checkpoint pragma in the prune task only does
+	// anything once WAL is actually enabled.
+	_, err := model.InitDB(viper.GetString("bot.db") + "?_pragma=journal_mode(WAL)&_pragma=analysis_limit(400)")
 	if err != nil {
 		panic(fmt.Errorf("failed to initialize database: %w", err))
+	}
+	// Surface the actual journal mode at boot. Silent typos in the DSN
+	// pragma list previously left the DB in rollback mode for the whole
+	// branch — logging the resolved value makes that loud next time.
+	var journalMode string
+	if err := model.DB.Raw("PRAGMA journal_mode").Scan(&journalMode).Error; err == nil {
+		slog.Info("SQLite journal mode", "mode", journalMode)
 	}
 
 	r := handler.New()
