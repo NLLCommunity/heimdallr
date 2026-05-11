@@ -26,9 +26,10 @@ const auditLogPageSize = 50
 // older entries being reached via explicit From / pagination.
 const auditLogDefaultLookback = 7 * 24 * time.Hour
 
-// handleAuditLog renders the audit log viewer. HTMX POSTs from the filter
-// form re-target #auditlog-table so we render the partial-only response
-// when the request is HX-Request and the full page otherwise.
+// handleAuditLog renders the audit log viewer. The filter form and the
+// pagination links both issue hx-get requests targeting #auditlog-table,
+// so we render the table partial when the request carries HX-Request +
+// HX-Target=auditlog-table, and the full page otherwise.
 func handleAuditLog(client *bot.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		guildIDStr := r.PathValue("id")
@@ -392,10 +393,8 @@ func roleNames(d map[string]any, key string) []string {
 // back to the raw type for unmapped values so adding a new event type
 // degrades gracefully even before its label is registered here.
 func eventLabel(t string) string {
-	for _, opt := range auditLogEventOptions() {
-		if opt.Value == t {
-			return opt.Label
-		}
+	if label, ok := auditLogEventLabels[t]; ok {
+		return label
 	}
 	return t
 }
@@ -588,23 +587,37 @@ func parsePage(s string) int {
 // auditLogEventOptions returns the dropdown options for the EventType
 // filter. Listed centrally here rather than hardcoded in the template so
 // adding a new audit event type only requires updating the audit package
-// and this slice.
+// and auditLogEventOptionList.
 func auditLogEventOptions() []pages.AuditLogEventOption {
-	return []pages.AuditLogEventOption{
-		{Value: string(audit.EventMessageEdit), Label: "Message edited", Category: string(audit.CategoryMessage)},
-		{Value: string(audit.EventMessageDelete), Label: "Message deleted", Category: string(audit.CategoryMessage)},
-		{Value: string(audit.EventMemberNickChange), Label: "Nickname changed", Category: string(audit.CategoryMember)},
-		{Value: string(audit.EventMemberRoleChange), Label: "Roles changed", Category: string(audit.CategoryMember)},
-		{Value: string(audit.EventMemberTimeoutAdd), Label: "Member timed out", Category: string(audit.CategoryMember)},
-		{Value: string(audit.EventMemberTimeoutClear), Label: "Timeout cleared", Category: string(audit.CategoryMember)},
-		{Value: string(audit.EventGuildBan), Label: "Member banned", Category: string(audit.CategoryGuild)},
-		{Value: string(audit.EventGuildUnban), Label: "Member unbanned", Category: string(audit.CategoryGuild)},
-		{Value: string(audit.EventGuildKick), Label: "Member kicked", Category: string(audit.CategoryGuild)},
-		{Value: string(audit.EventGuildPrune), Label: "Members pruned", Category: string(audit.CategoryGuild)},
-		{Value: string(audit.EventBotWarn), Label: "Bot warning issued", Category: string(audit.CategoryGuild)},
-		{Value: string(audit.EventWebSettingsUpdate), Label: "Settings updated", Category: string(audit.CategoryGuild)},
-		{Value: string(audit.EventWebPostCreate), Label: "Post created", Category: string(audit.CategoryGuild)},
-		{Value: string(audit.EventWebPostUpdate), Label: "Post updated", Category: string(audit.CategoryGuild)},
-		{Value: string(audit.EventWebPostDelete), Label: "Post deleted", Category: string(audit.CategoryGuild)},
-	}
+	return auditLogEventOptionList
 }
+
+// auditLogEventOptionList is built once at package init. eventLabel runs
+// per row, so a per-call slice allocation + linear scan would do real
+// work on busy pages; auditLogEventLabels backs that lookup as an O(1)
+// map derived from this same source of truth.
+var auditLogEventOptionList = []pages.AuditLogEventOption{
+	{Value: string(audit.EventMessageEdit), Label: "Message edited", Category: string(audit.CategoryMessage)},
+	{Value: string(audit.EventMessageDelete), Label: "Message deleted", Category: string(audit.CategoryMessage)},
+	{Value: string(audit.EventMemberNickChange), Label: "Nickname changed", Category: string(audit.CategoryMember)},
+	{Value: string(audit.EventMemberRoleChange), Label: "Roles changed", Category: string(audit.CategoryMember)},
+	{Value: string(audit.EventMemberTimeoutAdd), Label: "Member timed out", Category: string(audit.CategoryMember)},
+	{Value: string(audit.EventMemberTimeoutClear), Label: "Timeout cleared", Category: string(audit.CategoryMember)},
+	{Value: string(audit.EventGuildBan), Label: "Member banned", Category: string(audit.CategoryGuild)},
+	{Value: string(audit.EventGuildUnban), Label: "Member unbanned", Category: string(audit.CategoryGuild)},
+	{Value: string(audit.EventGuildKick), Label: "Member kicked", Category: string(audit.CategoryGuild)},
+	{Value: string(audit.EventGuildPrune), Label: "Members pruned", Category: string(audit.CategoryGuild)},
+	{Value: string(audit.EventBotWarn), Label: "Bot warning issued", Category: string(audit.CategoryGuild)},
+	{Value: string(audit.EventWebSettingsUpdate), Label: "Settings updated", Category: string(audit.CategoryGuild)},
+	{Value: string(audit.EventWebPostCreate), Label: "Post created", Category: string(audit.CategoryGuild)},
+	{Value: string(audit.EventWebPostUpdate), Label: "Post updated", Category: string(audit.CategoryGuild)},
+	{Value: string(audit.EventWebPostDelete), Label: "Post deleted", Category: string(audit.CategoryGuild)},
+}
+
+var auditLogEventLabels = func() map[string]string {
+	m := make(map[string]string, len(auditLogEventOptionList))
+	for _, opt := range auditLogEventOptionList {
+		m[opt.Value] = opt.Label
+	}
+	return m
+}()
