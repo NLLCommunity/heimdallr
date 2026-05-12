@@ -77,8 +77,11 @@ func pruneAuditLog(ctx context.Context) {
 	)
 
 	if failed := audit.DrainCommitFailures(); failed > 0 {
-		slog.Warn("audit log dropped writes since last prune cycle — DB likely degraded",
-			"dropped_events", failed)
+		// Error-level: each failure is a row that never made it to the
+		// audit trail. Sustained drops are real data loss, not just noise.
+		slog.Error("audit log dropped writes since last prune cycle — DB likely degraded",
+			"dropped_events", failed,
+			"dropped_events_total", audit.CommitFailureTotal())
 	}
 
 	// After a delete burst the WAL holds the freed pages until SQLite's

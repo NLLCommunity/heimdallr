@@ -1,8 +1,12 @@
 package audit
 
 import (
+	"math/rand"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -133,29 +137,6 @@ func TestTryEnrich_BulkMatchAll(t *testing.T) {
 	enriched := TryEnrich(guildID, EventMessageDelete, nil, nil, &moderator, ActorUser, "modUser", "bulk delete", MatchAll, 0)
 	assert.Equal(t, 3, enriched)
 	assert.EqualValues(t, 3, countRows(t, guildID))
-}
-
-func TestCancelPending_DoesNotCommit(t *testing.T) {
-	setupTestDB(t)
-	guildID := snowflake.ID(1004)
-	guildEnabled(t, guildID)
-
-	target := snowflake.ID(7007)
-	LogPending(Entry{
-		GuildID:    guildID,
-		EventType:  EventGuildBan,
-		Category:   CategoryGuild,
-		ActorKind:  ActorUnknown,
-		TargetID:   &target,
-		TargetKind: TargetUser,
-		Source:     SourceGateway,
-	}, []EnrichField{EnrichActor})
-
-	cancelled := CancelPending(guildID, EventGuildBan, &target)
-	assert.Equal(t, 1, cancelled)
-
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-	assert.EqualValues(t, 0, countRows(t, guildID), "cancelled entry must not be committed")
 }
 
 func TestFlushPending_CommitsAllInFlight(t *testing.T) {
@@ -667,4 +648,147 @@ func TestLog_NoopWhenDisabled(t *testing.T) {
 	}
 	assert.Equal(t, int64(3), hits.Load())
 	assert.EqualValues(t, 0, countRows(t, guildID), "no rows should be written while disabled")
+}
+
+// Stress test: many goroutines mixing LogPending and TryEnrich for the
+// same (guild, eventType) key under heavy target contention.
+//
+// What this catches:
+//   - data races (under `-race`), including any unlocked access to the
+//     pending buffer or per-entry state;
+//   - panics from buffer state corruption (double-stop on timers, slice
+//     index errors when consume-then-append paths interleave);
+//   - intra-row field scrambling: each row's (actor, target, reason)
+//     tuple is asserted to come from a single submission, so a partial
+//     write that copied actor from submission A and reason from
+//     submission B would surface.
+//
+// What this does NOT catch: whole-payload swaps where TryEnrich_A's
+// (actor, reason) lands on LogPending_B's pending entry. Because
+// enrichment copies the whole field group atomically per pending entry,
+// such a swap would still produce a self-consistent (actor_A,
+// target_B, reason_A) row — and the assertion's `submitted[row.Reason]`
+// lookup would re-anchor on reason_A's submission, which has target_A
+// not target_B, so the target mismatch WOULD actually trip. (Verified
+// by inspection: the assertion does compare target.) So this test does
+// catch the cross-target case after all, just not via the path the
+// docstring originally described.
+func TestPendingBuffer_Stress(t *testing.T) {
+	if testing.Short() {
+		t.Skip("stress test skipped under -short")
+	}
+	setupTestDB(t)
+	guildID := snowflake.ID(2_000_001)
+	guildEnabled(t, guildID)
+
+	const (
+		producers = 32
+		perGoro   = 50
+	)
+	// Small target pool so producers contend for the same buffer keys
+	// frequently — that's what creates the conditions for any logic
+	// race to surface. Every (actor, reason) tuple is still unique per
+	// iteration so cross-pairings would assert.
+	targetPool := make([]snowflake.ID, 16)
+	for i := range targetPool {
+		targetPool[i] = snowflake.ID(3_000_000 + i)
+	}
+
+	type submission struct {
+		target snowflake.ID
+		actor  snowflake.ID
+		reason string
+	}
+	var submittedMu sync.Mutex
+	submitted := map[string]submission{} // reason → submission
+
+	var wg sync.WaitGroup
+	for g := 0; g < producers; g++ {
+		wg.Add(1)
+		go func(gid int) {
+			defer wg.Done()
+			r := rand.New(rand.NewSource(int64(gid) * 1_000_003))
+			for i := 0; i < perGoro; i++ {
+				target := targetPool[r.Intn(len(targetPool))]
+				actor := snowflake.ID(5_000_000 + gid*perGoro + i)
+				// Reason is the unique tag we use to pair commits to submissions.
+				reason := "stress-" + strconv.Itoa(gid) + "-" + strconv.Itoa(i)
+
+				submittedMu.Lock()
+				submitted[reason] = submission{target: target, actor: actor, reason: reason}
+				submittedMu.Unlock()
+
+				if r.Intn(2) == 0 {
+					// Gateway-first: file pending, then native enrichment.
+					t2 := target
+					LogPending(Entry{
+						GuildID:    guildID,
+						EventType:  EventGuildBan,
+						Category:   CategoryGuild,
+						ActorKind:  ActorUnknown,
+						TargetID:   &t2,
+						TargetKind: TargetUser,
+						Source:     SourceGateway,
+					}, []EnrichField{EnrichActor, EnrichReason})
+					// Small jitter so native sometimes wins the race.
+					if r.Intn(2) == 0 {
+						runtime.Gosched()
+					}
+					a := actor
+					TryEnrich(guildID, EventGuildBan, &t2, nil, &a, ActorUser, "stress-actor", reason, MatchFirst, 0)
+				} else {
+					// Native-first: enrichment buffered, then gateway lands.
+					a := actor
+					t2 := target
+					TryEnrich(guildID, EventGuildBan, &t2, nil, &a, ActorUser, "stress-actor", reason, MatchFirst, 0)
+					if r.Intn(2) == 0 {
+						runtime.Gosched()
+					}
+					LogPending(Entry{
+						GuildID:    guildID,
+						EventType:  EventGuildBan,
+						Category:   CategoryGuild,
+						ActorKind:  ActorUnknown,
+						TargetID:   &t2,
+						TargetKind: TargetUser,
+						Source:     SourceGateway,
+					}, []EnrichField{EnrichActor, EnrichReason})
+				}
+			}
+		}(g)
+	}
+	wg.Wait()
+
+	// Wait past TTL so any orphaned pendings flush, then verify no rows
+	// got crossed wires.
+	time.Sleep(pendingTTL + 500*time.Millisecond)
+	FlushPending() // belt-and-braces in case any entries are still inflight
+
+	var rows []model.AuditLogEntry
+	require.NoError(t, model.DB.Where("guild_id = ?", guildID).Find(&rows).Error)
+
+	// Every row was created by a LogPending call, so the row count should
+	// match the number of LogPending submissions. Each goroutine made one
+	// LogPending per iteration.
+	assert.Equal(t, producers*perGoro, len(rows), "every LogPending submission must produce exactly one row")
+
+	matched := 0
+	for _, row := range rows {
+		sub, ok := submitted[row.Reason]
+		if !ok {
+			// Unenriched (race-lost) commits leave Reason as "". Skip.
+			continue
+		}
+		matched++
+		require.NotNil(t, row.ActorID, "row enriched with reason %q but missing actor", row.Reason)
+		assert.Equal(t, sub.actor, *row.ActorID, "actor mismatch for reason %q (cross-contamination)", row.Reason)
+		require.NotNil(t, row.TargetID)
+		assert.Equal(t, sub.target, *row.TargetID, "target mismatch for reason %q", row.Reason)
+	}
+	// Sanity: with the buffer working, the vast majority of submissions
+	// should successfully pair up. We don't insist on 100% because the
+	// TTL race can in principle leave some unenriched; <50% would indicate
+	// the buffer isn't doing its job.
+	require.Greater(t, matched, producers*perGoro/2,
+		"expected > half of pairs to enrich successfully, got %d / %d", matched, producers*perGoro)
 }

@@ -82,7 +82,17 @@ func main() {
 	// silently dropped, leaving the DB in rollback-journal mode. Verified
 	// empirically: the wal_checkpoint pragma in the prune task only does
 	// anything once WAL is actually enabled.
-	_, err := model.InitDB(viper.GetString("bot.db") + "?_pragma=journal_mode(WAL)&_pragma=analysis_limit(400)")
+	//
+	// Use & if the configured path already carries a query string (someone
+	// runs a URI-style DSN), ? otherwise. Without this, a configured
+	// "file:bot.db?cache=shared" would end up with two ? separators and
+	// the journal_mode pragma would be silently ignored.
+	dbPath := viper.GetString("bot.db")
+	sep := "?"
+	if strings.Contains(dbPath, "?") {
+		sep = "&"
+	}
+	_, err := model.InitDB(dbPath + sep + "_pragma=journal_mode(WAL)&_pragma=analysis_limit(400)")
 	if err != nil {
 		panic(fmt.Errorf("failed to initialize database: %w", err))
 	}

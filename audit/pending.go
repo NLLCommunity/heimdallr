@@ -1,3 +1,40 @@
+// Pending-enrichment buffer for audit log entries that need moderator
+// attribution from Discord's native audit log.
+//
+// Problem: gateway events (message delete, member ban, etc.) tell us
+// WHAT happened, but not WHO did it when the actor is someone other
+// than the affected user. The native audit log entries delivered via
+// GuildAuditLogEntryCreate carry the moderator's identity, but they
+// arrive on a different channel and can land either before or after
+// the corresponding gateway event. We need to correlate the two so
+// the persisted row carries both the event details and the actor.
+//
+// Design: a single buffer holds two sides of the race —
+//   - pendingEntry: gateway-witnessed event waiting for native actor info
+//   - pendingEnrichment: native actor info waiting for its gateway entry
+//
+// LogPending and TryEnrich each consult the buffer under one shared
+// mutex (pendingBuffer.mu) and serialize the consume-vs-append decision,
+// so the gateway-first and native-first orderings collapse to the same
+// "look first, then add if no match" code path. Whichever arrives second
+// commits the row inline; whichever arrives first sets a TTL timer and
+// either commits unenriched when the timer fires (gateway-first miss) or
+// drops silently (native-first miss — Discord-only events without a
+// gateway counterpart aren't persisted).
+//
+// MatchFirst (one-shot) vs MatchAll (sticky for the burst) selects how
+// many gateway entries a single native enrichment may attribute. MatchAll
+// is capped by the count Discord reports in Options.Count so an aggregated
+// burst can't accidentally claim unrelated same-key events arriving later
+// within TTL. requiredDetails additionally narrows matching for
+// message-delete, where TargetID alone (messageID gateway-side, authorID
+// native-side) doesn't line up — the gateway entry stores
+// (channel_id, author_id) in Details and the native side matches on those.
+//
+// Locking: see the invariant comment above pendingEntry below. The race
+// detector catches data races; logic-race coverage lives in the
+// *_test.go file.
+
 package audit
 
 import (
@@ -374,54 +411,6 @@ func setDetail(entry *Entry, key string, value any) {
 		entry.Details = map[string]any{}
 	}
 	entry.Details[key] = value
-}
-
-// CancelPending removes a pending entry without committing. Returns the
-// number of pending entries cancelled. Public for callers that need to
-// drop an in-flight entry (e.g. a follow-up gateway event that obviates
-// the pending one).
-func CancelPending(guildID snowflake.ID, eventType EventType, targetID *snowflake.ID) int {
-	key := pendingKey{guildID: guildID, eventType: eventType}
-	pendingBuffer.mu.Lock()
-	cancelled := cancelMatchingPendingLocked(key, targetID)
-	pendingBuffer.mu.Unlock()
-
-	for _, pe := range cancelled {
-		pe.mu.Lock()
-		if !pe.committed {
-			pe.committed = true
-			pe.timer.Stop()
-		}
-		pe.mu.Unlock()
-	}
-	return len(cancelled)
-}
-
-// cancelMatchingPendingLocked removes pending entries matching the target
-// from the buffer and returns them. MUST be called with pendingBuffer.mu
-// held. Callers are responsible for marking the returned entries
-// committed under their own mu (release the buffer lock first to keep
-// buffer.mu-before-pe.mu ordering).
-func cancelMatchingPendingLocked(key pendingKey, targetID *snowflake.ID) []*pendingEntry {
-	pending := pendingBuffer.entries[key]
-	if len(pending) == 0 {
-		return nil
-	}
-	var cancelled []*pendingEntry
-	var remaining []*pendingEntry
-	for _, pe := range pending {
-		if matchesTarget(pe.entry.TargetID, targetID) {
-			cancelled = append(cancelled, pe)
-		} else {
-			remaining = append(remaining, pe)
-		}
-	}
-	if len(remaining) == 0 {
-		delete(pendingBuffer.entries, key)
-	} else {
-		pendingBuffer.entries[key] = remaining
-	}
-	return cancelled
 }
 
 // FlushPending immediately commits every entry currently in the buffer

@@ -13,13 +13,17 @@ import (
 // OnAuditLogKick is the legacy moderator-channel kick notification listener.
 // It posts a "User X was kicked by Y" message to the configured moderator
 // channel and does NOT write to the bot's audit log — that row is written
-// by OnAuditNativeEnrichment (audit_native_enrichment.go), which also
-// suppresses the corresponding gateway leave so we don't double-record.
-// Both listeners subscribe to the same GuildAuditLogEntryCreate event.
+// by OnAuditNativeEnrichment (audit_native_enrichment.go). The gateway
+// leave event for the kicked member is not audited, so no suppression of
+// a duplicate row is required. Both listeners subscribe to the same
+// GuildAuditLogEntryCreate event; disgo dispatches to both.
 func OnAuditLogKick(e *events.GuildAuditLogEntryCreate) {
 	entry := e.AuditLogEntry
 
 	if entry.ActionType != discord.AuditLogEventMemberKick {
+		return
+	}
+	if entry.TargetID == nil {
 		return
 	}
 

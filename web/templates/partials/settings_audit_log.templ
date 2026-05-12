@@ -38,9 +38,13 @@ templ SettingsAuditLog(data AuditLogSettingsData) {
 	<section id="audit-log">
 		<h3>Audit Log</h3>
 		<p>
-			Records moderation events (member joins/leaves, message edits and deletes,
-			bans, dashboard changes) to a searchable log visible
+			Records moderation events (message edits and deletes, member nickname / role /
+			timeout changes, kicks, bans, prunes, and dashboard / command setting changes)
+			to a searchable log visible
 			<a href={ templ.SafeURL("/guild/" + data.GuildID + "/auditlog") }>here</a>.
+			Discord configuration changes (channels, roles, webhooks, etc.) and member
+			joins / leaves are <em>not</em> recorded — Discord's own audit log is the
+			source of truth for those.
 			Without the bot having the
 			<em>View Audit Log</em> Discord permission in this server, moderator
 			attribution for some events will be missing.

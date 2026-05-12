@@ -40,6 +40,13 @@ type AuditLogEventOption struct {
 templ AuditLog(nav layouts.NavData, data AuditLogData) {
 	@layouts.Base("Audit Log", nav) {
 		<h2>Audit Log</h2>
+		<p class="audit-log-scope-note">
+			Records moderation events only — message edits and deletes, member
+			nickname / role / timeout changes, kicks, bans, prunes, and setting
+			changes. Discord channel, role, and webhook configuration changes
+			are <em>not</em> recorded here; check Discord's own audit log for
+			those.
+		</p>
 		if !data.Enabled {
 			<article>
 				<p>

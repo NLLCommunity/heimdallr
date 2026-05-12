@@ -215,12 +215,29 @@ func InvalidateShouldLogCache(guildID snowflake.ID) {
 // warn logs that are easy to lose in volume.
 var commitFailures atomic.Int64
 
+// commitFailuresTotal is the cumulative count since process start —
+// not reset by DrainCommitFailures. Exposed via CommitFailureTotal so a
+// healthcheck endpoint or dashboard can show "has this process EVER
+// dropped audit writes?" independent of the drain interval.
+var commitFailuresTotal atomic.Int64
+
 // DrainCommitFailures returns the failure count accumulated since the
 // last call and resets the counter. Wire this to a periodic task so a
 // non-zero return surfaces as a single aggregated warning instead of
 // being buried in the per-event noise.
+//
+// Each commit failure is also a data-loss event for the affected row:
+// the audit trail's value depends on its completeness, so any non-zero
+// return should escalate to Error-level logging (or alerting). Use
+// CommitFailureTotal for the lifetime counter.
 func DrainCommitFailures() int64 {
 	return commitFailures.Swap(0)
+}
+
+// CommitFailureTotal returns the cumulative count of audit row write
+// failures since the process started. Read-only; never reset.
+func CommitFailureTotal() int64 {
+	return commitFailuresTotal.Load()
 }
 
 // commit serializes details and writes the row. Errors are logged at warn
@@ -245,6 +262,7 @@ func commit(entry Entry) {
 	}
 	if err := model.DB.Create(row).Error; err != nil {
 		commitFailures.Add(1)
+		commitFailuresTotal.Add(1)
 		slog.Warn("audit: failed to write entry",
 			"err", err,
 			"event", entry.EventType,
@@ -262,10 +280,4 @@ func marshalDetails(d map[string]any) (string, error) {
 		return "", err
 	}
 	return string(b), nil
-}
-
-// SnowflakePtr is a small helper since callers frequently need to take the
-// address of a snowflake.ID literal for the Entry pointer fields.
-func SnowflakePtr(id snowflake.ID) *snowflake.ID {
-	return &id
 }

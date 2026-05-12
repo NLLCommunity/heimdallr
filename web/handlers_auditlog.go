@@ -301,14 +301,25 @@ func settingsSectionLabel(section string) string {
 }
 
 // humanizeFieldName converts a snake_case settings key into Sentence case.
-// Used as the label inside the changed-values disclosure body.
+// Used as the label inside the changed-values disclosure body. Empty
+// parts (from leading / trailing / consecutive underscores) are dropped
+// so we never index into "" and never emit leading/duplicate spaces.
 func humanizeFieldName(key string) string {
 	if key == "" {
 		return ""
 	}
 	parts := strings.Split(key, "_")
-	parts[0] = strings.ToUpper(parts[0][:1]) + parts[0][1:]
-	return strings.Join(parts, " ")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p == "" {
+			continue
+		}
+		if len(out) == 0 {
+			p = strings.ToUpper(p[:1]) + p[1:]
+		}
+		out = append(out, p)
+	}
+	return strings.Join(out, " ")
 }
 
 // formatSettingsValue renders a setting's stored value for display.
@@ -605,6 +616,11 @@ func matchChannelsByName(client *bot.Client, guildID snowflake.ID, query string)
 	return ids
 }
 
+// auditLogMaxPage caps the page parameter so a crafted query string can't
+// drive an arbitrarily large OFFSET into the DB. At pageSize=50 this still
+// reaches 500k rows of history, far beyond any realistic guild's retention.
+const auditLogMaxPage = 10_000
+
 func parsePage(s string) int {
 	if s == "" {
 		return 1
@@ -612,6 +628,9 @@ func parsePage(s string) int {
 	n, err := strconv.Atoi(s)
 	if err != nil || n < 1 {
 		return 1
+	}
+	if n > auditLogMaxPage {
+		return auditLogMaxPage
 	}
 	return n
 }
