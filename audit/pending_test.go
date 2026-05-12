@@ -95,7 +95,7 @@ func TestTryEnrich_AttachesActorAndCommits(t *testing.T) {
 	}, []EnrichField{EnrichActor})
 
 	moderator := snowflake.ID(4004)
-	enriched := TryEnrich(guildID, EventGuildBan, &target, &moderator, ActorUser, "modUser", "different reason", MatchFirst)
+	enriched := TryEnrich(guildID, EventGuildBan, &target, nil, &moderator, ActorUser, "modUser", "different reason", MatchFirst, 0)
 	assert.Equal(t, 1, enriched)
 
 	// commit happened immediately, before the TTL would have fired.
@@ -129,8 +129,8 @@ func TestTryEnrich_BulkMatchAll(t *testing.T) {
 	}
 
 	moderator := snowflake.ID(6006)
-	// nil targetID = wildcard match, MatchAll = sweep all pending.
-	enriched := TryEnrich(guildID, EventMessageDelete, nil, &moderator, ActorUser, "modUser", "bulk delete", MatchAll)
+	// nil targetID = wildcard target match, MatchAll = sweep all pending.
+	enriched := TryEnrich(guildID, EventMessageDelete, nil, nil, &moderator, ActorUser, "modUser", "bulk delete", MatchAll, 0)
 	assert.Equal(t, 3, enriched)
 	assert.EqualValues(t, 3, countRows(t, guildID))
 }
@@ -199,7 +199,7 @@ func TestEnrichWhitelist_DoesNotClobberNonWhitelistedFields(t *testing.T) {
 	}, []EnrichField{}) // empty whitelist — nothing is enrichable
 
 	enricher := snowflake.ID(2020)
-	TryEnrich(guildID, EventGuildBan, &target, &enricher, ActorUser, "modUser", "different reason", MatchFirst)
+	TryEnrich(guildID, EventGuildBan, &target, nil, &enricher, ActorUser, "modUser", "different reason", MatchFirst, 0)
 
 	var row model.AuditLogEntry
 	require.NoError(t, model.DB.Where("guild_id = ?", guildID).First(&row).Error)
@@ -220,7 +220,7 @@ func TestTryEnrich_NativeBeforeGateway(t *testing.T) {
 	moderator := snowflake.ID(22002)
 
 	// Native enrichment arrives first.
-	enriched := TryEnrich(guildID, EventMemberUpdate, &target, &moderator, ActorUser, "modUser", "timeout", MatchFirst)
+	enriched := TryEnrich(guildID, EventMemberUpdate, &target, nil, &moderator, ActorUser, "modUser", "timeout", MatchFirst, 0)
 	assert.Equal(t, 0, enriched, "no pending entries yet — TryEnrich returns 0")
 
 	// Gateway entry arrives a moment later — should pick up the buffered
@@ -269,7 +269,7 @@ func TestTryEnrich_MatchFirstDoesNotBleedIntoNextEntry(t *testing.T) {
 		Source:     SourceGateway,
 	}, []EnrichField{EnrichActor, EnrichReason})
 
-	enriched := TryEnrich(guildID, EventMemberNickChange, &target, &moderator, ActorUser, "modUser", "policy", MatchFirst)
+	enriched := TryEnrich(guildID, EventMemberNickChange, &target, nil, &moderator, ActorUser, "modUser", "policy", MatchFirst, 0)
 	assert.Equal(t, 1, enriched, "first gateway event should be enriched")
 
 	// 2nd action — same target, same event type — fires within the TTL
@@ -302,6 +302,345 @@ func TestTryEnrich_MatchFirstDoesNotBleedIntoNextEntry(t *testing.T) {
 	require.NotNil(t, rows[1].ActorID)
 	assert.Equal(t, target, *rows[1].ActorID, "second row must NOT be attributed to moderator — it's a self-action")
 	assert.Equal(t, "", rows[1].Reason, "second row must NOT inherit moderator's reason")
+}
+
+// Regression: with the prior wildcard MatchAll for message-delete, an
+// unrelated user-self-delete in another channel would be swept into a
+// moderator's attribution if it landed within the TTL window. The
+// (channel_id, author_id) required-details match must scope enrichment
+// to entries that actually correspond to the native audit log row.
+func TestTryEnrich_MessageDelete_DetailsScope(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1500)
+	guildEnabled(t, guildID)
+
+	modChannel := snowflake.ID(7100)
+	otherChannel := snowflake.ID(7200)
+	victim := snowflake.ID(7300)
+	bystander := snowflake.ID(7301)
+
+	// Mod-deleted: in modChannel, authored by victim.
+	modMsg := snowflake.ID(7501)
+	LogPending(Entry{
+		GuildID:    guildID,
+		EventType:  EventMessageDelete,
+		Category:   CategoryMessage,
+		ActorID:    &victim,
+		ActorKind:  ActorUser,
+		TargetID:   &modMsg,
+		TargetKind: TargetMessage,
+		Source:     SourceGateway,
+		Details: map[string]any{
+			"channel_id":      modChannel.String(),
+			"author_id":       victim.String(),
+			"author_username": "victim",
+			"actor_username":  "victim",
+		},
+	}, []EnrichField{EnrichActor, EnrichReason})
+
+	// Unrelated self-delete: different channel, different author.
+	selfMsg := snowflake.ID(7502)
+	LogPending(Entry{
+		GuildID:    guildID,
+		EventType:  EventMessageDelete,
+		Category:   CategoryMessage,
+		ActorID:    &bystander,
+		ActorKind:  ActorUser,
+		TargetID:   &selfMsg,
+		TargetKind: TargetMessage,
+		Source:     SourceGateway,
+		Details: map[string]any{
+			"channel_id":      otherChannel.String(),
+			"author_id":       bystander.String(),
+			"author_username": "bystander",
+			"actor_username":  "bystander",
+		},
+	}, []EnrichField{EnrichActor, EnrichReason})
+
+	moderator := snowflake.ID(7400)
+	// Native audit log fired for the mod's single delete in modChannel:
+	// TargetID = victim, Options.ChannelID = modChannel.
+	required := map[string]string{
+		"channel_id": modChannel.String(),
+		"author_id":  victim.String(),
+	}
+	enriched := TryEnrich(guildID, EventMessageDelete, nil, required,
+		&moderator, ActorUser, "modUser", "spam", MatchFirst, 0)
+	assert.Equal(t, 1, enriched, "only the mod-deleted message should be enriched")
+
+	// Let the unrelated self-delete flush unenriched.
+	time.Sleep(pendingTTL + 200*time.Millisecond)
+	assert.EqualValues(t, 2, countRows(t, guildID))
+
+	var rows []model.AuditLogEntry
+	require.NoError(t, model.DB.Where("guild_id = ?", guildID).Order("target_id ASC").Find(&rows).Error)
+	require.Len(t, rows, 2)
+
+	// rows[0] = lowest target_id = modMsg; rows[1] = selfMsg.
+	require.NotNil(t, rows[0].ActorID)
+	assert.Equal(t, moderator, *rows[0].ActorID, "mod's delete attributed to moderator")
+	assert.Equal(t, "spam", rows[0].Reason)
+
+	require.NotNil(t, rows[1].ActorID)
+	assert.Equal(t, bystander, *rows[1].ActorID, "self-delete in another channel must NOT inherit mod attribution")
+	assert.Equal(t, "", rows[1].Reason)
+}
+
+// Native-arrives-first variant of the misattribution scenario: the
+// buffered enrichment must apply only to pending entries whose Details
+// satisfy the requiredDetails predicate, not to any same-key entry that
+// happens to land within TTL.
+func TestTryEnrich_MessageDelete_NativeFirst_DetailsScope(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1501)
+	guildEnabled(t, guildID)
+
+	modChannel := snowflake.ID(7600)
+	otherChannel := snowflake.ID(7700)
+	victim := snowflake.ID(7800)
+	bystander := snowflake.ID(7801)
+	moderator := snowflake.ID(7900)
+
+	// Native enrichment lands first — nothing pending yet.
+	required := map[string]string{
+		"channel_id": modChannel.String(),
+		"author_id":  victim.String(),
+	}
+	enriched := TryEnrich(guildID, EventMessageDelete, nil, required,
+		&moderator, ActorUser, "modUser", "spam", MatchFirst, 0)
+	assert.Equal(t, 0, enriched, "no pending yet — buffered for later")
+
+	// Bystander's unrelated self-delete in another channel arrives next.
+	// Must not pick up the buffered enrichment.
+	bystanderMsg := snowflake.ID(7901)
+	LogPending(Entry{
+		GuildID:    guildID,
+		EventType:  EventMessageDelete,
+		Category:   CategoryMessage,
+		ActorID:    &bystander,
+		ActorKind:  ActorUser,
+		TargetID:   &bystanderMsg,
+		TargetKind: TargetMessage,
+		Source:     SourceGateway,
+		Details: map[string]any{
+			"channel_id": otherChannel.String(),
+			"author_id":  bystander.String(),
+		},
+	}, []EnrichField{EnrichActor, EnrichReason})
+
+	// Victim's actually-mod-deleted message arrives — should pick up
+	// the buffered enrichment and commit immediately with mod attribution.
+	modMsg := snowflake.ID(7902)
+	LogPending(Entry{
+		GuildID:    guildID,
+		EventType:  EventMessageDelete,
+		Category:   CategoryMessage,
+		ActorID:    &victim,
+		ActorKind:  ActorUser,
+		TargetID:   &modMsg,
+		TargetKind: TargetMessage,
+		Source:     SourceGateway,
+		Details: map[string]any{
+			"channel_id": modChannel.String(),
+			"author_id":  victim.String(),
+		},
+	}, []EnrichField{EnrichActor, EnrichReason})
+
+	// Let the bystander entry flush unenriched.
+	time.Sleep(pendingTTL + 200*time.Millisecond)
+	assert.EqualValues(t, 2, countRows(t, guildID))
+
+	var rows []model.AuditLogEntry
+	require.NoError(t, model.DB.Where("guild_id = ?", guildID).Order("target_id ASC").Find(&rows).Error)
+	require.Len(t, rows, 2)
+
+	// rows[0] = lowest target_id = bystanderMsg, rows[1] = modMsg.
+	require.NotNil(t, rows[0].ActorID)
+	assert.Equal(t, bystander, *rows[0].ActorID, "bystander's self-delete must not inherit mod attribution")
+	assert.Equal(t, "", rows[0].Reason)
+
+	require.NotNil(t, rows[1].ActorID)
+	assert.Equal(t, moderator, *rows[1].ActorID, "victim's mod-deleted message attributed to moderator")
+	assert.Equal(t, "spam", rows[1].Reason)
+}
+
+// max parameter caps how many gateway entries a MatchAll buffered
+// enrichment may claim. With max=2 and three matching pendings arriving
+// after the native, only the first two get mod attribution; the third
+// must commit unenriched. This prevents a Discord-aggregated burst
+// (Options.Count=N) from latching onto an unrelated same-(channel,
+// author) delete that happens to arrive within TTL once the burst is
+// fully attributed.
+func TestTryEnrich_MatchAll_CountCap(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1502)
+	guildEnabled(t, guildID)
+
+	channel := snowflake.ID(8100)
+	victim := snowflake.ID(8200)
+	moderator := snowflake.ID(8300)
+
+	required := map[string]string{
+		"channel_id": channel.String(),
+		"author_id":  victim.String(),
+	}
+	// Native arrives first with Count=2.
+	enriched := TryEnrich(guildID, EventMessageDelete, nil, required,
+		&moderator, ActorUser, "modUser", "spam", MatchAll, 2)
+	assert.Equal(t, 0, enriched)
+
+	makePending := func(id snowflake.ID) {
+		t.Helper()
+		mid := id
+		LogPending(Entry{
+			GuildID:    guildID,
+			EventType:  EventMessageDelete,
+			Category:   CategoryMessage,
+			ActorID:    &victim,
+			ActorKind:  ActorUser,
+			TargetID:   &mid,
+			TargetKind: TargetMessage,
+			Source:     SourceGateway,
+			Details: map[string]any{
+				"channel_id": channel.String(),
+				"author_id":  victim.String(),
+			},
+		}, []EnrichField{EnrichActor, EnrichReason})
+	}
+
+	// Three matching pendings — only the first two should be enriched.
+	makePending(8401)
+	makePending(8402)
+	makePending(8403)
+
+	time.Sleep(pendingTTL + 200*time.Millisecond)
+	assert.EqualValues(t, 3, countRows(t, guildID))
+
+	var rows []model.AuditLogEntry
+	require.NoError(t, model.DB.Where("guild_id = ?", guildID).Order("target_id ASC").Find(&rows).Error)
+	require.Len(t, rows, 3)
+
+	require.NotNil(t, rows[0].ActorID)
+	assert.Equal(t, moderator, *rows[0].ActorID, "1st pending attributed to mod")
+	require.NotNil(t, rows[1].ActorID)
+	assert.Equal(t, moderator, *rows[1].ActorID, "2nd pending attributed to mod (cap reached)")
+	require.NotNil(t, rows[2].ActorID)
+	assert.Equal(t, victim, *rows[2].ActorID, "3rd pending past the cap — must commit unenriched")
+	assert.Equal(t, "", rows[2].Reason)
+}
+
+// Mixed-arrival count cap: some matching pendings already in buffer when
+// the native arrives (so they get inline matched), with cap budget left
+// over for late arrivals. Total mod-attributed entries must equal max.
+func TestTryEnrich_MatchAll_CountCap_InlinePlusBuffered(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1503)
+	guildEnabled(t, guildID)
+
+	channel := snowflake.ID(8500)
+	victim := snowflake.ID(8600)
+	moderator := snowflake.ID(8700)
+
+	makePending := func(id snowflake.ID) {
+		t.Helper()
+		mid := id
+		LogPending(Entry{
+			GuildID:    guildID,
+			EventType:  EventMessageDelete,
+			Category:   CategoryMessage,
+			ActorID:    &victim,
+			ActorKind:  ActorUser,
+			TargetID:   &mid,
+			TargetKind: TargetMessage,
+			Source:     SourceGateway,
+			Details: map[string]any{
+				"channel_id": channel.String(),
+				"author_id":  victim.String(),
+			},
+		}, []EnrichField{EnrichActor, EnrichReason})
+	}
+
+	// 2 pendings filed first — these will match inline.
+	makePending(8801)
+	makePending(8802)
+
+	required := map[string]string{
+		"channel_id": channel.String(),
+		"author_id":  victim.String(),
+	}
+	// Native with max=3 arrives: inline-matches 2, buffers with remaining=1.
+	enriched := TryEnrich(guildID, EventMessageDelete, nil, required,
+		&moderator, ActorUser, "modUser", "spam", MatchAll, 3)
+	assert.Equal(t, 2, enriched, "2 inline matches; 1 budget unit left in buffer")
+
+	// 2 more pendings arrive after the native: the first picks up the
+	// remaining budget, the second commits unenriched.
+	makePending(8803)
+	makePending(8804)
+
+	time.Sleep(pendingTTL + 200*time.Millisecond)
+	assert.EqualValues(t, 4, countRows(t, guildID))
+
+	var rows []model.AuditLogEntry
+	require.NoError(t, model.DB.Where("guild_id = ?", guildID).Order("target_id ASC").Find(&rows).Error)
+	require.Len(t, rows, 4)
+
+	for i, want := range []snowflake.ID{moderator, moderator, moderator, victim} {
+		require.NotNil(t, rows[i].ActorID, "row %d has nil ActorID", i)
+		assert.Equal(t, want, *rows[i].ActorID, "row %d actor", i)
+	}
+	assert.Equal(t, "spam", rows[0].Reason)
+	assert.Equal(t, "spam", rows[1].Reason)
+	assert.Equal(t, "spam", rows[2].Reason)
+	assert.Equal(t, "", rows[3].Reason, "4th pending past the cap — must be unenriched")
+}
+
+// Cache-miss pendings (no author_id captured in Details) must NOT match
+// an enrichment requiring author_id, even when channel_id matches. The
+// pending commits unenriched after TTL — that's the no-misattribution
+// guarantee the audit_message.go cache-miss branch relies on.
+func TestTryEnrich_DetailsMatch_RequiresAllKeys(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1504)
+	guildEnabled(t, guildID)
+
+	channel := snowflake.ID(9100)
+	victim := snowflake.ID(9200)
+	moderator := snowflake.ID(9300)
+	messageID := snowflake.ID(9400)
+
+	// Pending without author_id — simulates cache-miss in OnAuditMessageDelete.
+	LogPending(Entry{
+		GuildID:    guildID,
+		EventType:  EventMessageDelete,
+		Category:   CategoryMessage,
+		ActorKind:  ActorUnknown,
+		TargetID:   &messageID,
+		TargetKind: TargetMessage,
+		Source:     SourceGateway,
+		Details: map[string]any{
+			"channel_id": channel.String(),
+			// author_id deliberately absent
+		},
+	}, []EnrichField{EnrichActor, EnrichReason})
+
+	// Native enrichment requires (channel_id, author_id). Channel matches,
+	// author_id is missing from the pending — must not bind.
+	required := map[string]string{
+		"channel_id": channel.String(),
+		"author_id":  victim.String(),
+	}
+	enriched := TryEnrich(guildID, EventMessageDelete, nil, required,
+		&moderator, ActorUser, "modUser", "spam", MatchFirst, 0)
+	assert.Equal(t, 0, enriched, "missing author_id must not match")
+
+	time.Sleep(pendingTTL + 200*time.Millisecond)
+	assert.EqualValues(t, 1, countRows(t, guildID))
+
+	var row model.AuditLogEntry
+	require.NoError(t, model.DB.Where("guild_id = ?", guildID).First(&row).Error)
+	assert.Nil(t, row.ActorID, "cache-miss pending must commit unenriched, not picked up by mod's enrichment")
+	assert.Equal(t, "", row.Reason)
 }
 
 // Sanity: shouldLog returns false when the toggle is off.

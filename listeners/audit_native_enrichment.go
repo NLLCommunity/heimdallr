@@ -1,6 +1,8 @@
 package listeners
 
 import (
+	"strconv"
+
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/snowflake/v2"
@@ -41,12 +43,63 @@ func OnAuditNativeEnrichment(e *events.GuildAuditLogEntryCreate) {
 	}
 
 	switch entry.ActionType {
-	case discord.AuditLogEventMessageDelete, discord.AuditLogEventMessageBulkDelete:
-		// Bulk and single both enrich every pending message-delete in the
-		// guild within the TTL window. Native audit doesn't tell us which
-		// individual messages a bulk delete covered, so the wildcard match
-		// (nil targetID) is the best available scope.
-		audit.TryEnrich(guildID, audit.EventMessageDelete, nil, actorPtr, audit.ActorUser, actorUsername, reason, audit.MatchAll)
+	case discord.AuditLogEventMessageDelete:
+		// Single (sometimes Discord-aggregated) message-delete entry.
+		// Native side reports TargetID = author and Options.ChannelID =
+		// channel; pending side stored those same values in Details. Match
+		// on (channel_id, author_id) so concurrent unrelated deletes —
+		// e.g. a user self-deleting in another channel — aren't swept
+		// into the moderator's attribution. Cache-miss pendings (no
+		// author_id captured) deliberately fail to match and commit
+		// unenriched rather than risk misattribution.
+		//
+		// Discord aggregates repeated deletes of one author's messages
+		// in one channel into a single native entry with Count > 1, so
+		// MatchAll is the right mode when count > 1, capped at exactly
+		// Count consumptions so the buffered enrichment can't latch
+		// onto an unrelated same-(channel, author) delete arriving
+		// later within TTL. Count == 1 stays MatchFirst (one-shot).
+		if entry.TargetID == nil || entry.Options == nil || entry.Options.ChannelID == nil {
+			return
+		}
+		count := auditEntryCount(entry.Options.Count)
+		match := audit.MatchFirst
+		maxMatches := 0
+		if count > 1 {
+			match = audit.MatchAll
+			maxMatches = count
+		}
+		required := map[string]string{
+			"channel_id": entry.Options.ChannelID.String(),
+			"author_id":  entry.TargetID.String(),
+		}
+		audit.TryEnrich(guildID, audit.EventMessageDelete, nil, required, actorPtr, audit.ActorUser, actorUsername, reason, match, maxMatches)
+
+	case discord.AuditLogEventMessageBulkDelete:
+		// Bulk-delete entry's TargetID IS the channel (Options carries
+		// the count but isn't required for matching). Sweep every
+		// pending message-delete whose Details.channel_id matches,
+		// capped by Options.Count when known so the enrichment expires
+		// once the burst is fully attributed.
+		//
+		// Fall back to Discord's documented bulk-delete API ceiling
+		// (100 messages per request) when Options/Count is missing —
+		// keeps the misattribution window finite if Discord ever omits
+		// the count, rather than leaving an unlimited sticky enrichment
+		// that any same-channel self-delete within TTL could latch onto.
+		if entry.TargetID == nil {
+			return
+		}
+		maxMatches := bulkDeleteCeiling
+		if entry.Options != nil {
+			if c := auditEntryCount(entry.Options.Count); c > 0 {
+				maxMatches = c
+			}
+		}
+		required := map[string]string{
+			"channel_id": entry.TargetID.String(),
+		}
+		audit.TryEnrich(guildID, audit.EventMessageDelete, nil, required, actorPtr, audit.ActorUser, actorUsername, reason, audit.MatchAll, maxMatches)
 
 	case discord.AuditLogEventMemberBanAdd:
 		var target *snowflake.ID
@@ -54,7 +107,7 @@ func OnAuditNativeEnrichment(e *events.GuildAuditLogEntryCreate) {
 			id := *entry.TargetID
 			target = &id
 		}
-		audit.TryEnrich(guildID, audit.EventGuildBan, target, actorPtr, audit.ActorUser, actorUsername, reason, audit.MatchFirst)
+		audit.TryEnrich(guildID, audit.EventGuildBan, target, nil, actorPtr, audit.ActorUser, actorUsername, reason, audit.MatchFirst, 0)
 
 	case discord.AuditLogEventMemberBanRemove:
 		var target *snowflake.ID
@@ -62,7 +115,7 @@ func OnAuditNativeEnrichment(e *events.GuildAuditLogEntryCreate) {
 			id := *entry.TargetID
 			target = &id
 		}
-		audit.TryEnrich(guildID, audit.EventGuildUnban, target, actorPtr, audit.ActorUser, actorUsername, reason, audit.MatchFirst)
+		audit.TryEnrich(guildID, audit.EventGuildUnban, target, nil, actorPtr, audit.ActorUser, actorUsername, reason, audit.MatchFirst, 0)
 
 	case discord.AuditLogEventMemberUpdate, discord.AuditLogEventMemberRoleUpdate:
 		// MemberUpdate / MemberRoleUpdate from native audit only fire when
@@ -79,7 +132,7 @@ func OnAuditNativeEnrichment(e *events.GuildAuditLogEntryCreate) {
 			target = &id
 		}
 		for _, ev := range memberUpdateEnrichmentTargets(entry.Changes) {
-			audit.TryEnrich(guildID, ev, target, actorPtr, audit.ActorUser, actorUsername, reason, audit.MatchFirst)
+			audit.TryEnrich(guildID, ev, target, nil, actorPtr, audit.ActorUser, actorUsername, reason, audit.MatchFirst, 0)
 		}
 
 	case discord.AuditLogEventMemberKick:
@@ -200,4 +253,24 @@ func memberUpdateEnrichmentTargets(changes []discord.AuditLogChange) []audit.Eve
 func isNullJSON(raw []byte) bool {
 	s := string(raw)
 	return s == "" || s == "null"
+}
+
+// bulkDeleteCeiling is Discord's documented per-request cap on bulk
+// message deletes (POST .../messages/bulk-delete accepts at most 100
+// IDs). Used as the cap on bulk-delete enrichment when Options.Count
+// is missing so the buffered enrichment can't latch onto unlimited
+// late-arriving pendings.
+const bulkDeleteCeiling = 100
+
+// auditEntryCount parses Discord's stringly-typed Options.Count field.
+// Returns 0 when nil or unparseable so callers can branch on "unknown".
+func auditEntryCount(raw *string) int {
+	if raw == nil || *raw == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(*raw)
+	if err != nil || n < 0 {
+		return 0
+	}
+	return n
 }

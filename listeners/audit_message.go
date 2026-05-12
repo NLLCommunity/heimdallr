@@ -1,6 +1,8 @@
 package listeners
 
 import (
+	"log/slog"
+
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/snowflake/v2"
 
@@ -84,6 +86,17 @@ func OnAuditMessageDelete(e *events.GuildMessageDelete) {
 		// (and ActorID/ActorKind) with the moderator's data.
 		details["actor_username"] = e.Message.Author.Username
 		authorID = &id
+	} else {
+		// Cache miss: the native enrichment path matches on
+		// (channel_id, author_id), and without author_id the moderator
+		// attribution silently fails to bind. Surface this so the
+		// failure mode is debuggable when a moderator reports a delete
+		// that committed as ActorUnknown.
+		slog.Debug("audit message delete: pending logged without author_id; native enrichment will not match",
+			"guild_id", e.GuildID,
+			"channel_id", e.ChannelID,
+			"message_id", messageID,
+		)
 	}
 
 	entry := audit.Entry{

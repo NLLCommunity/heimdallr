@@ -33,12 +33,20 @@ const (
 	MatchAll
 )
 
-// pendingKey identifies a (guild, event) pair. TargetID is matched
-// separately so wildcard / bulk matches work.
+// pendingKey identifies a (guild, event) pair. TargetID and
+// requiredDetails are matched separately so wildcard / bulk matches work.
 type pendingKey struct {
 	guildID   snowflake.ID
 	eventType EventType
 }
+
+// lock ordering invariant: locks are never nested in either direction.
+// Paths that begin with pendingBuffer.mu (LogPending, TryEnrich) release
+// it before taking any pendingEntry.mu or pendingEnrichment.mu. Paths
+// that begin with the per-entry / per-enrichment mu (flushOne,
+// expireEnrichment) release it before re-acquiring pendingBuffer.mu.
+// The findAndRemove* helpers run under pendingBuffer.mu only; callers
+// do the per-X mutation after releasing it.
 
 type pendingEntry struct {
 	entry      Entry
@@ -57,16 +65,35 @@ type pendingEntry struct {
 // actorUsername lets the enrichment overwrite Details["actor_username"]
 // when the actor itself is being replaced (e.g. self-delete row enriched
 // to a moderator-delete) so the viewer doesn't show a stale name.
+//
+// requiredDetails further narrows matching when the natural TargetID
+// doesn't line up between gateway and native sides (e.g. message-delete:
+// pending TargetID is messageID, native TargetID is the author). Every
+// (key, value) pair must be present and stringwise-equal in the pending
+// entry's Details for the enrichment to apply.
+//
+// remaining caps how many gateway entries a MatchAll enrichment may
+// enrich before it's removed from the buffer (independent of TTL):
+//   - < 0  unlimited (sticky until TTL — used when the native side
+//     doesn't carry a count, e.g. unknown-size bulk delete).
+//   - > 0  decrement on each consumption; remove from buffer when zero
+//     so a same-(channel, author) gateway event arriving after the
+//     burst isn't misattributed to the moderator.
+//
+// MatchFirst ignores remaining (one-shot anyway). remaining is accessed
+// only under pendingBuffer.mu, not en.mu.
 type pendingEnrichment struct {
-	targetID      *snowflake.ID // nil = wildcard (bulk events)
-	actorID       *snowflake.ID
-	actorKind     ActorKind
-	actorUsername string
-	reason        string
-	match         MatchMode
-	timer         *time.Timer
-	expired       bool
-	mu            sync.Mutex
+	targetID        *snowflake.ID // nil = wildcard target match
+	requiredDetails map[string]string
+	actorID         *snowflake.ID
+	actorKind       ActorKind
+	actorUsername   string
+	reason          string
+	match           MatchMode
+	remaining       int
+	timer           *time.Timer
+	expired         bool
+	mu              sync.Mutex
 }
 
 // pendingBuffer holds entries waiting for native-audit enrichment and
@@ -110,7 +137,7 @@ func LogPending(entry Entry, enrichable []EnrichField) {
 
 	pendingBuffer.mu.Lock()
 
-	matched := findAndRemoveEnrichmentLocked(key, entry.TargetID)
+	matched := findAndRemoveEnrichmentLocked(key, &entry)
 
 	var pe *pendingEntry
 	if matched == nil {
@@ -143,11 +170,20 @@ func LogPending(entry Entry, enrichable []EnrichField) {
 	}
 }
 
-// findAndRemoveEnrichmentLocked returns a matching enrichment for key and
-// target, removing it from the buffer (except for sticky MatchAll
-// enrichments, which stay until TTL). MUST be called with
-// pendingBuffer.mu held.
-func findAndRemoveEnrichmentLocked(key pendingKey, target *snowflake.ID) *pendingEnrichment {
+// findAndRemoveEnrichmentLocked returns a matching enrichment for the
+// given entry, removing it from the buffer. MatchAll enrichments stay
+// in the buffer until either (a) their TTL expires or (b) their
+// remaining counter hits zero (set from Discord's Options.Count, which
+// caps how many gateway entries an aggregated native row can attribute).
+//
+// First-match-wins: if multiple buffered enrichments could match the
+// entry, only the earliest in iteration order is returned. Subsequent
+// matches stay in the buffer for their own TTL — they'll bind to later
+// pending entries or expire unconsumed. We don't try to merge match
+// criteria; each native audit row corresponds to one TryEnrich call,
+// and the surrounding callers don't produce overlapping criteria.
+// MUST be called with pendingBuffer.mu held.
+func findAndRemoveEnrichmentLocked(key pendingKey, entry *Entry) *pendingEnrichment {
 	enrichments := pendingBuffer.enrichments[key]
 	if len(enrichments) == 0 {
 		return nil
@@ -155,10 +191,26 @@ func findAndRemoveEnrichmentLocked(key pendingKey, target *snowflake.ID) *pendin
 	var matched *pendingEnrichment
 	var remaining []*pendingEnrichment
 	for _, en := range enrichments {
-		if matched == nil && enrichmentTargetMatches(en, target) {
+		if matched == nil && enrichmentMatches(en, entry) {
 			matched = en
 			if en.match == MatchAll {
-				remaining = append(remaining, en)
+				// Decrement the consumption budget; > 0 = stay sticky,
+				// 0 = exhausted (drop from buffer), < 0 = unlimited.
+				if en.remaining > 0 {
+					en.remaining--
+				}
+				if en.remaining != 0 {
+					remaining = append(remaining, en)
+				} else {
+					// Exhausted — stop the TTL timer so it doesn't run
+					// pointless work later. We deliberately don't set
+					// en.expired here: we already hold buffer.mu and have
+					// removed en from the list, so expireEnrichment's
+					// fast path (which sets expired under en.mu) isn't
+					// load-bearing — if the timer raced past Stop, it
+					// will fail to find en in the list and exit cleanly.
+					en.timer.Stop()
+				}
 			}
 			continue
 		}
@@ -177,6 +229,13 @@ func findAndRemoveEnrichmentLocked(key pendingKey, target *snowflake.ID) *pendin
 // pending entry exists, the enrichment is buffered for pendingTTL so a
 // gateway entry arriving slightly later can still pick it up.
 //
+// requiredDetails optionally narrows matching: when non-empty, the
+// pending entry's Details must contain every (key, value) pair as a
+// string. Used when targetID alone isn't a tight enough match — e.g.
+// message-delete, where pending entries are keyed on messageID but
+// Discord's native audit log reports (channel_id, author_id) and a
+// wildcard sweep would misattribute concurrent unrelated deletes.
+//
 // actorUsername should be the actor's resolved Username (typically from
 // the disgo member cache); when non-empty and EnrichActor is whitelisted,
 // it overwrites Details["actor_username"] so the viewer doesn't show a
@@ -184,17 +243,30 @@ func findAndRemoveEnrichmentLocked(key pendingKey, target *snowflake.ID) *pendin
 //
 // match controls how many pending entries are enriched: MatchFirst (single)
 // or MatchAll (every pending entry under the key — for bulk events).
+//
+// maxMatches caps how many gateway entries a MatchAll buffered enrichment
+// may claim (inline matches count toward the cap, late arrivals consume
+// the remainder). 0 or negative means unlimited (sticky until TTL); use
+// when Discord doesn't supply a count. Ignored for MatchFirst.
+//
 // Returns the number of pending entries enriched immediately.
 func TryEnrich(
 	guildID snowflake.ID,
 	eventType EventType,
 	targetID *snowflake.ID,
+	requiredDetails map[string]string,
 	actorID *snowflake.ID,
 	actorKind ActorKind,
 	actorUsername string,
 	reason string,
 	match MatchMode,
+	maxMatches int,
 ) int {
+	// Clamp negative caps to "unlimited" so misbehaving callers can't
+	// accidentally disable the buffered-enrichment path with -1.
+	if maxMatches < 0 {
+		maxMatches = 0
+	}
 	key := pendingKey{guildID: guildID, eventType: eventType}
 
 	pendingBuffer.mu.Lock()
@@ -202,7 +274,9 @@ func TryEnrich(
 	var matched []*pendingEntry
 	var remaining []*pendingEntry
 	for _, pe := range pending {
-		if matchesTarget(pe.entry.TargetID, targetID) && (match == MatchAll || len(matched) == 0) {
+		if matchesTarget(pe.entry.TargetID, targetID) &&
+			detailsMatch(pe.entry.Details, requiredDetails) &&
+			(match == MatchAll || len(matched) == 0) {
 			matched = append(matched, pe)
 		} else {
 			remaining = append(remaining, pe)
@@ -214,24 +288,52 @@ func TryEnrich(
 		pendingBuffer.entries[key] = remaining
 	}
 
-	// Buffer the enrichment for late-arriving gateway entries only when:
+	// Decide whether to buffer a sticky enrichment for late-arriving
+	// gateway entries. Buffer when:
 	//   - nothing matched right now (native-first race — wait for the
-	//     gateway entry to land within TTL), or
-	//   - this is a MatchAll burst that should sweep every gateway entry
-	//     of the same key over the TTL window (e.g. bulk message delete).
+	//     gateway entry to land within TTL); OR
+	//   - MatchAll with budget left over after the inline sweep.
 	//
-	// For MatchFirst with at least one match the action is already fully
-	// attributed. Leaving a stale enrichment in the buffer would silently
-	// latch onto the next, unrelated gateway event for the same
-	// (guild, eventType, target) within pendingTTL and misattribute it.
-	if len(matched) == 0 || match == MatchAll {
+	// MatchFirst with at least one inline match is fully attributed; a
+	// lingering buffered enrichment would latch onto the next, unrelated
+	// gateway event with the same key within pendingTTL.
+	//
+	// MatchAll with maxMatches > 0 caps the buffered enrichment so a
+	// moderator's aggregated burst (e.g. AuditLogEventMessageDelete with
+	// Count=N) can't silently attribute unrelated same-(channel, author)
+	// deletes that happen to land within TTL after the burst is fully
+	// consumed. -1 is the canonical "unlimited" sentinel stored on the
+	// buffered enrichment.
+	bufferEnrichment := false
+	bufferRemaining := -1
+	switch {
+	case len(matched) == 0:
+		// Native-first race: nothing pending yet. Buffer the full
+		// budget; if MatchAll with a cap, store it on the enrichment.
+		bufferEnrichment = true
+		if match == MatchAll && maxMatches > 0 {
+			bufferRemaining = maxMatches
+		}
+	case match == MatchAll && maxMatches == 0:
+		// Unlimited sticky: caller didn't supply a count cap, keep the
+		// enrichment alive for the TTL window.
+		bufferEnrichment = true
+	case match == MatchAll && maxMatches > len(matched):
+		// Mixed: inline sweep consumed some, residual budget goes into
+		// the buffer for late arrivals.
+		bufferEnrichment = true
+		bufferRemaining = maxMatches - len(matched)
+	}
+	if bufferEnrichment {
 		en := &pendingEnrichment{
-			targetID:      copySnowflake(targetID),
-			actorID:       copySnowflake(actorID),
-			actorKind:     actorKind,
-			actorUsername: actorUsername,
-			reason:        reason,
-			match:         match,
+			targetID:        copySnowflake(targetID),
+			requiredDetails: copyStringMap(requiredDetails),
+			actorID:         copySnowflake(actorID),
+			actorKind:       actorKind,
+			actorUsername:   actorUsername,
+			reason:          reason,
+			match:           match,
+			remaining:       bufferRemaining,
 		}
 		en.timer = time.AfterFunc(pendingTTL, func() {
 			expireEnrichment(key, en)
@@ -439,18 +541,38 @@ func matchesTarget(entryTarget, filterTarget *snowflake.ID) bool {
 	return *entryTarget == *filterTarget
 }
 
-// enrichmentTargetMatches is the LogPending-side counterpart to
-// matchesTarget — checks whether a stored enrichment applies to a given
-// pending entry's target.
-func enrichmentTargetMatches(en *pendingEnrichment, entryTarget *snowflake.ID) bool {
-	// Wildcard enrichment matches any entry, including ones with no target.
-	if en.targetID == nil {
+// enrichmentMatches is the LogPending-side counterpart to the matching
+// in TryEnrich — checks whether a stored enrichment applies to a given
+// new pending entry. Combines target match (wildcard if en.targetID is
+// nil) with the optional requiredDetails predicate.
+func enrichmentMatches(en *pendingEnrichment, entry *Entry) bool {
+	if en.targetID != nil {
+		if entry.TargetID == nil || *en.targetID != *entry.TargetID {
+			return false
+		}
+	}
+	return detailsMatch(entry.Details, en.requiredDetails)
+}
+
+// detailsMatch returns true when every (key, value) in required is also
+// present in have as a string-typed entry with the same value. Nil/empty
+// required matches anything. Non-string values in have are treated as a
+// miss — every required key currently passes string-stringified IDs.
+func detailsMatch(have map[string]any, required map[string]string) bool {
+	if len(required) == 0 {
 		return true
 	}
-	if entryTarget == nil {
-		return false
+	for k, want := range required {
+		got, ok := have[k]
+		if !ok {
+			return false
+		}
+		s, ok := got.(string)
+		if !ok || s != want {
+			return false
+		}
 	}
-	return *en.targetID == *entryTarget
+	return true
 }
 
 func copySnowflake(id *snowflake.ID) *snowflake.ID {
@@ -459,4 +581,15 @@ func copySnowflake(id *snowflake.ID) *snowflake.ID {
 	}
 	v := *id
 	return &v
+}
+
+func copyStringMap(m map[string]string) map[string]string {
+	if len(m) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
 }

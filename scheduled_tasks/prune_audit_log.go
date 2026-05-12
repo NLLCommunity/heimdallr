@@ -113,7 +113,7 @@ func pruneCategory(ctx context.Context, guildID snowflake.ID, c categoryRetentio
 		// Forever: do not prune.
 		return 0, nil
 	}
-	cutoff := time.Now().Add(-time.Duration(days) * 24 * time.Hour)
+	cutoff := time.Now().UTC().Add(-time.Duration(days) * 24 * time.Hour)
 	return model.PruneAuditLogEntriesBefore(ctx, guildID, string(c.category), cutoff)
 }
 
