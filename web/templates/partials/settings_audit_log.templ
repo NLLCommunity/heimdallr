@@ -89,7 +89,7 @@ templ auditRetentionField(name, label, value string, max uint, effective string)
 			type="number"
 			name={ name }
 			value={ value }
-			min="0"
+			min={ retentionMin(max) }
 			placeholder="Use default"
 		/>
 		<small>
@@ -98,12 +98,22 @@ templ auditRetentionField(name, label, value string, max uint, effective string)
 	</label>
 }
 
+// retentionMin matches parseRetentionField's rule: 0 (forever) is only
+// accepted when the bot ceiling is also 0. With a finite ceiling, the
+// server rejects 0, so the input shouldn't offer it.
+func retentionMin(max uint) string {
+	if max == 0 {
+		return "0"
+	}
+	return "1"
+}
+
 func retentionHelp(max uint, effective string) string {
 	out := ""
 	if max == 0 {
 		out = "Bot ceiling: unlimited. Leave blank to use default, or 0 to keep forever."
 	} else {
-		out = "Bot ceiling: " + strconv.FormatUint(uint64(max), 10) + " days. Leave blank to use default."
+		out = "Bot ceiling: " + strconv.FormatUint(uint64(max), 10) + " days. Leave blank to use default; 0 (forever) is not allowed while the ceiling is finite."
 	}
 	if effective != "" {
 		out += " Currently: " + effective + "."

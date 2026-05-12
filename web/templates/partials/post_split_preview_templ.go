@@ -42,7 +42,7 @@ func PostSplitPreview(data PostSplitPreviewData) templ.Component {
 			var templ_7745c5c3_Var2 string
 			templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(data.Error)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/partials/post_split_preview.templ`, Line: 10, Col: 45}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/post_split_preview.templ`, Line: 10, Col: 45}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 			if templ_7745c5c3_Err != nil {
@@ -60,7 +60,7 @@ func PostSplitPreview(data PostSplitPreviewData) templ.Component {
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(len(data.Chunks))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/partials/post_split_preview.templ`, Line: 12, Col: 64}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/post_split_preview.templ`, Line: 12, Col: 64}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -78,7 +78,7 @@ func PostSplitPreview(data PostSplitPreviewData) templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(i + 1)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/partials/post_split_preview.templ`, Line: 15, Col: 28}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/post_split_preview.templ`, Line: 15, Col: 28}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -91,7 +91,7 @@ func PostSplitPreview(data PostSplitPreviewData) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(chunk)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/partials/post_split_preview.templ`, Line: 16, Col: 22}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/post_split_preview.templ`, Line: 16, Col: 22}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {

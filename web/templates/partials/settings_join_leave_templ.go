@@ -58,7 +58,7 @@ func SettingsJoinLeave(data JoinLeaveData) templ.Component {
 		var templ_7745c5c3_Var2 templ.SafeURL
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/guild/" + data.GuildID + "/settings/join-leave"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/partials/settings_join_leave.templ`, Line: 30, Col: 76}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_join_leave.templ`, Line: 30, Col: 76}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -71,7 +71,7 @@ func SettingsJoinLeave(data JoinLeaveData) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs("/guild/" + data.GuildID + "/settings/join-leave")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/partials/settings_join_leave.templ`, Line: 31, Col: 62}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_join_leave.templ`, Line: 31, Col: 62}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {

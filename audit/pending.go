@@ -49,7 +49,10 @@ import (
 // arrive within a few hundred ms of the corresponding gateway event in either
 // direction; 1.5s gives generous slack for ordering jitter without making
 // moderation actions feel laggy in the viewer.
-const pendingTTL = 1500 * time.Millisecond
+//
+// Declared as var (not const) so tests can shrink it via TestMain; production
+// code never reassigns it.
+var pendingTTL = 1500 * time.Millisecond
 
 // EnrichField names the fields that TryEnrich is permitted to fill.
 // LogPending callers pass these per-event to prevent enrichment from

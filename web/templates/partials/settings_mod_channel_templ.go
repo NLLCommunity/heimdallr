@@ -46,7 +46,7 @@ func SettingsModChannel(data ModChannelData) templ.Component {
 		var templ_7745c5c3_Var2 templ.SafeURL
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/guild/" + data.GuildID + "/settings/mod-channel"))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/partials/settings_mod_channel.templ`, Line: 18, Col: 77}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_mod_channel.templ`, Line: 18, Col: 77}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
@@ -59,7 +59,7 @@ func SettingsModChannel(data ModChannelData) templ.Component {
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs("/guild/" + data.GuildID + "/settings/mod-channel")
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `templates/partials/settings_mod_channel.templ`, Line: 19, Col: 63}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/partials/settings_mod_channel.templ`, Line: 19, Col: 63}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {

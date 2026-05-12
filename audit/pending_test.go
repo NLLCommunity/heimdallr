@@ -18,6 +18,13 @@ import (
 	"github.com/NLLCommunity/heimdallr/model"
 )
 
+// TestMain shrinks pendingTTL so the suite's TTL-driven sleeps run in
+// tens of ms instead of seconds; without this, this file alone burns ~12s.
+func TestMain(m *testing.M) {
+	pendingTTL = 25 * time.Millisecond
+	os.Exit(m.Run())
+}
+
 // setupTestDB initialises a temporary SQLite-backed model.DB so audit.commit
 // can write rows during pending-buffer tests. We can't unit-test the buffer
 // in isolation without a DB because committing rows is the whole point.
