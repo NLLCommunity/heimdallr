@@ -72,6 +72,12 @@ templ AuditLogTable(data AuditLogTableData) {
 				}
 			</tbody>
 		</table>
+	}
+	// Pagination renders whenever there are matching rows at all, even if
+	// the current page is empty — without this, navigating past the last
+	// page (e.g. ?page=999) leaves the user with no "← Newer" link to
+	// return.
+	if data.Total > 0 {
 		@auditLogPagination(data)
 	}
 }

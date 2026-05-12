@@ -8,6 +8,7 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/audit"
+	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 // OnAuditMemberUpdate writes one audit log entry per kind of change in a
@@ -51,8 +52,8 @@ func OnAuditMemberUpdate(e *events.GuildMemberUpdate) {
 
 	if !nickEqual(old.Nick, new.Nick) {
 		emit(audit.EventMemberNickChange, map[string]any{
-			"nick_before": derefString(old.Nick),
-			"nick_after":  derefString(new.Nick),
+			"nick_before": utils.RefDefault(old.Nick, ""),
+			"nick_after":  utils.RefDefault(new.Nick, ""),
 		})
 	}
 
@@ -102,13 +103,6 @@ func nickEqual(a, b *string) bool {
 		return false
 	}
 	return *a == *b
-}
-
-func derefString(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }
 
 // diffRoles returns IDs in a but not in b.

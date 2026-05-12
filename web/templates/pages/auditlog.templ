@@ -8,6 +8,11 @@ import (
 // AuditLogData carries everything the audit log page renders. Filters and
 // pagination state are mirrored from the URL query string so the form
 // preserves the user's selection on submit.
+//
+// One exception: when no filters are present in the URL, the handler
+// injects a default `From` of (today - 7 days) before populating Filters,
+// so a first-time visit isn't a full-history scan. The form then shows
+// that defaulted date; users can clear it to widen the window.
 type AuditLogData struct {
 	GuildID  string
 	Enabled  bool

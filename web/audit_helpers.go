@@ -26,11 +26,12 @@ func logSettingsUpdate(
 		details[k] = v
 	}
 
+	gid := guildID
 	entry := audit.Entry{
 		GuildID:    guildID,
 		EventType:  audit.EventSettingsUpdate,
 		ActorKind:  audit.ActorSystem,
-		TargetID:   ptrSnowflake(guildID),
+		TargetID:   &gid,
 		TargetKind: audit.TargetGuild,
 		Source:     audit.SourceWeb,
 		Details:    details,
@@ -77,8 +78,4 @@ func logPostUpdate(
 		details["actor_username"] = session.Username
 	}
 	audit.Log(entry)
-}
-
-func ptrSnowflake(id snowflake.ID) *snowflake.ID {
-	return &id
 }
