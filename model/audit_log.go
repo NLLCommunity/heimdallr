@@ -106,6 +106,13 @@ func (f AuditLogFilter) applyTo(tx *gorm.DB) *gorm.DB {
 // and "actor_username" / "target_username"); not user-controlled, so
 // concatenating them into the SQL fragment is safe. All variable values
 // flow through ? placeholders.
+//
+// Every json_extract is gated by json_valid(details) so rows with empty
+// or malformed JSON (legacy rows, tests that bypass audit.commit) don't
+// error the query; SQLite's AND short-circuits the json_extract call
+// when json_valid returns 0. Same predicate as idx_audit_details_channel
+// so the planner can use the partial expression index for channel
+// filters.
 func buildPersonClause(idCol, jsonField string, ids, channelIDs []snowflake.ID, query string) (string, []any) {
 	var parts []string
 	var args []any
@@ -119,14 +126,15 @@ func buildPersonClause(idCol, jsonField string, ids, channelIDs []snowflake.ID, 
 	if len(channelIDs) > 0 {
 		// channel_id is stored as a string in the JSON payload, so we
 		// match against stringified IDs to keep type coercion explicit.
-		parts = append(parts, "json_extract(details, '$.channel_id') IN "+placeholderList(len(channelIDs)))
+		parts = append(parts,
+			"(json_valid(details) AND json_extract(details, '$.channel_id') IN "+placeholderList(len(channelIDs))+")")
 		for _, id := range channelIDs {
 			args = append(args, id.String())
 		}
 	}
 	if query != "" {
 		parts = append(parts,
-			"LOWER(json_extract(details, '$."+jsonField+"')) LIKE ?")
+			"(json_valid(details) AND LOWER(json_extract(details, '$."+jsonField+"')) LIKE ?)")
 		args = append(args, "%"+strings.ToLower(query)+"%")
 	}
 

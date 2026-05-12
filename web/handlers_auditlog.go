@@ -207,7 +207,8 @@ func summariseDetail(client *bot.Client, guildID snowflake.ID, eventType, detail
 			return "inactive ≥ " + days + " days", nil
 		}
 
-	case string(audit.EventWebSettingsUpdate):
+	case string(audit.EventSettingsUpdate),
+		string(audit.EventWebSettingsUpdate):
 		return formatSettingsUpdate(client, guildID, d)
 
 	case string(audit.EventWebPostCreate),
@@ -659,22 +660,24 @@ var auditLogEventOptionList = []pages.AuditLogEventOption{
 	{Value: string(audit.EventGuildKick), Label: "Member kicked", Category: string(audit.CategoryGuild)},
 	{Value: string(audit.EventGuildPrune), Label: "Members pruned", Category: string(audit.CategoryGuild)},
 	{Value: string(audit.EventBotWarn), Label: "Bot warning issued", Category: string(audit.CategoryGuild)},
-	{Value: string(audit.EventWebSettingsUpdate), Label: "Settings updated", Category: string(audit.CategoryGuild)},
+	{Value: string(audit.EventSettingsUpdate), Label: "Settings updated", Category: string(audit.CategoryGuild)},
 	{Value: string(audit.EventWebPostCreate), Label: "Post created", Category: string(audit.CategoryGuild)},
 	{Value: string(audit.EventWebPostUpdate), Label: "Post updated", Category: string(audit.CategoryGuild)},
 	{Value: string(audit.EventWebPostDelete), Label: "Post deleted", Category: string(audit.CategoryGuild)},
 }
 
 var auditLogEventLabels = func() map[string]string {
-	m := make(map[string]string, len(auditLogEventOptionList)+1)
+	m := make(map[string]string, len(auditLogEventOptionList)+2)
 	for _, opt := range auditLogEventOptionList {
 		m[opt.Value] = opt.Label
 	}
-	// Legacy event type — kept out of the filter dropdown (the listener
-	// now writes per-change types) but still possible on old DB rows, so
-	// it gets a readable label rather than falling through to the raw
-	// "member.update" string. refineMemberUpdateLabel may further refine
-	// this when the details payload identifies the specific change.
+	// Legacy event types — kept out of the filter dropdown (new entries
+	// use the renamed types) but still possible on DB rows written
+	// before the rename, so they get a readable label rather than
+	// falling through to the raw event string. refineMemberUpdateLabel
+	// may further refine the member.update label when the details
+	// payload identifies the specific change.
 	m[string(audit.EventMemberUpdate)] = "Member updated"
+	m[string(audit.EventWebSettingsUpdate)] = "Settings updated"
 	return m
 }()

@@ -56,10 +56,20 @@ const (
 
 	EventBotWarn EventType = "bot.warn"
 
+	// EventSettingsUpdate is the canonical event for any settings change
+	// regardless of origin (web dashboard or slash command). Source on
+	// the persisted row distinguishes which path produced it.
+	EventSettingsUpdate EventType = "settings.update"
+
+	// EventWebSettingsUpdate is the legacy event type used by rows
+	// written before EventSettingsUpdate existed. Kept so historical
+	// rows still have a label and are reachable via the filter
+	// dropdown; new entries should use EventSettingsUpdate.
 	EventWebSettingsUpdate EventType = "web.settings.update"
-	EventWebPostCreate     EventType = "web.post.create"
-	EventWebPostUpdate     EventType = "web.post.update"
-	EventWebPostDelete     EventType = "web.post.delete"
+
+	EventWebPostCreate EventType = "web.post.create"
+	EventWebPostUpdate EventType = "web.post.update"
+	EventWebPostDelete EventType = "web.post.delete"
 )
 
 // ActorKind disambiguates the namespace of ActorID — same numeric snowflake
@@ -110,7 +120,8 @@ func EventCategory(t EventType) Category {
 		return CategoryMember
 	case EventGuildBan, EventGuildUnban, EventGuildKick, EventGuildPrune,
 		EventBotWarn,
-		EventWebSettingsUpdate, EventWebPostCreate, EventWebPostUpdate, EventWebPostDelete:
+		EventSettingsUpdate, EventWebSettingsUpdate,
+		EventWebPostCreate, EventWebPostUpdate, EventWebPostDelete:
 		return CategoryGuild
 	}
 	return ""

@@ -7,7 +7,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/model"
 )
 
-// logSettingsUpdate records a web.settings.update audit log entry. Each
+// logSettingsUpdate records a settings.update audit log entry. Each
 // settings save handler calls this on its happy path with the section name
 // (the form/group that was saved, e.g. "mod_channel") and an optional map of
 // fields that were changed.
@@ -28,7 +28,7 @@ func logSettingsUpdate(
 
 	entry := audit.Entry{
 		GuildID:    guildID,
-		EventType:  audit.EventWebSettingsUpdate,
+		EventType:  audit.EventSettingsUpdate,
 		ActorKind:  audit.ActorSystem,
 		TargetID:   ptrSnowflake(guildID),
 		TargetKind: audit.TargetGuild,

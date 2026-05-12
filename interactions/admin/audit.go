@@ -33,7 +33,7 @@ func logSettingsCommandUpdate(
 	gid := guildID
 	audit.Log(audit.Entry{
 		GuildID:    guildID,
-		EventType:  audit.EventWebSettingsUpdate,
+		EventType:  audit.EventSettingsUpdate,
 		ActorID:    &uid,
 		ActorKind:  audit.ActorUser,
 		TargetID:   &gid,
