@@ -218,10 +218,26 @@ func summariseDetail(client *bot.Client, guildID snowflake.ID, eventType, detail
 	return "", nil
 }
 
+// settingsUpdateMetadataKeys are keys present in a settings.update
+// Details payload that are NOT user-changed settings — they're
+// attribution / routing metadata co-located in the same map (e.g.
+// actor_username for cache-miss rendering, section for the form group).
+// formatSettingsUpdate skips these when building the "Changed values"
+// section so the viewer doesn't claim "Actor username: alice" is a
+// setting that was modified.
+var settingsUpdateMetadataKeys = map[string]bool{
+	"section":         true,
+	"actor_username":  true,
+	"target_username": true,
+}
+
 // formatSettingsUpdate renders a web.settings.update entry's details into
 // a humanized summary + a "Changed values" section listing each field as
 // "Field name: value". Channel and role IDs are resolved via the cache
 // so the disclosure shows "#general" rather than the raw snowflake.
+//
+// Keys in settingsUpdateMetadataKeys are skipped — they're attribution
+// metadata, not actual settings.
 func formatSettingsUpdate(client *bot.Client, guildID snowflake.ID, d map[string]any) (string, []partials.DetailSection) {
 	section := stringField(d, "section")
 	summary := settingsSectionLabel(section)
@@ -231,7 +247,7 @@ func formatSettingsUpdate(client *bot.Client, guildID snowflake.ID, d map[string
 	}
 	var fields []field
 	for k, raw := range d {
-		if k == "section" {
+		if settingsUpdateMetadataKeys[k] {
 			continue
 		}
 		v := formatSettingsValue(client, guildID, k, raw)
@@ -302,8 +318,9 @@ func humanizeFieldName(key string) string {
 // command-side updates emit "0", so both shapes funnel to the same label.
 // True override-style fields (retention days, etc.) keep "(default)" for
 // empty values; an explicit "0" for those fields renders as the literal
-// "0" since it can mean a legitimate user choice (e.g. retention=forever
-// when the bot ceiling is also 0).
+// "0". parseRetentionField now collapses 0-when-ceiling-is-0 to nil at
+// save time, so a literal "0" in the audit Details payload should only
+// appear on legacy rows written before that normalization landed.
 func formatSettingsValue(client *bot.Client, guildID snowflake.ID, key string, raw any) string {
 	isSnowflakeKey := strings.HasSuffix(key, "_channel") || strings.HasSuffix(key, "_role")
 	switch v := raw.(type) {
