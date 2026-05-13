@@ -1,6 +1,7 @@
 package partials
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 )
@@ -127,14 +128,7 @@ templ auditLogTableRow(r AuditLogRow) {
 templ auditLogPagination(data AuditLogTableData) {
 	<nav class="audit-pagination">
 		<ul>
-			<li>
-				{ "Showing " }
-				{ strconv.Itoa(offsetStart(data.Page, data.PageSize, len(data.Rows))) }
-				–
-				{ strconv.Itoa(offsetEnd(data.Page, data.PageSize, len(data.Rows))) }
-				{ " of " }
-				{ strconv.FormatInt(data.Total, 10) }
-			</li>
+			<li>{ paginationLabel(data.Page, data.PageSize, len(data.Rows), data.Total) }</li>
 		</ul>
 		<ul>
 			if data.Page > 1 {
@@ -163,13 +157,17 @@ templ auditLogPagination(data AuditLogTableData) {
 	</nav>
 }
 
-func offsetStart(page, size, count int) int {
+// paginationLabel renders the "Showing X–Y of N" line. When the current
+// page has no rows but there are entries overall (e.g. user navigates
+// past the last page via ?page=999) we render an explicit empty-page
+// label instead of "Showing 0–0 of N" — the offset arithmetic isn't
+// meaningful with zero rows, and the user needs a clear cue that the
+// "← Newer" link is the way back.
+func paginationLabel(page, pageSize, count int, total int64) string {
 	if count == 0 {
-		return 0
+		return fmt.Sprintf("Page %d is empty — %d entries total", page, total)
 	}
-	return (page-1)*size + 1
-}
-
-func offsetEnd(page, size, count int) int {
-	return (page-1)*size + count
+	start := (page-1)*pageSize + 1
+	end := (page-1)*pageSize + count
+	return fmt.Sprintf("Showing %d–%d of %d", start, end, total)
 }

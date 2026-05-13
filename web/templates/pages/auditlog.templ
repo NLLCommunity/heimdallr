@@ -76,6 +76,8 @@ templ AuditLog(nav layouts.NavData, data AuditLogData) {
 
 templ auditLogFilterForm(data AuditLogData) {
 	<form
+		action={ templ.SafeURL("/guild/" + data.GuildID + "/auditlog") }
+		method="get"
 		hx-get={ "/guild/" + data.GuildID + "/auditlog" }
 		hx-target="#auditlog-table"
 		hx-push-url="true"
