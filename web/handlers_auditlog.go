@@ -49,17 +49,17 @@ func handleAuditLog(client *bot.Client) http.HandlerFunc {
 		filters := parseAuditLogFilters(r)
 		page := parsePage(r.URL.Query().Get("page"))
 
-		var (
-			entries []model.AuditLogEntry
-			total   int64
-		)
-		if settings.AuditLogEnabled {
-			modelFilter := buildAuditLogFilter(client, guildID, filters)
-			entries, total, err = model.ListAuditLogEntries(guildID, modelFilter, auditLogPageSize, (page-1)*auditLogPageSize)
-			if err != nil {
-				http.Error(w, "failed to query audit log", http.StatusInternalServerError)
-				return
-			}
+		// Query regardless of the enabled flag. The flag gates *writes*
+		// (new entries are dropped at audit.Log / LogPending via shouldLog);
+		// reads are harmless and the settings UI tells admins existing
+		// rows "remain until pruned" — they should be visible whether the
+		// feature is currently on or off. The page renders a "currently
+		// disabled" banner above the table when applicable.
+		modelFilter := buildAuditLogFilter(client, guildID, filters)
+		entries, total, err := model.ListAuditLogEntries(guildID, modelFilter, auditLogPageSize, (page-1)*auditLogPageSize)
+		if err != nil {
+			http.Error(w, "failed to query audit log", http.StatusInternalServerError)
+			return
 		}
 
 		rows := buildAuditLogRows(client, guildID, entries)

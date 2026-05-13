@@ -59,23 +59,24 @@ templ AuditLog(nav layouts.NavData, data AuditLogData) {
 		if !data.Enabled {
 			<article>
 				<p>
-					Audit logging is disabled for this guild.
-					<a href={ templ.SafeURL("/guild/" + data.GuildID) }>Enable it in settings</a> to start recording events.
+					Audit logging is currently disabled for this guild — no new events are
+					being recorded.
+					<a href={ templ.SafeURL("/guild/" + data.GuildID) }>Enable it in settings</a>
+					to resume recording. Historical entries remain visible below until pruned.
 				</p>
 			</article>
-		} else {
-			@auditLogFilterForm(data)
-			<div id="auditlog-table">
-				@partials.AuditLogTable(partials.AuditLogTableData{
-					GuildID:     data.GuildID,
-					Rows:        data.Rows,
-					Total:       data.Total,
-					Page:        data.Page,
-					PageSize:    data.PageSize,
-					FilterQuery: data.FilterQuery,
-				})
-			</div>
 		}
+		@auditLogFilterForm(data)
+		<div id="auditlog-table">
+			@partials.AuditLogTable(partials.AuditLogTableData{
+				GuildID:     data.GuildID,
+				Rows:        data.Rows,
+				Total:       data.Total,
+				Page:        data.Page,
+				PageSize:    data.PageSize,
+				FilterQuery: data.FilterQuery,
+			})
+		</div>
 	}
 }
 

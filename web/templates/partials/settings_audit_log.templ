@@ -90,6 +90,10 @@ templ auditRetentionField(name, label, value string, max uint, effective string)
 			name={ name }
 			value={ value }
 			min={ retentionMin(max) }
+			if max > 0 {
+				max={ strconv.FormatUint(uint64(max), 10) }
+			}
+			step="1"
 			placeholder="Use default"
 		/>
 		<small>
