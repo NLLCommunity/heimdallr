@@ -23,19 +23,8 @@ import (
 func OnAuditMemberUpdate(e *events.GuildMemberUpdate) {
 	target := e.Member.User.ID
 	old := e.OldMember
-	new := e.Member
-	username := new.User.Username
-
-	// Disgo populates OldMember from the cache before applying the new
-	// state. If the member wasn't cached (common after a bot restart, or
-	// for guilds large enough that disgo hasn't chunked every member
-	// yet), OldMember is the zero value: empty role list, nil timeout,
-	// nil nick, zero User.ID. Every field diff against that produces a
-	// false "X changed from nothing to current value" entry, so bail
-	// out entirely rather than try to salvage any per-field comparison.
-	if old.User.ID == 0 {
-		return
-	}
+	updated := e.Member
+	username := updated.User.Username
 
 	emit := func(eventType audit.EventType, details map[string]any) {
 		details["target_username"] = username
@@ -50,16 +39,35 @@ func OnAuditMemberUpdate(e *events.GuildMemberUpdate) {
 		}, []audit.EnrichField{audit.EnrichActor, audit.EnrichReason})
 	}
 
-	if !nickEqual(old.Nick, new.Nick) {
+	// Disgo populates OldMember from the cache before applying the new
+	// state. If the member wasn't cached (common after a bot restart, or
+	// for guilds large enough that disgo hasn't chunked every member
+	// yet), OldMember is the zero value: empty role list, nil timeout,
+	// nil nick, zero User.ID. Diffing against a zero value would produce
+	// false "X changed from nothing to current value" entries for the
+	// fields whose old state matters (nick, roles), so we bail those.
+	// Timeout-add is the exception — a non-nil new timeout is unambiguous
+	// (the member IS timed out right now) and that's the single highest-
+	// severity member event admins audit, especially post-restart. We
+	// still can't safely emit timeout-clear on cold cache because a nil
+	// new state is indistinguishable from "never timed out".
+	if old.User.ID == 0 {
+		if updated.CommunicationDisabledUntil != nil {
+			emit(audit.EventMemberTimeoutAdd, map[string]any{"timeout_until": updated.CommunicationDisabledUntil})
+		}
+		return
+	}
+
+	if !nickEqual(old.Nick, updated.Nick) {
 		emit(audit.EventMemberNickChange, map[string]any{
 			"nick_before": utils.RefDefault(old.Nick, ""),
-			"nick_after":  utils.RefDefault(new.Nick, ""),
+			"nick_after":  utils.RefDefault(updated.Nick, ""),
 		})
 	}
 
-	if !slices.Equal(old.RoleIDs, new.RoleIDs) {
-		added := diffRoles(new.RoleIDs, old.RoleIDs)
-		removed := diffRoles(old.RoleIDs, new.RoleIDs)
+	if !slices.Equal(old.RoleIDs, updated.RoleIDs) {
+		added := diffRoles(updated.RoleIDs, old.RoleIDs)
+		removed := diffRoles(old.RoleIDs, updated.RoleIDs)
 		if len(added) > 0 || len(removed) > 0 {
 			emit(audit.EventMemberRoleChange, map[string]any{
 				"roles_added":   resolveRoles(e.Client(), e.GuildID, added),
@@ -69,7 +77,7 @@ func OnAuditMemberUpdate(e *events.GuildMemberUpdate) {
 	}
 
 	oldTimeout := old.CommunicationDisabledUntil
-	newTimeout := new.CommunicationDisabledUntil
+	newTimeout := updated.CommunicationDisabledUntil
 	switch {
 	case oldTimeout == nil && newTimeout != nil:
 		emit(audit.EventMemberTimeoutAdd, map[string]any{"timeout_until": newTimeout})

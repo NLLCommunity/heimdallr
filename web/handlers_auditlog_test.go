@@ -56,11 +56,13 @@ func TestParseAuditLogFilters_DefaultLookbackApplies(t *testing.T) {
 	assert.LessOrEqual(t, delta, 24*time.Hour, "default lookback should be ~%v ago, got %v", auditLogDefaultLookback, parsed)
 }
 
-func TestParseAuditLogFilters_NoDefaultWhenAnyFilterPresent(t *testing.T) {
-	// Any explicit filter should suppress the default From — the user
-	// already bounded the query.
+func TestParseAuditLogFilters_NoDefaultWhenNarrowingFilterPresent(t *testing.T) {
+	// A "narrowing" filter (actor/target/event/from/to) should suppress
+	// the default From — the user already bounded the query.
+	// Category alone splits the dataset only 3 ways, so it does NOT
+	// suppress the default — a category-only query on a busy guild would
+	// otherwise scan most of retention.
 	cases := []string{
-		"category=message",
 		"event_type=message.delete",
 		"actor=alice",
 		"target=%23general",
@@ -77,10 +79,19 @@ func TestParseAuditLogFilters_NoDefaultWhenAnyFilterPresent(t *testing.T) {
 			if qs == "from=2025-01-01" {
 				assert.Equal(t, "2025-01-01", f.From)
 			} else {
-				assert.Equal(t, "", f.From, "default From should NOT be injected when other filters are present")
+				assert.Equal(t, "", f.From, "default From should NOT be injected when narrowing filter is present")
 			}
 		})
 	}
+}
+
+func TestParseAuditLogFilters_CategoryAloneStillDefaultsLookback(t *testing.T) {
+	// Category alone is too coarse to safely bound an unfiltered query,
+	// so the 7-day default still applies.
+	r := httptest.NewRequest("GET", "/guild/123/auditlog?category=member", nil)
+	f := parseAuditLogFilters(r)
+	assert.Equal(t, "member", f.Category)
+	assert.NotEqual(t, "", f.From, "default From should still apply when only Category is set")
 }
 
 func TestParseAuditLogFilters_TrimsAndLowercases(t *testing.T) {

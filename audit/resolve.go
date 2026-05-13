@@ -1,7 +1,6 @@
 package audit
 
 import (
-	"encoding/json"
 	"fmt"
 
 	"github.com/disgoorg/disgo/bot"
@@ -97,15 +96,18 @@ func ResolveUserUsernameOrFetch(client *bot.Client, guildID, userID snowflake.ID
 // audit log row. Used by the web viewer to show "@modUser" instead of a
 // raw snowflake.
 //
-// detailsJSON is consulted as a fallback when the member cache misses —
-// listeners record actor_username (and target username) at write time so
-// we can render names for users no longer in the guild without a REST
-// round-trip.
+// details is the already-decoded entry.Details map (or nil). The caller
+// decodes once per row; passing the decoded map here lets a 50-row page
+// avoid 100+ redundant JSON unmarshals when also calling FormatTarget,
+// summariseDetail, etc. on the same payload.
 //
-// Returns "—" when the actor is missing or unknown — the alternative is
-// a snowflake ID, which is not actionable for the moderator browsing the
-// log.
-func FormatActor(client *bot.Client, guildID snowflake.ID, kind ActorKind, id *snowflake.ID, detailsJSON string) string {
+// The cached-name lookup uses the disgo member cache first; details is
+// consulted as a fallback when the cache misses — listeners record
+// actor_username at write time so we can render names for users no longer
+// in the guild without a REST round-trip.
+//
+// Returns "—" when the actor is missing or unknown.
+func FormatActor(client *bot.Client, guildID snowflake.ID, kind ActorKind, id *snowflake.ID, details map[string]any) string {
 	if id == nil {
 		switch kind {
 		case ActorBot:
@@ -115,7 +117,7 @@ func FormatActor(client *bot.Client, guildID snowflake.ID, kind ActorKind, id *s
 		}
 		return "—"
 	}
-	name := resolveUsername(client, guildID, *id, detailsJSON, "actor_username")
+	name := resolveUsername(client, guildID, *id, details, "actor_username")
 	if name == "" {
 		name = id.String()
 	}
@@ -136,17 +138,17 @@ func FormatActor(client *bot.Client, guildID snowflake.ID, kind ActorKind, id *s
 //
 // For message events the target ID is the now-deleted message and isn't
 // meaningful to a viewer; the channel where the message lived is more
-// informative, so we pull channel_id out of the JSON details payload and
+// informative, so we pull channel_id out of the details payload and
 // render the channel name instead.
 //
-// detailsJSON may be empty — the function falls back to ID-only labels in
-// that case.
+// details is the already-decoded entry.Details map (or nil); see
+// FormatActor for the rationale.
 func FormatTarget(
 	client *bot.Client,
 	guildID snowflake.ID,
 	kind TargetKind,
 	id *snowflake.ID,
-	detailsJSON string,
+	details map[string]any,
 ) string {
 	switch kind {
 	case TargetGuild, TargetNone:
@@ -156,7 +158,7 @@ func FormatTarget(
 
 	case TargetMessage:
 		// The message itself is gone; surface the channel for context.
-		if chID := channelIDFromDetails(detailsJSON); chID != 0 {
+		if chID := channelIDFromDetails(details); chID != 0 {
 			return "#" + ResolveChannelName(client, chID)
 		}
 		if id != nil {
@@ -178,7 +180,7 @@ func FormatTarget(
 
 	case TargetUser:
 		if id != nil {
-			name := resolveUsername(client, guildID, *id, detailsJSON, "target_username")
+			name := resolveUsername(client, guildID, *id, details, "target_username")
 			if name == "" {
 				name = id.String()
 			}
@@ -194,57 +196,36 @@ func FormatTarget(
 
 // resolveUsername resolves a user ID to a username via a layered lookup:
 // the disgo member cache (current name in the guild), then the named
-// field from the audit log's stored Details JSON. Returns "" if neither
+// field from the already-decoded details map. Returns "" if neither
 // source has a name.
 //
-// detailsField names the JSON key to consult — by convention listeners
+// detailsField names the map key to consult — by convention listeners
 // record the target as "target_username" (paired with target_id) and the
 // actor as "actor_username" (paired with actor_id). The function does
 // NOT fall back across fields: rendering the actor as the target's
 // username (or vice versa) would silently produce wrong attribution. For
 // events where actor == target, the listener stores both fields.
-func resolveUsername(client *bot.Client, guildID, userID snowflake.ID, detailsJSON, detailsField string) string {
+func resolveUsername(client *bot.Client, guildID, userID snowflake.ID, details map[string]any, detailsField string) string {
 	if name, ok := ResolveMemberUsername(client, guildID, userID); ok {
 		return name
 	}
-	return usernameFromDetails(detailsJSON, detailsField)
-}
-
-// usernameFromDetails extracts the named field from a stored Details JSON
-// payload. Returns "" on any parse failure or missing key.
-func usernameFromDetails(detailsJSON, field string) string {
-	if detailsJSON == "" {
-		return ""
-	}
-	var d map[string]any
-	if err := json.Unmarshal([]byte(detailsJSON), &d); err != nil {
-		return ""
-	}
-	if v, ok := d[field].(string); ok {
+	if v, ok := details[detailsField].(string); ok {
 		return v
 	}
 	return ""
 }
 
-// channelIDFromDetails extracts the "channel_id" field from a stored
-// audit-log Details JSON payload. Listeners write it as a string (via
-// snowflake.ID.String) so the JSON shape is always {"channel_id": "..."}.
+// channelIDFromDetails extracts the "channel_id" field from an
+// already-decoded details map. Listeners write it as a string (via
+// snowflake.ID.String) so the shape is always {"channel_id": "..."}.
 //
 // Returns 0 on any parse miss; callers treat that as "no channel context".
-func channelIDFromDetails(detailsJSON string) snowflake.ID {
-	if detailsJSON == "" {
+func channelIDFromDetails(details map[string]any) snowflake.ID {
+	s, ok := details["channel_id"].(string)
+	if !ok || s == "" {
 		return 0
 	}
-	var d struct {
-		ChannelID string `json:"channel_id"`
-	}
-	if err := json.Unmarshal([]byte(detailsJSON), &d); err != nil {
-		return 0
-	}
-	if d.ChannelID == "" {
-		return 0
-	}
-	id, err := snowflake.Parse(d.ChannelID)
+	id, err := snowflake.Parse(s)
 	if err != nil {
 		return 0
 	}

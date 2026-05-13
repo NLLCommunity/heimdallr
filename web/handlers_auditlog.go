@@ -3,6 +3,7 @@ package web
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"sort"
 	"strconv"
@@ -101,23 +102,41 @@ func handleAuditLog(client *bot.Client) http.HandlerFunc {
 // rows with names resolved from the disgo cache. Done here (not in templ)
 // so the template stays free of cache lookups and unit tests aren't
 // blocked on a live bot client.
+//
+// Each entry's Details JSON is decoded exactly once per row, then passed
+// to FormatActor / FormatTarget / summariseDetail / refineMemberUpdateLabel
+// as the same map. Previously each of those helpers unmarshalled the
+// payload itself — on a 50-row page that meant up to 200 redundant parses.
 func buildAuditLogRows(client *bot.Client, guildID snowflake.ID, entries []model.AuditLogEntry) []partials.AuditLogRow {
 	rows := make([]partials.AuditLogRow, len(entries))
 	for i, e := range entries {
+		var details map[string]any
+		if e.Details != "" {
+			if err := json.Unmarshal([]byte(e.Details), &details); err != nil {
+				// Malformed payload still renders the row (with an
+				// ID-only target and no summary), but log so an operator
+				// can investigate — corruption / manual DB edit / schema
+				// drift from a rolled-back writer would otherwise produce
+				// silently-blank rows.
+				slog.Warn("audit log: unparseable Details JSON",
+					"err", err, "entry_id", e.ID, "event_type", e.EventType)
+			}
+		}
+
 		label := eventLabel(e.EventType)
 		// Legacy rows written before member.update was split: re-derive a
 		// specific label from the stored details so old entries don't
 		// just say "Member updated".
 		if e.EventType == string(audit.EventMemberUpdate) {
-			label = refineMemberUpdateLabel(label, e.Details)
+			label = refineMemberUpdateLabel(label, details)
 		}
-		summary, sections := summariseDetail(client, guildID, e.EventType, e.Details)
+		summary, sections := summariseDetail(client, guildID, e.EventType, details)
 		rows[i] = partials.AuditLogRow{
 			CreatedAt:      e.CreatedAt,
 			EventType:      e.EventType,
 			EventLabel:     label,
-			Actor:          audit.FormatActor(client, guildID, audit.ActorKind(e.ActorKind), e.ActorID, e.Details),
-			Target:         audit.FormatTarget(client, guildID, audit.TargetKind(e.TargetKind), e.TargetID, e.Details),
+			Actor:          audit.FormatActor(client, guildID, audit.ActorKind(e.ActorKind), e.ActorID, details),
+			Target:         audit.FormatTarget(client, guildID, audit.TargetKind(e.TargetKind), e.TargetID, details),
 			Reason:         e.Reason,
 			DetailSummary:  summary,
 			DetailSections: sections,
@@ -127,7 +146,7 @@ func buildAuditLogRows(client *bot.Client, guildID snowflake.ID, entries []model
 }
 
 // summariseDetail extracts a one-line human summary plus optional
-// sections from the stored details JSON for a given event type.
+// sections from the already-decoded details map for a given event type.
 //
 // Sections are headed text blocks that render inside an expandable
 // <details> disclosure when present. Events that produce only a short
@@ -139,13 +158,10 @@ func buildAuditLogRows(client *bot.Client, guildID snowflake.ID, entries []model
 // details payload (web settings updates can carry these as referenced
 // values).
 //
-// Returns ("", nil) when there's nothing useful to surface.
-func summariseDetail(client *bot.Client, guildID snowflake.ID, eventType, detailsJSON string) (summary string, sections []partials.DetailSection) {
-	if detailsJSON == "" {
-		return "", nil
-	}
-	var d map[string]any
-	if err := json.Unmarshal([]byte(detailsJSON), &d); err != nil {
+// Returns ("", nil) when there's nothing useful to surface. A nil details
+// map (legacy or malformed-JSON row) is treated as "nothing to surface".
+func summariseDetail(client *bot.Client, guildID snowflake.ID, eventType string, d map[string]any) (summary string, sections []partials.DetailSection) {
+	if d == nil {
 		return "", nil
 	}
 
@@ -438,34 +454,33 @@ func eventLabel(t string) string {
 }
 
 // refineMemberUpdateLabel returns a more specific label for legacy
-// member.update rows by inspecting which keys are in the stored details
-// JSON. Current listeners write split event types (member.nick_change,
+// member.update rows by inspecting which keys are in the already-decoded
+// details map. Current listeners write split event types (member.nick_change,
 // member.role_change, member.timeout_add, member.timeout_clear), so the
 // only member.update rows that reach this function are either pre-split
 // historical rows or the fallback emitted when memberUpdateEnrichmentTargets
 // doesn't recognise any change key — neither path writes timeout fields.
-func refineMemberUpdateLabel(fallback, detailsJSON string) string {
-	if detailsJSON == "" {
+func refineMemberUpdateLabel(fallback string, d map[string]any) string {
+	if d == nil {
 		return fallback
 	}
-	var d struct {
-		NickBefore   *string `json:"nick_before"`
-		NickAfter    *string `json:"nick_after"`
-		RolesAdded   []any   `json:"roles_added"`
-		RolesRemoved []any   `json:"roles_removed"`
-	}
-	if err := json.Unmarshal([]byte(detailsJSON), &d); err != nil {
-		return fallback
-	}
+	// Type-assert against string so a JSON `null` value is treated as
+	// absent — matches the old pointer-based decode where `null` decoded
+	// to a nil *string. Current writers don't emit null nicks (they go
+	// to EventMemberNickChange), but legacy/hand-edited rows might.
+	_, hasNickBefore := d["nick_before"].(string)
+	_, hasNickAfter := d["nick_after"].(string)
+	rolesAdded, _ := d["roles_added"].([]any)
+	rolesRemoved, _ := d["roles_removed"].([]any)
 
 	switch {
-	case len(d.RolesAdded) > 0 && len(d.RolesRemoved) > 0:
+	case len(rolesAdded) > 0 && len(rolesRemoved) > 0:
 		return "Roles changed"
-	case len(d.RolesAdded) > 0:
+	case len(rolesAdded) > 0:
 		return "Role added"
-	case len(d.RolesRemoved) > 0:
+	case len(rolesRemoved) > 0:
 		return "Role removed"
-	case d.NickAfter != nil || d.NickBefore != nil:
+	case hasNickAfter || hasNickBefore:
 		return "Nickname changed"
 	}
 	return fallback
@@ -475,8 +490,10 @@ func refineMemberUpdateLabel(fallback, detailsJSON string) string {
 // the form-state struct used by the template. Empty values mean "no filter".
 //
 // `from` defaults to today minus auditLogDefaultLookback if missing — but
-// only when no other filters narrow the scope, since explicitly filtering
-// on actor/target/event already bounds the result set.
+// only when no actor/target/event/time filter narrows the scope. Category
+// alone doesn't suppress the default because it splits the dataset only
+// 3 ways; a category-only query on a busy guild would still scan most of
+// retention. Actor/target/event are precise enough to bound results.
 func parseAuditLogFilters(r *http.Request) pages.AuditLogFilters {
 	q := r.URL.Query()
 	filters := pages.AuditLogFilters{
@@ -489,7 +506,7 @@ func parseAuditLogFilters(r *http.Request) pages.AuditLogFilters {
 	}
 	if filters.From == "" && filters.To == "" &&
 		filters.Actor == "" && filters.Target == "" &&
-		filters.EventType == "" && filters.Category == "" {
+		filters.EventType == "" {
 		filters.From = time.Now().Add(-auditLogDefaultLookback).UTC().Format("2006-01-02")
 	}
 	return filters

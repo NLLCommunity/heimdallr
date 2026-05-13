@@ -87,6 +87,13 @@ type pendingKey struct {
 // expireEnrichment) release it before re-acquiring pendingBuffer.mu.
 // The findAndRemove* helpers run under pendingBuffer.mu only; callers
 // do the per-X mutation after releasing it.
+//
+// pe.entry mutation invariant: pe.entry is mutated only by the goroutine
+// that has already removed the pe from pendingBuffer.entries under
+// pendingBuffer.mu. Readers may therefore inspect pe.entry while holding
+// only pendingBuffer.mu (which is how TryEnrich peeks at TargetID /
+// Details when scanning candidates). pe.mu protects pe.committed —
+// pe.entry's safety is structural, not lock-mediated.
 
 type pendingEntry struct {
 	entry      Entry

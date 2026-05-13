@@ -29,6 +29,7 @@ func OnAuditLogKick(e *events.GuildAuditLogEntryCreate) {
 
 	targetUser, err := e.Client().Rest.GetUser(*entry.TargetID)
 	if err != nil {
+		slog.Warn("Failed to get target user for audit log kick.", "err", err, "user_id", *entry.TargetID)
 		return
 	}
 	user, err := e.Client().Rest.GetUser(entry.UserID)
@@ -38,6 +39,12 @@ func OnAuditLogKick(e *events.GuildAuditLogEntryCreate) {
 	}
 
 	if pruned, _ := model.IsMemberPruned(e.GuildID, targetUser.ID); pruned {
+		return
+	}
+
+	guildSettings, err := model.GetGuildSettings(e.GuildID)
+	if err != nil {
+		slog.Warn("Failed to load guild settings for audit log kick.", "err", err, "guild", e.GuildID)
 		return
 	}
 
@@ -51,11 +58,6 @@ func OnAuditLogKick(e *events.GuildAuditLogEntryCreate) {
 		user.Mention(),
 		reason,
 	)
-
-	guildSettings, err := model.GetGuildSettings(e.GuildID)
-	if err != nil {
-		return
-	}
 
 	_, err = e.Client().Rest.CreateMessage(
 		guildSettings.ModeratorChannel, discord.NewMessageCreate().

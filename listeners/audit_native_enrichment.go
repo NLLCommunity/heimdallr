@@ -32,6 +32,16 @@ func OnAuditNativeEnrichment(e *events.GuildAuditLogEntryCreate) {
 	entry := e.AuditLogEntry
 	guildID := e.GuildID
 
+	// Discord fires GuildAuditLogEntryCreate for dozens of action types
+	// (channel/role/webhook/emoji CRUD, voice moves, etc.), most of which
+	// this listener doesn't handle. Gate on action type first so unhandled
+	// types skip the cache lookup + REST round-trip in
+	// ResolveMemberUsernameOrFetch — that fallback is the dominant cost
+	// on guilds where the bot's member cache hasn't fully populated.
+	if !isHandledAuditAction(entry.ActionType) {
+		return
+	}
+
 	actorID := entry.UserID
 	actorPtr := &actorID
 	// Resolve the moderator's username via the disgo cache, falling back
@@ -261,6 +271,26 @@ func isNullJSON(raw []byte) bool {
 // is missing so the buffered enrichment can't latch onto unlimited
 // late-arriving pendings.
 const bulkDeleteCeiling = 100
+
+// isHandledAuditAction reports whether the listener has a case for this
+// native audit log action type. Used as an early bail-out so we don't
+// pay the cost of ResolveMemberUsernameOrFetch (cache lookup + REST
+// fallback) on every channel/role/webhook/voice event Discord emits.
+// Must stay in sync with the switch in OnAuditNativeEnrichment.
+func isHandledAuditAction(t discord.AuditLogEvent) bool {
+	switch t {
+	case discord.AuditLogEventMessageDelete,
+		discord.AuditLogEventMessageBulkDelete,
+		discord.AuditLogEventMemberBanAdd,
+		discord.AuditLogEventMemberBanRemove,
+		discord.AuditLogEventMemberUpdate,
+		discord.AuditLogEventMemberRoleUpdate,
+		discord.AuditLogEventMemberKick,
+		discord.AuditLogEventMemberPrune:
+		return true
+	}
+	return false
+}
 
 // auditEntryCount parses Discord's stringly-typed Options.Count field.
 // Returns 0 when nil or unparseable so callers can branch on "unknown".
