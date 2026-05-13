@@ -494,9 +494,18 @@ func TestTryEnrichWithFallback_FlushSkipsConsumedFallback(t *testing.T) {
 //
 // Reproduces the race deterministically by setting en.expired manually
 // before calling FlushPending (simulating expireEnrichment having
-// claimed but not yet committed).
+// claimed but not yet committed). pendingTTL is bumped to a value
+// large enough that the buffered timer cannot fire during the manual
+// setup phase even on a slow CI runner — without this the timer's
+// real expireEnrichment could fire between the TryEnrichWithFallback
+// call and the manual lookup, making the test pass for the wrong
+// reason (or fail intermittently).
 func TestTryEnrichWithFallback_ExpireFlushRace(t *testing.T) {
 	setupTestDB(t)
+	prevTTL := pendingTTL
+	pendingTTL = 30 * time.Second
+	t.Cleanup(func() { pendingTTL = prevTTL })
+
 	guildID := snowflake.ID(1307)
 	guildEnabled(t, guildID)
 
@@ -542,13 +551,107 @@ func TestTryEnrichWithFallback_ExpireFlushRace(t *testing.T) {
 	// check-and-set it commits the fallback because nobody else has yet.
 	FlushPending()
 
-	// Give any in-flight timer callback a moment to run; it should bail
-	// on en.expired without writing anything (and FlushPending stopped
-	// the timer anyway).
-	time.Sleep(pendingTTL + 100*time.Millisecond)
-
 	assert.EqualValues(t, 1, countRows(t, guildID),
 		"FlushPending must commit fallback even when expireEnrichment claimed it but didn't get to commit")
+}
+
+// The fallback Entry must be decoupled from the caller's storage:
+// mutating Details or the snowflake pointers' targets after the call
+// must not affect what eventually gets committed. Without the deep
+// clone in TryEnrichWithFallback this would both (a) corrupt the
+// stored row and (b) race the TTL goroutine reading Details for the
+// commit's JSON marshal.
+func TestTryEnrichWithFallback_ClonesCallerStorage(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1308)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(13081)
+	moderator := snowflake.ID(13082)
+
+	details := map[string]any{
+		"nick_before": "original-old",
+		"nick_after":  "original-new",
+	}
+	fallback := Entry{
+		GuildID:    guildID,
+		Category:   CategoryMember,
+		EventType:  EventMemberNickChange,
+		ActorID:    &moderator,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+		Details:    details,
+	}
+
+	TryEnrichWithFallback(guildID, EventMemberNickChange, &target, nil,
+		&moderator, ActorUser, "modUser", "", MatchFirst, 0, fallback)
+
+	// Mutate everything the caller still holds references to.
+	details["nick_before"] = "MUTATED"
+	details["nick_after"] = "MUTATED"
+	delete(details, "nick_before")
+	moderator = snowflake.ID(99999)
+	target = snowflake.ID(99998)
+
+	time.Sleep(pendingTTL + 200*time.Millisecond)
+
+	var row model.AuditLogEntry
+	require.NoError(t, model.DB.Where("guild_id = ?", guildID).First(&row).Error)
+	assert.Contains(t, row.Details, "original-old",
+		"stored Details must reflect pre-mutation state — buffered fallback shouldn't alias caller's map")
+	assert.NotContains(t, row.Details, "MUTATED",
+		"caller's post-call mutation must not be visible in the stored row")
+	require.NotNil(t, row.ActorID)
+	assert.Equal(t, snowflake.ID(13082), *row.ActorID,
+		"stored ActorID must reflect pre-mutation value — buffered fallback shouldn't alias caller's pointer target")
+	require.NotNil(t, row.TargetID)
+	assert.Equal(t, snowflake.ID(13081), *row.TargetID)
+}
+
+// The fallback's identity fields (GuildID/EventType/TargetID) are
+// normalized to match the explicit args at the call boundary. A
+// caller that passes mismatched values shouldn't be able to write a
+// row keyed differently than the buffered enrichment claims.
+func TestTryEnrichWithFallback_NormalizesIdentity(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1309)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(13091)
+	moderator := snowflake.ID(13092)
+	wrongGuild := snowflake.ID(99999)
+	wrongTarget := snowflake.ID(99998)
+
+	fallback := Entry{
+		// Wrong identity fields — should be overwritten by explicit args.
+		GuildID:    wrongGuild,
+		EventType:  EventMessageDelete,
+		TargetID:   &wrongTarget,
+		Category:   CategoryMember,
+		ActorID:    &moderator,
+		ActorKind:  ActorUser,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+		Details:    map[string]any{"nick_after": "new"},
+	}
+
+	TryEnrichWithFallback(guildID, EventMemberNickChange, &target, nil,
+		&moderator, ActorUser, "modUser", "", MatchFirst, 0, fallback)
+	time.Sleep(pendingTTL + 200*time.Millisecond)
+
+	// Row should land under the explicit guild, not the fallback's wrong one.
+	assert.EqualValues(t, 1, countRows(t, guildID))
+	assert.EqualValues(t, 0, countRows(t, wrongGuild))
+
+	var row model.AuditLogEntry
+	require.NoError(t, model.DB.Where("guild_id = ?", guildID).First(&row).Error)
+	assert.Equal(t, string(EventMemberNickChange), row.EventType,
+		"EventType must be the explicit arg, not the fallback's stale value")
+	require.NotNil(t, row.TargetID)
+	assert.Equal(t, snowflake.ID(13091), *row.TargetID,
+		"TargetID must be the explicit arg, not the fallback's stale value")
 }
 
 // MatchAll + fallback is unsupported (would duplicate). The pairing must

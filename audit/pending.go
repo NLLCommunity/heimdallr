@@ -197,6 +197,12 @@ func LogPending(entry Entry, enrichable []EnrichField) {
 		return
 	}
 
+	// Decouple from the caller's storage. The entry sits in the buffer
+	// until commit; without cloning, a caller that recycles its Details
+	// map (or mutates the snowflake pointers' targets) would race with
+	// the TTL goroutine reading the stored copy.
+	entry = cloneEntry(entry)
+
 	allowed := make(map[EnrichField]bool, len(enrichable))
 	for _, f := range enrichable {
 		allowed[f] = true
@@ -359,6 +365,17 @@ func TryEnrich(
 // audit logging between TryEnrich and TTL expiry won't get backdoor rows
 // and a caller that forgets to set Category won't silently produce a
 // broken row.
+//
+// Ownership: the fallback Entry is deep-cloned on entry, so the caller
+// may mutate (or recycle) the Details map and the snowflake-pointer
+// targets after this returns without affecting the buffered copy or
+// racing the TTL goroutine.
+//
+// Identity normalization: the fallback's GuildID / EventType / TargetID
+// are overwritten with the explicit guildID / eventType / targetID args
+// before buffering. Mismatch is logged at warn level so caller bugs are
+// visible, but the row that eventually gets written is internally
+// consistent with how it would have been keyed.
 func TryEnrichWithFallback(
 	guildID snowflake.ID,
 	eventType EventType,
@@ -396,6 +413,28 @@ func tryEnrich(
 		slog.Warn("audit: dropping fallback paired with non-MatchFirst — unsupported combination",
 			"guild_id", guildID, "event_type", eventType)
 		fallback = nil
+	}
+	if fallback != nil {
+		// Defend against caller misuse: the fallback's identity fields
+		// must match the explicit match-key args, otherwise we'd commit
+		// a row keyed differently than the buffered enrichment we're
+		// supposedly replacing. Warn loudly so the bug is visible, then
+		// normalize so the row that gets written is at least internally
+		// consistent. The clone also decouples the stored fallback from
+		// the caller's storage — TTL expiry can fire on another goroutine
+		// 1.5s later, and we don't want to race the caller's Details map.
+		if fallback.GuildID != guildID ||
+			fallback.EventType != eventType ||
+			!snowflakePtrEqual(fallback.TargetID, targetID) {
+			slog.Warn("audit: fallback identity fields don't match explicit args — normalizing",
+				"explicit_guild", guildID, "fallback_guild", fallback.GuildID,
+				"explicit_event", eventType, "fallback_event", fallback.EventType)
+		}
+		cloned := cloneEntry(*fallback)
+		cloned.GuildID = guildID
+		cloned.EventType = eventType
+		cloned.TargetID = copySnowflake(targetID)
+		fallback = &cloned
 	}
 	// Clamp negative caps to "unlimited" so misbehaving callers can't
 	// accidentally disable the buffered-enrichment path with -1.
@@ -721,6 +760,15 @@ func copySnowflake(id *snowflake.ID) *snowflake.ID {
 	return &v
 }
 
+// snowflakePtrEqual treats nil pointers as equal to other nils and
+// dereferences non-nil pointers to compare the underlying IDs.
+func snowflakePtrEqual(a, b *snowflake.ID) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
+}
+
 func copyStringMap(m map[string]string) map[string]string {
 	if len(m) == 0 {
 		return nil
@@ -730,4 +778,59 @@ func copyStringMap(m map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+// cloneEntry returns an Entry safe to retain across goroutine boundaries.
+// The caller's Details map and the snowflake pointers are not aliased by
+// the returned value, so the caller can mutate (or recycle) the original
+// after the call without affecting what eventually gets committed — and
+// without racing the TTL goroutine that reads the stored copy.
+func cloneEntry(e Entry) Entry {
+	e.ActorID = copySnowflake(e.ActorID)
+	e.TargetID = copySnowflake(e.TargetID)
+	e.Details = cloneDetails(e.Details)
+	return e
+}
+
+// cloneDetails deep-copies a Details map. Scalar values (strings, numbers,
+// booleans) are immutable from Go's perspective and copied via assignment;
+// nested maps and slices are recursively cloned so the result shares no
+// mutable storage with the input. Unrecognised composite types fall through
+// to a shallow assignment — callers using exotic value shapes must clone
+// them themselves; current audit listeners only emit string / float /
+// map / slice combinations.
+func cloneDetails(d map[string]any) map[string]any {
+	if d == nil {
+		return nil
+	}
+	out := make(map[string]any, len(d))
+	for k, v := range d {
+		out[k] = cloneDetailValue(v)
+	}
+	return out
+}
+
+func cloneDetailValue(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		return cloneDetails(x)
+	case []any:
+		out := make([]any, len(x))
+		for i, item := range x {
+			out[i] = cloneDetailValue(item)
+		}
+		return out
+	case []map[string]any:
+		out := make([]map[string]any, len(x))
+		for i, m := range x {
+			out[i] = cloneDetails(m)
+		}
+		return out
+	case []string:
+		out := make([]string, len(x))
+		copy(out, x)
+		return out
+	}
+	// Scalars and unknown types: shallow assignment.
+	return v
 }

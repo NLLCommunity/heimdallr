@@ -311,12 +311,12 @@ func buildMemberUpdateFallback(
 		details["target_username"] = targetUsername
 	}
 	return audit.Entry{
-		GuildID:   guildID,
-		Category:  audit.EventCategory(ev),
-		EventType: ev,
-		ActorID:   actorPtr,
-		ActorKind: audit.ActorUser,
-		TargetID:  target,
+		GuildID:    guildID,
+		Category:   audit.EventCategory(ev),
+		EventType:  ev,
+		ActorID:    actorPtr,
+		ActorKind:  audit.ActorUser,
+		TargetID:   target,
 		TargetKind: audit.TargetUser,
 		// The native side produced this row; Log / LogPending normally
 		// fill in the Source, but the fallback path goes through commit
