@@ -1,0 +1,144 @@
+package pages
+
+import (
+	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
+	"github.com/NLLCommunity/heimdallr/web/templates/partials"
+)
+
+// AuditLogData carries everything the audit log page renders. Filters and
+// pagination state are mirrored from the URL query string so the form
+// preserves the user's selection on submit.
+//
+// One exception: when no filters are present in the URL, the handler
+// injects a default `From` of (today - 7 days) before populating Filters,
+// so a first-time visit isn't a full-history scan. The form then shows
+// that defaulted date; users can clear it to widen the window.
+type AuditLogData struct {
+	GuildID string
+	Enabled bool
+	Filters AuditLogFilters
+	// FilterQuery is the URL-encoded representation of Filters (no leading
+	// "?", no page parameter). Threaded through to the table partial so
+	// pagination links can include the active filters in their hrefs.
+	FilterQuery string
+	Rows        []partials.AuditLogRow
+	Total       int64
+	Page        int
+	PageSize    int
+	// EventOptions is the list of event types to populate in the dropdown.
+	// Sourced from the audit package's catalog so the page doesn't need its
+	// own list to keep in sync.
+	EventOptions []AuditLogEventOption
+}
+
+type AuditLogFilters struct {
+	Category  string
+	EventType string
+	Actor     string
+	Target    string
+	From      string // YYYY-MM-DD
+	To        string
+}
+
+type AuditLogEventOption struct {
+	Value    string
+	Label    string
+	Category string
+}
+
+templ AuditLog(nav layouts.NavData, data AuditLogData) {
+	@layouts.Base("Audit Log", nav) {
+		<h2>Audit Log</h2>
+		<p class="audit-log-scope-note">
+			Records moderation events only — message edits and deletes, member
+			nickname / role / timeout changes, kicks, bans, prunes, and setting
+			changes. Discord channel, role, and webhook configuration changes
+			are <em>not</em> recorded here; check Discord's own audit log for
+			those.
+		</p>
+		if !data.Enabled {
+			<article>
+				<p>
+					Audit logging is currently disabled for this guild — no new events are
+					being recorded.
+					<a href={ templ.SafeURL("/guild/" + data.GuildID) }>Enable it in settings</a>
+					to resume recording. Historical entries remain visible below until pruned.
+				</p>
+			</article>
+		}
+		@auditLogFilterForm(data)
+		<div id="auditlog-table">
+			@partials.AuditLogTable(partials.AuditLogTableData{
+				GuildID:     data.GuildID,
+				Rows:        data.Rows,
+				Total:       data.Total,
+				Page:        data.Page,
+				PageSize:    data.PageSize,
+				FilterQuery: data.FilterQuery,
+			})
+		</div>
+	}
+}
+
+templ auditLogFilterForm(data AuditLogData) {
+	<form
+		action={ templ.SafeURL("/guild/" + data.GuildID + "/auditlog") }
+		method="get"
+		hx-get={ "/guild/" + data.GuildID + "/auditlog" }
+		hx-target="#auditlog-table"
+		hx-push-url="true"
+		style="margin-bottom: 1rem;"
+	>
+		<div class="grid">
+			<label>
+				Category
+				<select name="category">
+					<option value="" selected?={ data.Filters.Category == "" }>All</option>
+					<option value="message" selected?={ data.Filters.Category == "message" }>Message</option>
+					<option value="member" selected?={ data.Filters.Category == "member" }>Member</option>
+					<option value="guild" selected?={ data.Filters.Category == "guild" }>Guild / Bot</option>
+				</select>
+			</label>
+			<label>
+				Event
+				<select name="event_type">
+					<option value="" selected?={ data.Filters.EventType == "" }>All</option>
+					for _, e := range data.EventOptions {
+						<option value={ e.Value } selected?={ data.Filters.EventType == e.Value }>
+							{ e.Label }
+						</option>
+					}
+				</select>
+			</label>
+		</div>
+		<div class="grid">
+			<label>
+				Actor
+				<input type="text" name="actor" value={ data.Filters.Actor } placeholder="@username or snowflake"/>
+			</label>
+			<label>
+				Target
+				<input type="text" name="target" value={ data.Filters.Target } placeholder="@user, #channel, or snowflake"/>
+			</label>
+		</div>
+		<div class="grid">
+			<label>
+				From
+				<input type="date" name="from" value={ data.Filters.From }/>
+			</label>
+			<label>
+				To
+				<input type="date" name="to" value={ data.Filters.To }/>
+			</label>
+		</div>
+		<div class="form-actions">
+			<button type="submit">Apply</button>
+			<button
+				type="button"
+				class="outline secondary"
+				onclick={ templ.JSFuncCall("window.location.assign", "/guild/"+data.GuildID+"/auditlog") }
+			>Reset</button>
+		</div>
+	</form>
+}
+

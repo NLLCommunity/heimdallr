@@ -9,6 +9,7 @@ import (
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/omit"
 
+	"github.com/NLLCommunity/heimdallr/audit"
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
@@ -123,6 +124,26 @@ func WarnHandler(e *handler.CommandEvent) error {
 	}
 
 	slog.DebugContext(ctx, "Created infraction.", "infraction", inf.Sqid())
+
+	moderatorID := e.User().ID
+	targetID := user.ID
+	audit.Log(audit.Entry{
+		GuildID:    guild.ID,
+		EventType:  audit.EventBotWarn,
+		ActorID:    &moderatorID,
+		ActorKind:  audit.ActorUser,
+		TargetID:   &targetID,
+		TargetKind: audit.TargetUser,
+		Source:     audit.SourceCommand,
+		Reason:     inf.Reason,
+		Details: map[string]any{
+			"infraction_id":   inf.Sqid(),
+			"weight":          inf.Weight,
+			"silent":          inf.Silent,
+			"actor_username":  e.User().Username,
+			"target_username": user.Username,
+		},
+	})
 
 	embed := discord.NewEmbedBuilder().
 		SetTitlef(`Warning in "%s"`, guild.Name).

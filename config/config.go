@@ -72,6 +72,15 @@ func init() {
 
 	viper.SetDefault("dashboard.base_url", "http://localhost:8484")
 
+	// Audit log retention ceilings, in days. Per-guild settings may LOWER
+	// these (or set their own value) but never raise above them. 0 means
+	// "no limit / forever" — guilds may set 0 only when the bot ceiling
+	// is also 0. The pruner runs at audit_log.prune_interval_hours.
+	viper.SetDefault("audit_log.message_retention_days", 14)
+	viper.SetDefault("audit_log.member_retention_days", 90)
+	viper.SetDefault("audit_log.guild_retention_days", 0)
+	viper.SetDefault("audit_log.prune_interval_hours", 6)
+
 	viper.AutomaticEnv()
 
 	if err := viper.ReadInConfig(); err != nil {

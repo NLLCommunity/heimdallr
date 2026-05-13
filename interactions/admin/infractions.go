@@ -108,6 +108,11 @@ func AdminInfractionsHandler(e *handler.CommandEvent) error {
 	if err != nil {
 		return err
 	}
+	logSettingsCommandUpdate(guild.ID, e.User(), "infractions", map[string]any{
+		"half_life_days":                 settings.InfractionHalfLifeDays,
+		"notify_on_warned_user_join":     settings.NotifyOnWarnedUserJoin,
+		"notify_warn_severity_threshold": settings.NotifyWarnSeverityThreshold,
+	})
 
 	return e.CreateMessage(interactions.EphemeralMessageContent(message))
 }

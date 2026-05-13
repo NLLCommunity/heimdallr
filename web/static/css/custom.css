@@ -131,3 +131,93 @@
 @keyframes toast-slide-out {
   to { transform: translateX(110%); opacity: 0; }
 }
+
+/* Audit log table — parent row + collapsible detail sub-row.
+   The detail row is visually attached to the row above by removing
+   the bottom border from the parent and the top border from the
+   detail row. The boundary between an audit pair and the next entry
+   keeps the normal table border, so groupings remain legible. */
+.audit-log-table tr.audit-row-has-detail > td {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.audit-log-table tr.audit-detail-row > td {
+  padding-top: 0.25rem;
+  font-size: 0.9em;
+  color: var(--pico-muted-color);
+}
+/* Disclosure marker. Pico draws its own chevron on summary::after
+   anchored to the right; we want only one marker, on the left, in
+   Pico's visual style. The SVG-mask approach inherits currentColor
+   so it adapts to light/dark theme without further work. */
+.audit-log-table tr.audit-detail-row details summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.audit-log-table tr.audit-detail-row details summary::-webkit-details-marker,
+.audit-log-table tr.audit-detail-row details summary::marker {
+  display: none;
+  content: "";
+}
+.audit-log-table tr.audit-detail-row details summary::after {
+  /* Suppress Pico's default right-anchored chevron. */
+  content: none;
+  display: none;
+  background: none;
+}
+.audit-log-table tr.audit-detail-row details summary::before {
+  content: "";
+  flex: 0 0 auto;
+  width: 0.7em;
+  height: 0.7em;
+  background-color: currentColor;
+  /* mask-mode: alpha forces alpha-channel interpretation; without it
+     some browsers (notably Firefox historically) fall back to
+     luminance, which renders stroke='black' as fully transparent and
+     hides the chevron entirely. White stroke is belt-and-braces so
+     even luminance-mode browsers see the icon. */
+  mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 18 15 12 9 6'/></svg>");
+  mask-mode: alpha;
+  mask-repeat: no-repeat;
+  mask-position: center;
+  mask-size: contain;
+  -webkit-mask-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'><polyline points='9 18 15 12 9 6'/></svg>");
+  -webkit-mask-mode: alpha;
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+  transition: transform 0.15s ease;
+}
+.audit-log-table tr.audit-detail-row details[open] summary::before {
+  transform: rotate(90deg);
+}
+.audit-detail-sections {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.audit-detail-heading {
+  font-size: 0.95em;
+  font-weight: 600;
+  color: var(--pico-color);
+  margin: 0.25rem 0 -0.25rem;
+}
+.audit-detail-body {
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  padding: 0.5rem 0.75rem;
+  background-color: color-mix(in srgb, var(--pico-color) 7%, transparent);
+  border-radius: var(--pico-border-radius);
+  font-family: var(--pico-font-family-monospace);
+  font-size: 0.9em;
+}
+.audit-event-detail {
+  font-size: 0.85em;
+  color: var(--pico-muted-color);
+  margin-top: 0.15em;
+}

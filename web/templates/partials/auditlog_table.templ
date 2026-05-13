@@ -1,0 +1,194 @@
+package partials
+
+import (
+	"fmt"
+	"strconv"
+	"time"
+)
+
+// DetailSection is one heading + body block inside an audit row's
+// expandable disclosure. Used for events whose detail naturally splits
+// into labelled parts (e.g. message edit → Before / After).
+type DetailSection struct {
+	Heading string
+	Body    string
+}
+
+// AuditLogRow is a render-ready audit log entry with names already resolved
+// from the disgo cache. The handler builds these from raw model rows so the
+// templ stays free of cache-lookup logic.
+//
+// DetailSummary and DetailSections together drive how detail content is
+// presented:
+//   - DetailSections non-empty → expandable sub-row with <details>; the
+//     summary text becomes the <summary> label, sections render inside.
+//   - DetailSections empty, DetailSummary non-empty → small inline label
+//     under the event name (no sub-row, no disclosure widget).
+//   - Both empty → nothing extra rendered.
+type AuditLogRow struct {
+	CreatedAt      time.Time
+	EventLabel     string // human label, e.g. "Message deleted"
+	EventType      string
+	Actor          string // e.g. "@modUser" or "—"
+	Target         string // e.g. "#general" or "@bob" or "—"
+	Reason         string
+	DetailSummary  string
+	DetailSections []DetailSection
+}
+
+// auditLogColumnCount is the colspan applied to the detail sub-row.
+// Update this if the column list in AuditLogTable changes.
+const auditLogColumnCount = 5
+
+type AuditLogTableData struct {
+	GuildID string
+	Rows    []AuditLogRow
+	Total   int64
+	Page    int
+	PageSize int
+	// FilterQuery is the URL-encoded active filters (no leading "?", no
+	// page parameter). Embedded into pagination link hrefs so a user
+	// opening "← Newer" in a new tab — or browsing without HTMX — gets
+	// the same filtered view they had on-page. hx-include="form" covers
+	// the in-page HTMX path, but the rendered href stands alone.
+	FilterQuery string
+}
+
+// AuditLogTable renders the table contents. The wrapping #auditlog-table div
+// is owned by the parent page template — keeping it outside the partial means
+// HTMX swaps replace innerHTML cleanly without nested duplicate IDs.
+templ AuditLogTable(data AuditLogTableData) {
+	if len(data.Rows) == 0 {
+		<article>
+			<p>No entries match these filters.</p>
+		</article>
+	} else {
+		<table class="audit-log-table">
+			<thead>
+				<tr>
+					<th>Time (UTC)</th>
+					<th>Event</th>
+					<th>Actor</th>
+					<th>Target</th>
+					<th>Reason</th>
+				</tr>
+			</thead>
+			<tbody>
+				for _, r := range data.Rows {
+					@auditLogTableRow(r)
+				}
+			</tbody>
+		</table>
+	}
+	// Pagination renders whenever there are matching rows at all, even if
+	// the current page is empty — without this, navigating past the last
+	// page (e.g. ?page=999) leaves the user with no "← Newer" link to
+	// return.
+	if data.Total > 0 {
+		@auditLogPagination(data)
+	}
+}
+
+templ auditLogTableRow(r AuditLogRow) {
+	{{ hasSections := len(r.DetailSections) > 0 }}
+	{{ hasInline := !hasSections && r.DetailSummary != "" }}
+	if hasSections {
+		<tr class="audit-row audit-row-has-detail">
+			<td>{ r.CreatedAt.UTC().Format(time.RFC3339) }</td>
+			<td>{ r.EventLabel }</td>
+			<td>{ r.Actor }</td>
+			<td>{ r.Target }</td>
+			<td>{ r.Reason }</td>
+		</tr>
+		<tr class="audit-detail-row">
+			<td colspan={ strconv.Itoa(auditLogColumnCount) }>
+				<details>
+					<summary>{ r.DetailSummary }</summary>
+					<div class="audit-detail-sections">
+						for _, sec := range r.DetailSections {
+							if sec.Heading != "" {
+								<div class="audit-detail-heading">{ sec.Heading }</div>
+							}
+							<pre class="audit-detail-body">{ sec.Body }</pre>
+						}
+					</div>
+				</details>
+			</td>
+		</tr>
+	} else {
+		<tr class="audit-row">
+			<td>{ r.CreatedAt.UTC().Format(time.RFC3339) }</td>
+			<td>
+				{ r.EventLabel }
+				if hasInline {
+					<div class="audit-event-detail">{ r.DetailSummary }</div>
+				}
+			</td>
+			<td>{ r.Actor }</td>
+			<td>{ r.Target }</td>
+			<td>{ r.Reason }</td>
+		</tr>
+	}
+}
+
+templ auditLogPagination(data AuditLogTableData) {
+	<nav class="audit-pagination">
+		<ul>
+			<li>{ paginationLabel(data.Page, data.PageSize, len(data.Rows), data.Total) }</li>
+		</ul>
+		<ul>
+			if data.Page > 1 {
+				<li>
+					<a
+						href={ templ.SafeURL(auditLogPageHref(data.GuildID, data.Page-1, data.FilterQuery)) }
+						hx-get={ auditLogPageHref(data.GuildID, data.Page-1, data.FilterQuery) }
+						hx-target="#auditlog-table"
+						hx-include="form"
+						hx-push-url="true"
+					>← Newer</a>
+				</li>
+			}
+			if int64(data.Page*data.PageSize) < data.Total {
+				<li>
+					<a
+						href={ templ.SafeURL(auditLogPageHref(data.GuildID, data.Page+1, data.FilterQuery)) }
+						hx-get={ auditLogPageHref(data.GuildID, data.Page+1, data.FilterQuery) }
+						hx-target="#auditlog-table"
+						hx-include="form"
+						hx-push-url="true"
+					>Older →</a>
+				</li>
+			}
+		</ul>
+	</nav>
+}
+
+// paginationLabel renders the "Showing X–Y of N" line. When the current
+// page has no rows but there are entries overall (e.g. user navigates
+// past the last page via ?page=999) we render an explicit empty-page
+// label instead of "Showing 0–0 of N" — the offset arithmetic isn't
+// meaningful with zero rows, and the user needs a clear cue that the
+// "← Newer" link is the way back.
+func paginationLabel(page, pageSize, count int, total int64) string {
+	if count == 0 {
+		return fmt.Sprintf("Page %d is empty (%d entries total)", page, total)
+	}
+	start := (page-1)*pageSize + 1
+	end := (page-1)*pageSize + count
+	return fmt.Sprintf("Showing %d–%d of %d", start, end, total)
+}
+
+// auditLogPageHref builds the URL for a pagination link, embedding both
+// the target page and the active filter query so the link stands alone:
+// users opening "← Newer" in a new tab — or navigating without HTMX —
+// get the same filtered view they had on-page.
+//
+// filterQuery is already URL-encoded (built by auditLogFilterQuery in the
+// web package) and contains no leading "?" or page parameter.
+func auditLogPageHref(guildID string, page int, filterQuery string) string {
+	href := "/guild/" + guildID + "/auditlog?page=" + strconv.Itoa(page)
+	if filterQuery != "" {
+		href += "&" + filterQuery
+	}
+	return href
+}

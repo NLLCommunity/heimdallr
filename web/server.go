@@ -60,6 +60,9 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	mux.HandleFunc("POST /guild/{id}/settings/gatekeep", handleSaveGatekeep(client))
 	mux.HandleFunc("POST /guild/{id}/settings/join-leave", handleSaveJoinLeave(client))
 
+	mux.HandleFunc("GET /guild/{id}/auditlog", handleAuditLog(client))
+	mux.HandleFunc("POST /guild/{id}/settings/audit-log", handleSaveAuditLog(client))
+
 	// Per-session rate limiter for sandbox sends — keyed by user ID rather
 	// than IP, since the threat is admin abuse, not anonymous flooding.
 	sandboxLimiter := newKeyedRateLimiter(

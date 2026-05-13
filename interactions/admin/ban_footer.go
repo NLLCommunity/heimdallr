@@ -50,6 +50,10 @@ func AdminBanFooterHandler(e *handler.CommandEvent) error {
 		if err != nil {
 			return e.CreateMessage(ix.EphemeralMessageContent("Failed to save settings."))
 		}
+		logSettingsCommandUpdate(guild.ID, e.User(), "ban_footer", map[string]any{
+			"footer":      settings.BanFooter,
+			"always_send": settings.AlwaysSendBanFooter,
+		})
 		return e.CreateMessage(ix.EphemeralMessageContent("Settings saved."))
 	}
 
@@ -60,6 +64,10 @@ func AdminBanFooterHandler(e *handler.CommandEvent) error {
 		if err != nil {
 			return err
 		}
+		logSettingsCommandUpdate(guild.ID, e.User(), "ban_footer", map[string]any{
+			"footer":      settings.BanFooter,
+			"always_send": settings.AlwaysSendBanFooter,
+		})
 		return e.CreateMessage(ix.EphemeralMessageContent("Ban footer has been reset."))
 	}
 
@@ -120,6 +128,10 @@ func AdminBanFooterModalHandler(e *handler.ModalEvent) error {
 	if err != nil {
 		return e.CreateMessage(ix.EphemeralMessageContent("Failed to update ban footer"))
 	}
+	logSettingsCommandUpdate(guild.ID, e.User(), "ban_footer", map[string]any{
+		"footer":      settings.BanFooter,
+		"always_send": settings.AlwaysSendBanFooter,
+	})
 
 	return e.CreateMessage(ix.EphemeralMessageContent("Ban footer updated."))
 }

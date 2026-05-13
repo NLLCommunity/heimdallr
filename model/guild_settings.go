@@ -45,6 +45,21 @@ type GuildSettings struct {
 
 	BanFooter           string
 	AlwaysSendBanFooter bool
+
+	// AuditLogEnabled is the master per-guild toggle for the bot's audit
+	// log. When false, no rows are written for the guild. Disabling it
+	// does not prune existing rows — those follow the retention schedule.
+	AuditLogEnabled bool
+
+	// AuditMessageRetentionDays / AuditMemberRetentionDays /
+	// AuditGuildRetentionDays are per-guild retention overrides in days.
+	// nil means "use the bot-operator default from config". A guild may
+	// only LOWER retention versus the bot ceiling — values above the bot
+	// max are rejected at the settings handler. 0 means "forever" (only
+	// permitted if the bot ceiling itself is 0).
+	AuditMessageRetentionDays *uint
+	AuditMemberRetentionDays  *uint
+	AuditGuildRetentionDays   *uint
 }
 
 func GetGuildSettings(guildID snowflake.ID) (*GuildSettings, error) {

@@ -159,6 +159,12 @@ func AdminAntiSpamHandler(e *handler.CommandEvent) error {
 		slog.Warn("Failed to set guild settings", "err", err)
 		return err
 	}
+	logSettingsCommandUpdate(guild.ID, e.User(), "anti_spam", map[string]any{
+		"enabled":          settings.AntiSpamEnabled,
+		"count":            settings.AntiSpamCount,
+		"cooldown_seconds": settings.AntiSpamCooldownSeconds,
+		"timeout_minutes":  settings.AntiSpamTimeoutMinutes,
+	})
 
 	return e.CreateMessage(interactions.EphemeralMessageContent(message))
 }

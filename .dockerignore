@@ -3,6 +3,7 @@
 !go.sum
 !main.go
 !rm_commands.go
+!audit/
 !config/
 !interactions/
 !listeners/

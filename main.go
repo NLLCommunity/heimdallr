@@ -21,6 +21,7 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/spf13/viper"
 
+	"github.com/NLLCommunity/heimdallr/audit"
 	_ "github.com/NLLCommunity/heimdallr/config"
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/interactions/admin"
@@ -76,9 +77,31 @@ func main() {
 		return
 	}
 
-	_, err := model.InitDB(viper.GetString("bot.db") + "?_journal_mode=WAL")
+	// glebarez/sqlite only honours pragmas passed via the `_pragma` DSN
+	// parameter — `_journal_mode=WAL` (the older nokia-style form) is
+	// silently dropped, leaving the DB in rollback-journal mode. Verified
+	// empirically: the wal_checkpoint pragma in the prune task only does
+	// anything once WAL is actually enabled.
+	//
+	// Use & if the configured path already carries a query string (someone
+	// runs a URI-style DSN), ? otherwise. Without this, a configured
+	// "file:bot.db?cache=shared" would end up with two ? separators and
+	// the journal_mode pragma would be silently ignored.
+	dbPath := viper.GetString("bot.db")
+	sep := "?"
+	if strings.Contains(dbPath, "?") {
+		sep = "&"
+	}
+	_, err := model.InitDB(dbPath + sep + "_pragma=journal_mode(WAL)&_pragma=analysis_limit(400)")
 	if err != nil {
 		panic(fmt.Errorf("failed to initialize database: %w", err))
+	}
+	// Surface the actual journal mode at boot. Silent typos in the DSN
+	// pragma list previously left the DB in rollback mode for the whole
+	// branch — logging the resolved value makes that loud next time.
+	var journalMode string
+	if err := model.DB.Raw("PRAGMA journal_mode").Scan(&journalMode).Error; err == nil {
+		slog.Info("SQLite journal mode", "mode", journalMode)
 	}
 
 	r := handler.New()
@@ -128,8 +151,14 @@ func main() {
 		bot.WithEventListenerFunc(listeners.OnUserJoin),
 		bot.WithEventListenerFunc(listeners.OnUserLeave),
 		bot.WithEventListenerFunc(listeners.OnMemberBan),
-		bot.WithEventListenerFunc(listeners.OnAuditLog),
+		bot.WithEventListenerFunc(listeners.OnAuditLogKick),
 		bot.WithEventListenerFunc(listeners.OnAntispamMessageCreate),
+		bot.WithEventListenerFunc(listeners.OnAuditMemberUpdate),
+		bot.WithEventListenerFunc(listeners.OnAuditMessageUpdate),
+		bot.WithEventListenerFunc(listeners.OnAuditMessageDelete),
+		bot.WithEventListenerFunc(listeners.OnAuditMemberBan),
+		bot.WithEventListenerFunc(listeners.OnAuditGuildUnban),
+		bot.WithEventListenerFunc(listeners.OnAuditNativeEnrichment),
 		bot.WithGatewayConfigOpts(gateway.WithIntents(intents)),
 		bot.WithCacheConfigOpts(
 			cache.WithCaches(cache.FlagsAll),
@@ -139,7 +168,6 @@ func main() {
 	if err != nil {
 		panic(fmt.Errorf("failed to create disgo client: %w", err))
 	}
-	defer client.Close(context.Background())
 
 	var devGuilds []snowflake.ID
 	if viper.GetBool("dev_mode.enabled") {
@@ -178,6 +206,7 @@ func main() {
 
 	removeTempBansTask := scheduled_tasks.RemoveTempBansScheduledTask(client)
 	removeStalePrunesTask := scheduled_tasks.RemoveStalePendingPrunes()
+	pruneAuditLogTask := scheduled_tasks.PruneAuditLogScheduledTask()
 
 	webCtx, cancelWeb := context.WithCancel(context.Background())
 	defer cancelWeb()
@@ -195,8 +224,28 @@ func main() {
 	slog.Info("Shutdown signal received")
 	removeTempBansTask.Stop()
 	removeStalePrunesTask.Stop()
+	pruneAuditLogTask.Stop()
+	// Close ONLY the gateway first so listeners stop firing and can't
+	// refill the audit buffer after the flush below. We deliberately keep
+	// the REST client and caches alive: in-flight web requests still need
+	// them to render audit log pages, channel names, etc. — closing the
+	// whole client here would surface as REST errors mid-response.
+	client.Gateway.Close(context.Background())
+	// Commit any audit log entries still in the pending-enrichment buffer
+	// before the process exits. Best-effort: failures inside FlushPending
+	// are logged at warn but don't block shutdown.
+	audit.FlushPending()
 	cancelWeb()
 	<-webDone
+	// All writers stopped; refresh the SQLite query planner stats per the
+	// upstream recommendation for connection close. No-op when nothing
+	// has changed since the last run, so cheap to call unconditionally.
+	if err := model.DB.Exec("PRAGMA optimize").Error; err != nil {
+		slog.Warn("PRAGMA optimize at shutdown failed", "err", err)
+	}
+	// Now that the web server has drained, the REST client can go.
+	// client.Close also calls Gateway.Close, which is idempotent.
+	client.Close(context.Background())
 }
 
 func getLogLevel(level string) slog.Level {

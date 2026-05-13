@@ -154,6 +154,11 @@ func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
 	if err != nil {
 		return err
 	}
+	logSettingsCommandUpdate(guild.ID, e.User(), "join_leave", map[string]any{
+		"join_message_enabled":  settings.JoinMessageEnabled,
+		"leave_message_enabled": settings.LeaveMessageEnabled,
+		"join_leave_channel":    settings.JoinLeaveChannel.String(),
+	})
 
 	return e.CreateMessage(interactions.EphemeralMessageContent(message))
 }
