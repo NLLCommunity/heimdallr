@@ -65,6 +65,32 @@ func countRows(t *testing.T, guildID snowflake.ID) int64 {
 	return count
 }
 
+// waitForRows polls until countRows(guildID) == want or a timeout
+// elapses. Replaces fixed-duration "sleep past TTL + padding" patterns:
+// on success the test continues as soon as the commit lands (typically a
+// few ms after pendingTTL fires) instead of always paying the full
+// padding. Failure path still has a generous upper bound so a slow CI
+// runner doesn't flake.
+func waitForRows(t *testing.T, guildID snowflake.ID, want int64) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		return countRows(t, guildID) == want
+	}, pendingTTL*8, pendingTTL/5,
+		"expected %d row(s) for guild %d", want, guildID)
+}
+
+// assertRowsStayAt asserts countRows(guildID) stays at want for at least
+// pendingTTL*2 — long enough to be confident no late commit will arrive.
+// Use for "must NOT commit" scenarios (disabled guild, dropped fallback)
+// or to verify no duplicate after an inline commit.
+func assertRowsStayAt(t *testing.T, guildID snowflake.ID, want int64) {
+	t.Helper()
+	require.Never(t, func() bool {
+		return countRows(t, guildID) != want
+	}, pendingTTL*2, pendingTTL/2,
+		"row count for guild %d must stay at %d", guildID, want)
+}
+
 func TestLogPending_FlushesAfterTTL(t *testing.T) {
 	setupTestDB(t)
 	guildID := snowflake.ID(1001)
@@ -84,8 +110,7 @@ func TestLogPending_FlushesAfterTTL(t *testing.T) {
 	// Pre-TTL: the row hasn't been written yet.
 	assert.EqualValues(t, 0, countRows(t, guildID))
 
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-	assert.EqualValues(t, 1, countRows(t, guildID), "row should have been committed after TTL")
+	waitForRows(t, guildID, 1)
 }
 
 func TestTryEnrich_AttachesActorAndCommits(t *testing.T) {
@@ -270,8 +295,7 @@ func TestTryEnrichWithFallback_CommitsOnTTLExpiry(t *testing.T) {
 	// Pre-TTL: nothing committed yet.
 	assert.EqualValues(t, 0, countRows(t, guildID))
 
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-	assert.EqualValues(t, 1, countRows(t, guildID), "fallback should commit on TTL expiry")
+	waitForRows(t, guildID, 1)
 
 	var row model.AuditLogEntry
 	require.NoError(t, model.DB.Where("guild_id = ?", guildID).First(&row).Error)
@@ -326,8 +350,7 @@ func TestTryEnrichWithFallback_GatewayWinsNoDuplicate(t *testing.T) {
 
 	// Past TTL: the enrichment's timer fires, but since the buffer entry
 	// was already consumed by LogPending the fallback path must skip.
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-	assert.EqualValues(t, 1, countRows(t, guildID), "fallback must not duplicate after gateway already enriched")
+	assertRowsStayAt(t, guildID, 1)
 }
 
 // Disabled guilds must not receive backdoor rows via the fallback path.
@@ -359,10 +382,7 @@ func TestTryEnrichWithFallback_DisabledGuildDropsFallback(t *testing.T) {
 	TryEnrichWithFallback(guildID, EventMemberNickChange, &target, nil,
 		&moderator, ActorUser, "modUser", "", MatchFirst, 0, fallback)
 
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-
-	assert.EqualValues(t, 0, countRows(t, guildID),
-		"disabled guild must not get fallback row written")
+	assertRowsStayAt(t, guildID, 0)
 }
 
 // The fallback's Category must persist to the row — without it, retention
@@ -390,7 +410,7 @@ func TestTryEnrichWithFallback_PersistsCategory(t *testing.T) {
 
 	TryEnrichWithFallback(guildID, EventMemberNickChange, &target, nil,
 		&moderator, ActorUser, "modUser", "", MatchFirst, 0, fallback)
-	time.Sleep(pendingTTL + 200*time.Millisecond)
+	waitForRows(t, guildID, 1)
 
 	var row model.AuditLogEntry
 	require.NoError(t, model.DB.Where("guild_id = ?", guildID).First(&row).Error)
@@ -595,7 +615,7 @@ func TestTryEnrichWithFallback_ClonesCallerStorage(t *testing.T) {
 	moderator = snowflake.ID(99999)
 	target = snowflake.ID(99998)
 
-	time.Sleep(pendingTTL + 200*time.Millisecond)
+	waitForRows(t, guildID, 1)
 
 	var row model.AuditLogEntry
 	require.NoError(t, model.DB.Where("guild_id = ?", guildID).First(&row).Error)
@@ -639,10 +659,9 @@ func TestTryEnrichWithFallback_NormalizesIdentity(t *testing.T) {
 
 	TryEnrichWithFallback(guildID, EventMemberNickChange, &target, nil,
 		&moderator, ActorUser, "modUser", "", MatchFirst, 0, fallback)
-	time.Sleep(pendingTTL + 200*time.Millisecond)
 
 	// Row should land under the explicit guild, not the fallback's wrong one.
-	assert.EqualValues(t, 1, countRows(t, guildID))
+	waitForRows(t, guildID, 1)
 	assert.EqualValues(t, 0, countRows(t, wrongGuild))
 
 	var row model.AuditLogEntry
@@ -677,10 +696,8 @@ func TestTryEnrichWithFallback_MatchAllDropsFallback(t *testing.T) {
 
 	TryEnrichWithFallback(guildID, EventMessageDelete, &target, nil,
 		&moderator, ActorUser, "modUser", "", MatchAll, 0, fallback)
-	time.Sleep(pendingTTL + 200*time.Millisecond)
 
-	assert.EqualValues(t, 0, countRows(t, guildID),
-		"MatchAll + fallback must drop the fallback (would otherwise duplicate)")
+	assertRowsStayAt(t, guildID, 0)
 }
 
 // MatchFirst enrichments are one-shot: once a matching gateway entry has
@@ -725,9 +742,7 @@ func TestTryEnrich_MatchFirstDoesNotBleedIntoNextEntry(t *testing.T) {
 	}, []EnrichField{EnrichActor, EnrichReason})
 
 	// Wait past TTL so the second pending entry flushes.
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-
-	assert.EqualValues(t, 2, countRows(t, guildID))
+	waitForRows(t, guildID, 2)
 
 	var rows []model.AuditLogEntry
 	require.NoError(t, model.DB.Where("guild_id = ?", guildID).Order("created_at ASC").Find(&rows).Error)
@@ -807,8 +822,7 @@ func TestTryEnrich_MessageDelete_DetailsScope(t *testing.T) {
 	assert.Equal(t, 1, enriched, "only the mod-deleted message should be enriched")
 
 	// Let the unrelated self-delete flush unenriched.
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-	assert.EqualValues(t, 2, countRows(t, guildID))
+	waitForRows(t, guildID, 2)
 
 	var rows []model.AuditLogEntry
 	require.NoError(t, model.DB.Where("guild_id = ?", guildID).Order("target_id ASC").Find(&rows).Error)
@@ -885,8 +899,7 @@ func TestTryEnrich_MessageDelete_NativeFirst_DetailsScope(t *testing.T) {
 	}, []EnrichField{EnrichActor, EnrichReason})
 
 	// Let the bystander entry flush unenriched.
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-	assert.EqualValues(t, 2, countRows(t, guildID))
+	waitForRows(t, guildID, 2)
 
 	var rows []model.AuditLogEntry
 	require.NoError(t, model.DB.Where("guild_id = ?", guildID).Order("target_id ASC").Find(&rows).Error)
@@ -951,8 +964,7 @@ func TestTryEnrich_MatchAll_CountCap(t *testing.T) {
 	makePending(8402)
 	makePending(8403)
 
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-	assert.EqualValues(t, 3, countRows(t, guildID))
+	waitForRows(t, guildID, 3)
 
 	var rows []model.AuditLogEntry
 	require.NoError(t, model.DB.Where("guild_id = ?", guildID).Order("target_id ASC").Find(&rows).Error)
@@ -1016,8 +1028,7 @@ func TestTryEnrich_MatchAll_CountCap_InlinePlusBuffered(t *testing.T) {
 	makePending(8803)
 	makePending(8804)
 
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-	assert.EqualValues(t, 4, countRows(t, guildID))
+	waitForRows(t, guildID, 4)
 
 	var rows []model.AuditLogEntry
 	require.NoError(t, model.DB.Where("guild_id = ?", guildID).Order("target_id ASC").Find(&rows).Error)
@@ -1072,8 +1083,7 @@ func TestTryEnrich_DetailsMatch_RequiresAllKeys(t *testing.T) {
 		&moderator, ActorUser, "modUser", "spam", MatchFirst, 0)
 	assert.Equal(t, 0, enriched, "missing author_id must not match")
 
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-	assert.EqualValues(t, 1, countRows(t, guildID))
+	waitForRows(t, guildID, 1)
 
 	var row model.AuditLogEntry
 	require.NoError(t, model.DB.Where("guild_id = ?", guildID).First(&row).Error)
