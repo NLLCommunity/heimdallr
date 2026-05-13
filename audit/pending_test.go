@@ -398,6 +398,159 @@ func TestTryEnrichWithFallback_PersistsCategory(t *testing.T) {
 		"fallback row must carry its Category — retention pruning and viewer filters depend on it")
 }
 
+// FlushPending must commit unconsumed fallback rows on shutdown — the
+// cold-cache event would otherwise be silently dropped if the bot exits
+// before pendingTTL fires.
+func TestTryEnrichWithFallback_FlushCommitsFallback(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1305)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(13051)
+	moderator := snowflake.ID(13052)
+
+	fallback := Entry{
+		GuildID:    guildID,
+		Category:   CategoryMember,
+		EventType:  EventMemberNickChange,
+		ActorID:    &moderator,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+		Details:    map[string]any{"nick_before": "old", "nick_after": "new"},
+	}
+
+	TryEnrichWithFallback(guildID, EventMemberNickChange, &target, nil,
+		&moderator, ActorUser, "modUser", "", MatchFirst, 0, fallback)
+
+	// Pre-TTL: nothing committed yet — the enrichment is sitting in the
+	// buffer waiting for a gateway entry that will never come.
+	assert.EqualValues(t, 0, countRows(t, guildID))
+
+	// Bot shutdown mid-window.
+	FlushPending()
+
+	assert.EqualValues(t, 1, countRows(t, guildID),
+		"FlushPending must commit unconsumed fallback so cold-cache event isn't lost on shutdown")
+}
+
+// FlushPending must NOT commit a fallback whose enrichment was already
+// consumed by an inline gateway entry — that row was committed by the
+// gateway path and committing the fallback too would duplicate.
+func TestTryEnrichWithFallback_FlushSkipsConsumedFallback(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1306)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(13061)
+	moderator := snowflake.ID(13062)
+
+	fallback := Entry{
+		GuildID:    guildID,
+		Category:   CategoryMember,
+		EventType:  EventMemberNickChange,
+		ActorID:    &moderator,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+		Details:    map[string]any{"nick_before": "old", "nick_after": "new"},
+	}
+
+	// Native arrives first → buffered with fallback.
+	TryEnrichWithFallback(guildID, EventMemberNickChange, &target, nil,
+		&moderator, ActorUser, "modUser", "", MatchFirst, 0, fallback)
+	// Gateway arrives → consumes the enrichment, commits the row.
+	LogPending(Entry{
+		GuildID:    guildID,
+		EventType:  EventMemberNickChange,
+		Category:   CategoryMember,
+		ActorKind:  ActorUnknown,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+		Details:    map[string]any{"nick_before": "old", "nick_after": "new"},
+	}, []EnrichField{EnrichActor, EnrichReason})
+
+	assert.EqualValues(t, 1, countRows(t, guildID))
+
+	// Now shutdown. The buffered enrichment was already removed by
+	// LogPending, but the timer may still be alive — FlushPending must
+	// not double-commit.
+	FlushPending()
+
+	assert.EqualValues(t, 1, countRows(t, guildID),
+		"FlushPending must not duplicate a fallback whose enrichment was already consumed")
+}
+
+// Exercises the race between expireEnrichment and FlushPending: if
+// expireEnrichment has set en.expired = true but FlushPending swaps the
+// buffer before expireEnrichment can re-acquire buffer.mu, expireEnrichment
+// sees stillInBuffer = false and skips. Without the fallbackCommitted
+// check-and-set, FlushPending would also see expired = true and skip,
+// silently dropping the row. The check-and-set guarantees exactly one
+// path commits.
+//
+// Reproduces the race deterministically by setting en.expired manually
+// before calling FlushPending (simulating expireEnrichment having
+// claimed but not yet committed).
+func TestTryEnrichWithFallback_ExpireFlushRace(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1307)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(13071)
+	moderator := snowflake.ID(13072)
+
+	fallback := Entry{
+		GuildID:    guildID,
+		Category:   CategoryMember,
+		EventType:  EventMemberNickChange,
+		ActorID:    &moderator,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+		Details:    map[string]any{"nick_before": "old", "nick_after": "new"},
+	}
+
+	TryEnrichWithFallback(guildID, EventMemberNickChange, &target, nil,
+		&moderator, ActorUser, "modUser", "", MatchFirst, 0, fallback)
+
+	// Locate the buffered enrichment and simulate expireEnrichment's
+	// partial progress: en.expired set, but the buffer still contains
+	// the entry. (Real expireEnrichment would release en.mu here and
+	// race for buffer.mu against FlushPending.)
+	pendingBuffer.mu.Lock()
+	var en *pendingEnrichment
+	for _, list := range pendingBuffer.enrichments {
+		if len(list) > 0 {
+			en = list[0]
+			break
+		}
+	}
+	pendingBuffer.mu.Unlock()
+	require.NotNil(t, en, "enrichment should have been buffered")
+
+	en.mu.Lock()
+	en.expired = true
+	en.mu.Unlock()
+
+	// Now run FlushPending. With the buggy "skip if expired" check it
+	// would observe en.expired == true and skip; with the fallbackCommitted
+	// check-and-set it commits the fallback because nobody else has yet.
+	FlushPending()
+
+	// Give any in-flight timer callback a moment to run; it should bail
+	// on en.expired without writing anything (and FlushPending stopped
+	// the timer anyway).
+	time.Sleep(pendingTTL + 100*time.Millisecond)
+
+	assert.EqualValues(t, 1, countRows(t, guildID),
+		"FlushPending must commit fallback even when expireEnrichment claimed it but didn't get to commit")
+}
+
 // MatchAll + fallback is unsupported (would duplicate). The pairing must
 // drop the fallback rather than silently emit two rows.
 func TestTryEnrichWithFallback_MatchAllDropsFallback(t *testing.T) {

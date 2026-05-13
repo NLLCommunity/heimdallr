@@ -157,6 +157,12 @@ type pendingEnrichment struct {
 	// no pending entry ever arrives. On warm cache the gateway entry
 	// matches first and the fallback is discarded.
 	fallback *Entry
+	// fallbackCommitted is set under en.mu by whichever path (TTL expiry
+	// or FlushPending) succeeds in committing the fallback. Both paths
+	// do check-and-set under the same lock so they can't double-commit
+	// if a shutdown coincides with TTL: one wins the claim and calls
+	// Log, the other observes fallbackCommitted == true and skips.
+	fallbackCommitted bool
 }
 
 // pendingBuffer holds entries waiting for native-audit enrichment and
@@ -347,9 +353,12 @@ func TryEnrich(
 // fallback, the fallback is dropped with a warning and the call falls
 // back to plain TryEnrich semantics.
 //
-// shouldLog is rechecked at fallback-commit time (the toggle could flip
-// between TryEnrich and TTL expiry), so a guild that disables audit
-// logging mid-window won't receive backdoor rows.
+// The fallback commit is routed through Log (not the package-internal
+// commit) so it inherits Category derivation, the empty-Category warning
+// + drop, and the shouldLog re-check — meaning a guild that disables
+// audit logging between TryEnrich and TTL expiry won't get backdoor rows
+// and a caller that forgets to set Category won't silently produce a
+// broken row.
 func TryEnrichWithFallback(
 	guildID snowflake.ID,
 	eventType EventType,
@@ -530,21 +539,22 @@ func FlushPending() {
 	}
 	for _, list := range allEnrichments {
 		for _, en := range list {
+			// Check-and-set fallbackCommitted under en.mu — see the
+			// comment on expireEnrichment for the race we're defending
+			// against. en.expired is set unconditionally so any in-flight
+			// timer callback bails on entry rather than doing redundant
+			// buffer work.
 			en.mu.Lock()
-			alreadyExpired := en.expired
 			en.expired = true
 			en.timer.Stop()
 			fallback := en.fallback
+			won := fallback != nil && !en.fallbackCommitted
+			if won {
+				en.fallbackCommitted = true
+			}
 			en.mu.Unlock()
-			// On shutdown, preserve cold-cache fallbacks the same way
-			// expireEnrichment would have at TTL. Skip if the enrichment
-			// already expired (its expire path either committed the
-			// fallback already or there was no fallback to commit).
-			// shouldLog gate mirrors expireEnrichment's: a guild may
-			// have disabled audit logging between buffer time and the
-			// flush, and the fallback bypasses LogPending / Log.
-			if !alreadyExpired && fallback != nil && shouldLog(fallback.GuildID) {
-				commit(*fallback)
+			if won {
+				Log(*fallback)
 			}
 		}
 	}
@@ -600,6 +610,14 @@ func flushOne(pe *pendingEntry) {
 // TryEnrichWithFallback). That's the cold-cache moderator-action case:
 // the native side has full details and the gateway will never file a
 // pending entry, so we commit the fallback to preserve the event.
+//
+// Race with FlushPending: if a shutdown swaps the buffer between us
+// releasing en.mu and re-acquiring buffer.mu, our stillInBuffer check
+// returns false (FlushPending emptied the map) and FlushPending sees the
+// enrichment in its swapped-out list. Both paths could be tempted to
+// commit — or worse, both could skip. The check-and-set on
+// en.fallbackCommitted under en.mu resolves it: whichever path claims
+// the flag first commits, the other observes the flag and skips.
 func expireEnrichment(key pendingKey, en *pendingEnrichment) {
 	en.mu.Lock()
 	if en.expired {
@@ -625,20 +643,26 @@ func expireEnrichment(key pendingKey, en *pendingEnrichment) {
 	}
 	pendingBuffer.mu.Unlock()
 
-	// Only commit the fallback if this path was the one that removed the
-	// enrichment from the buffer. LogPending's findAndRemoveEnrichmentLocked
-	// runs under buffer.mu and may have already consumed the enrichment for
-	// a late-arriving gateway entry between en.mu being released and us
-	// re-acquiring buffer.mu — in that case the gateway side will commit
-	// the enriched row and the fallback would be a duplicate.
-	//
-	// Re-check shouldLog here even though TryEnrich was already called:
-	// the fallback commit bypasses LogPending / Log (which gate on the
-	// toggle), and a guild could have disabled audit logging between
-	// buffer time and TTL expiry. Without this gate, disabled guilds
-	// would receive backdoor rows.
-	if stillInBuffer && fallback != nil && shouldLog(fallback.GuildID) {
-		commit(*fallback)
+	// stillInBuffer false means either LogPending consumed (gateway took
+	// the row) or FlushPending swapped the buffer mid-flight (FlushPending
+	// will commit the fallback). Either way, leave the commit to the
+	// other path.
+	if !stillInBuffer || fallback == nil {
+		return
+	}
+
+	// Claim the right to commit. Route through Log so the fallback
+	// inherits Category derivation, the empty-Category drop-with-warning,
+	// and a re-check of shouldLog (the toggle could flip between
+	// TryEnrich and TTL expiry).
+	en.mu.Lock()
+	won := !en.fallbackCommitted
+	if won {
+		en.fallbackCommitted = true
+	}
+	en.mu.Unlock()
+	if won {
+		Log(*fallback)
 	}
 }
 
