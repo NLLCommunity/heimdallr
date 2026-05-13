@@ -43,18 +43,15 @@ func OnAuditMemberUpdate(e *events.GuildMemberUpdate) {
 	// state. If the member wasn't cached (common after a bot restart, or
 	// for guilds large enough that disgo hasn't chunked every member
 	// yet), OldMember is the zero value: empty role list, nil timeout,
-	// nil nick, zero User.ID. Diffing against a zero value would produce
-	// false "X changed from nothing to current value" entries for the
-	// fields whose old state matters (nick, roles), so we bail those.
-	// Timeout-add is the exception — a non-nil new timeout is unambiguous
-	// (the member IS timed out right now) and that's the single highest-
-	// severity member event admins audit, especially post-restart. We
-	// still can't safely emit timeout-clear on cold cache because a nil
-	// new state is indistinguishable from "never timed out".
+	// nil nick, zero User.ID. We can't tell whether THIS event changed
+	// anything or just happened to fire for an already-timed-out /
+	// already-nicked member, so emitting any audit row here would falsely
+	// pin a state change to this event's timestamp. Bail entirely; the
+	// missed events on cold cache (rare; cache fills within the first
+	// gateway events) are still recoverable from Discord's native audit
+	// log if a moderator needs to cross-check actions taken during
+	// startup.
 	if old.User.ID == 0 {
-		if updated.CommunicationDisabledUntil != nil {
-			emit(audit.EventMemberTimeoutAdd, map[string]any{"timeout_until": updated.CommunicationDisabledUntil})
-		}
 		return
 	}
 
@@ -88,8 +85,10 @@ func OnAuditMemberUpdate(e *events.GuildMemberUpdate) {
 		// since the prior one was effectively replaced.
 		emit(audit.EventMemberTimeoutAdd, map[string]any{"timeout_until": newTimeout})
 	}
-	// GuildMemberUpdate also fires for presence/avatar/etc. — those leave
-	// all four branches above silent, which is the correct outcome.
+	// GuildMemberUpdate also fires for avatar / public_flags / pending
+	// changes — those leave all four branches above silent, which is the
+	// correct outcome. Presence changes go through PresenceUpdate, not
+	// here.
 }
 
 func resolveRoles(client *bot.Client, guildID snowflake.ID, ids []snowflake.ID) []map[string]any {

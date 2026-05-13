@@ -103,11 +103,18 @@ type pendingEntry struct {
 	mu         sync.Mutex
 }
 
-// pendingEnrichment is a native-audit-log fact that's waiting for its
-// matching gateway entry. Stored when TryEnrich is called before the
-// gateway listener has filed its pending entry — fixes the race where
-// Discord's audit log entry handler runs ahead of the gateway event
-// handler.
+// pendingEnrichment is a native-audit-log fact that's waiting to enrich
+// gateway entries. TryEnrich buffers one in three situations:
+//   - no gateway entry exists yet (the native-first race — Discord's
+//     audit log entry handler runs ahead of the gateway handler).
+//   - MatchAll with maxMatches == 0 → unlimited sticky for the TTL
+//     window (used when the burst size is unknown, e.g. bulk delete
+//     missing Options.Count).
+//   - MatchAll with maxMatches > 0 and residual budget left after the
+//     inline matches consume the immediately-available entries.
+//
+// In all three the enrichment sits until either a matching gateway
+// entry arrives (consume) or the TTL fires (drop).
 //
 // actorUsername lets the enrichment overwrite Details["actor_username"]
 // when the actor itself is being replaced (e.g. self-delete row enriched
