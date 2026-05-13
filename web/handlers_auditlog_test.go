@@ -93,12 +93,12 @@ func TestParseAuditLogFilters_TrimsAndLowercases(t *testing.T) {
 	assert.Equal(t, "message.delete", f.EventType)
 }
 
-// resolveActorQuery and resolveTargetQuery touch client.Caches.Members /
-// ChannelsForGuild only on the non-snowflake fallback. We don't have a
-// bot.Client fake in this package, so we cover the paths that don't dip
-// into the cache: empty, whitespace-only, bare snowflake, and snowflake
-// with a scoping prefix.
-
+// TestResolveActorQuery_NoCachePaths and TestResolveTargetQuery_NoCachePaths
+// below exercise the paths through resolveActorQuery / resolveTargetQuery
+// that don't touch client.Caches.Members or ChannelsForGuild. The cache-
+// dipping paths (non-snowflake substring matching) need a bot.Client fake
+// that this package doesn't have, so the snowflake fast-path, empty
+// input, whitespace, and prefix-only inputs are what's covered here.
 func TestResolveActorQuery_NoCachePaths(t *testing.T) {
 	t.Run("empty input returns empty result", func(t *testing.T) {
 		ids, text := resolveActorQuery(nil, 0, "")
@@ -164,16 +164,25 @@ func TestResolveTargetQuery_NoCachePaths(t *testing.T) {
 		assert.Equal(t, snowflake.ID(175928847299117063), chIDs[0])
 		assert.Equal(t, "", text)
 	})
-	t.Run("#-prefixed snowflake parses after prefix strip", func(t *testing.T) {
+	t.Run("#-prefixed snowflake also matches details.channel_id", func(t *testing.T) {
+		// #-prefix says "this snowflake is a channel": match target_id
+		// (channel-target events) AND details.channel_id (message events
+		// that happened in the channel).
 		ids, chIDs, text := resolveTargetQuery(nil, 0, "#175928847299117063")
 		require.Len(t, ids, 1)
 		require.Len(t, chIDs, 1)
+		assert.Equal(t, snowflake.ID(175928847299117063), ids[0])
+		assert.Equal(t, snowflake.ID(175928847299117063), chIDs[0])
 		assert.Equal(t, "", text)
 	})
-	t.Run("@-prefixed snowflake parses after prefix strip", func(t *testing.T) {
+	t.Run("@-prefixed snowflake skips details.channel_id", func(t *testing.T) {
+		// @-prefix says "this snowflake is a user": match target_id only.
+		// channelIDs must be empty so we don't also match message events
+		// whose channel happens to share the user's snowflake.
 		ids, chIDs, text := resolveTargetQuery(nil, 0, "@175928847299117063")
 		require.Len(t, ids, 1)
-		require.Len(t, chIDs, 1)
+		assert.Nil(t, chIDs, "@-scoped query must not populate channelIDs")
+		assert.Equal(t, snowflake.ID(175928847299117063), ids[0])
 		assert.Equal(t, "", text)
 	})
 }

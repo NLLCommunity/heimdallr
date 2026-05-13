@@ -571,6 +571,16 @@ func resolveActorQuery(client *bot.Client, guildID snowflake.ID, query string) (
 //   - text: query for the LIKE fallback against details.target_username.
 //
 // Leading "#" or "@" scopes the search; bare input matches both kinds.
+// The snowflake fast-path respects the same scoping — an "@id" query
+// only matches target_id (treating the ID as a user) while "#id" also
+// extends the match to details.channel_id (treating the ID as a channel).
+//
+// When both user and channel matchers run (bare query), they overflow
+// independently: a query that matches too many cached members may drop
+// its user-ID contribution while the channel matcher still contributes
+// IDs (or vice versa). The text return is always populated for
+// non-snowflake queries, so the LIKE fallback against details still
+// covers the overflowed side.
 func resolveTargetQuery(client *bot.Client, guildID snowflake.ID, query string) (ids []snowflake.ID, channelIDs []snowflake.ID, text string) {
 	// Normalise whitespace before deciding scope so " #general" still
 	// reads as a channel-only query, then strip the scoping prefix.
@@ -582,7 +592,16 @@ func resolveTargetQuery(client *bot.Client, guildID snowflake.ID, query string) 
 		return nil, nil, ""
 	}
 	if id, err := snowflake.Parse(query); err == nil {
-		return []snowflake.ID{id}, []snowflake.ID{id}, ""
+		// target_id stores the user for user-target events and the channel
+		// for channel-target events, so any scope wants the snowflake in
+		// ids. channelIDs (which matches details.channel_id on message
+		// events) is only meaningful when the caller hinted "this is a
+		// channel" with the # prefix or didn't scope at all.
+		ids = []snowflake.ID{id}
+		if wantChannel {
+			channelIDs = []snowflake.ID{id}
+		}
+		return ids, channelIDs, ""
 	}
 	if wantUser {
 		ids = append(ids, matchMembersByUsername(client, guildID, query)...)
@@ -595,12 +614,36 @@ func resolveTargetQuery(client *bot.Client, guildID snowflake.ID, query string) 
 	return ids, channelIDs, query
 }
 
+// matchResolutionCap bounds how many cached IDs a substring match contributes
+// to the model filter. Each ID becomes a bound parameter in an IN (?,?,...)
+// list, and SQLite caps the total bound parameters per statement at
+// SQLITE_MAX_VARIABLE_NUMBER (999 by default, 32766 on 3.32+ — not portable
+// to assume the larger value). On a busy guild a permissive query like "a"
+// could match thousands of cached members and exceed that limit, erroring
+// the whole query. When a matcher overflows we drop the cache-precise IDs
+// and let the LIKE fallback against details.{actor,target}_username handle
+// it — less precise (only catches events whose details enriched the
+// username), but it never blows up the query. Sized well under SQLite's
+// budget after accounting for the other clauses in the same statement
+// (guild_id, category, event_type, From, To, the sibling actor/target
+// person clause, and the second person clause's own ID list).
+//
+// "Drop all on overflow" is intentional rather than "keep the first N":
+// a partial cache-precise match would silently bias the result toward
+// whatever subset of members the cache iterator emitted first, which is
+// implementation-dependent. Falling back to LIKE gives a result the user
+// can reason about.
+const matchResolutionCap = 200
+
 func matchMembersByUsername(client *bot.Client, guildID snowflake.ID, query string) []snowflake.ID {
 	q := strings.ToLower(query)
 	var ids []snowflake.ID
 	for member := range client.Caches.Members(guildID) {
 		if strings.Contains(strings.ToLower(member.User.Username), q) {
 			ids = append(ids, member.User.ID)
+			if len(ids) > matchResolutionCap {
+				return nil
+			}
 		}
 	}
 	return ids
@@ -612,6 +655,9 @@ func matchChannelsByName(client *bot.Client, guildID snowflake.ID, query string)
 	for ch := range client.Caches.ChannelsForGuild(guildID) {
 		if strings.Contains(strings.ToLower(ch.Name()), q) {
 			ids = append(ids, ch.ID())
+			if len(ids) > matchResolutionCap {
+				return nil
+			}
 		}
 	}
 	return ids

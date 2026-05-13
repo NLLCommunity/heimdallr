@@ -488,7 +488,7 @@ func auditLogPagination(data AuditLogTableData) templ.Component {
 // "← Newer" link is the way back.
 func paginationLabel(page, pageSize, count int, total int64) string {
 	if count == 0 {
-		return fmt.Sprintf("Page %d is empty — %d entries total", page, total)
+		return fmt.Sprintf("Page %d is empty (%d entries total)", page, total)
 	}
 	start := (page-1)*pageSize + 1
 	end := (page-1)*pageSize + count
