@@ -796,9 +796,10 @@ func cloneEntry(e Entry) Entry {
 // booleans) are immutable from Go's perspective and copied via assignment;
 // nested maps and slices are recursively cloned so the result shares no
 // mutable storage with the input. Unrecognised composite types fall through
-// to a shallow assignment — callers using exotic value shapes must clone
-// them themselves; current audit listeners only emit string / float /
-// map / slice combinations.
+// to a shallow assignment — callers using exotic mutable value shapes must
+// clone them themselves. Current audit listeners also emit shallow-copied
+// pointer values such as *time.Time (for example timeout_until), in addition
+// to string / float / map / slice combinations.
 func cloneDetails(d map[string]any) map[string]any {
 	if d == nil {
 		return nil
