@@ -14,13 +14,17 @@ import (
 // so a first-time visit isn't a full-history scan. The form then shows
 // that defaulted date; users can clear it to widen the window.
 type AuditLogData struct {
-	GuildID  string
-	Enabled  bool
-	Filters  AuditLogFilters
-	Rows     []partials.AuditLogRow
-	Total    int64
-	Page     int
-	PageSize int
+	GuildID string
+	Enabled bool
+	Filters AuditLogFilters
+	// FilterQuery is the URL-encoded representation of Filters (no leading
+	// "?", no page parameter). Threaded through to the table partial so
+	// pagination links can include the active filters in their hrefs.
+	FilterQuery string
+	Rows        []partials.AuditLogRow
+	Total       int64
+	Page        int
+	PageSize    int
 	// EventOptions is the list of event types to populate in the dropdown.
 	// Sourced from the audit package's catalog so the page doesn't need its
 	// own list to keep in sync.
@@ -63,11 +67,12 @@ templ AuditLog(nav layouts.NavData, data AuditLogData) {
 			@auditLogFilterForm(data)
 			<div id="auditlog-table">
 				@partials.AuditLogTable(partials.AuditLogTableData{
-					GuildID:  data.GuildID,
-					Rows:     data.Rows,
-					Total:    data.Total,
-					Page:     data.Page,
-					PageSize: data.PageSize,
+					GuildID:     data.GuildID,
+					Rows:        data.Rows,
+					Total:       data.Total,
+					Page:        data.Page,
+					PageSize:    data.PageSize,
+					FilterQuery: data.FilterQuery,
 				})
 			</div>
 		}

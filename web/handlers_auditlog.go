@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -62,16 +63,18 @@ func handleAuditLog(client *bot.Client) http.HandlerFunc {
 		}
 
 		rows := buildAuditLogRows(client, guildID, entries)
+		filterQuery := auditLogFilterQuery(filters)
 
 		// HTMX form submits target the table only — return just the partial
 		// so we don't repaint the filter form's input state.
 		if r.Header.Get("HX-Request") == "true" && r.Header.Get("HX-Target") == "auditlog-table" {
 			renderSafe(w, r, partials.AuditLogTable(partials.AuditLogTableData{
-				GuildID:  guildIDStr,
-				Rows:     rows,
-				Total:    total,
-				Page:     page,
-				PageSize: auditLogPageSize,
+				GuildID:     guildIDStr,
+				Rows:        rows,
+				Total:       total,
+				Page:        page,
+				PageSize:    auditLogPageSize,
+				FilterQuery: filterQuery,
 			}))
 			return
 		}
@@ -89,6 +92,7 @@ func handleAuditLog(client *bot.Client) http.HandlerFunc {
 			GuildID:      guildIDStr,
 			Enabled:      settings.AuditLogEnabled,
 			Filters:      filters,
+			FilterQuery:  filterQuery,
 			Rows:         rows,
 			Total:        total,
 			Page:         page,
@@ -484,6 +488,38 @@ func refineMemberUpdateLabel(fallback string, d map[string]any) string {
 		return "Nickname changed"
 	}
 	return fallback
+}
+
+// auditLogFilterQuery URL-encodes the active filters as a query string
+// fragment WITHOUT a leading "?" and WITHOUT the page parameter. Used by
+// the pagination links so the href and hx-get URL stand alone: a user
+// opening "← Newer" in a new tab, or browsing without HTMX, gets the
+// same filtered view they had on-page rather than an unfiltered scan.
+//
+// hx-include="form" already supplies these values for the in-page HTMX
+// request, but it doesn't influence the rendered href, so we still need
+// the values embedded explicitly for non-HTMX navigation.
+func auditLogFilterQuery(f pages.AuditLogFilters) string {
+	v := url.Values{}
+	if f.Category != "" {
+		v.Set("category", f.Category)
+	}
+	if f.EventType != "" {
+		v.Set("event_type", f.EventType)
+	}
+	if f.Actor != "" {
+		v.Set("actor", f.Actor)
+	}
+	if f.Target != "" {
+		v.Set("target", f.Target)
+	}
+	if f.From != "" {
+		v.Set("from", f.From)
+	}
+	if f.To != "" {
+		v.Set("to", f.To)
+	}
+	return v.Encode()
 }
 
 // parseAuditLogFilters reads the filter values out of the query string into
