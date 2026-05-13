@@ -38,6 +38,7 @@
 package audit
 
 import (
+	"log/slog"
 	"sync"
 	"time"
 
@@ -148,6 +149,14 @@ type pendingEnrichment struct {
 	timer           *time.Timer
 	expired         bool
 	mu              sync.Mutex
+	// fallback, if non-nil, is committed verbatim when the enrichment
+	// expires without consuming a pending entry. Used for events the
+	// native side can fully reconstruct on its own — moderator-driven
+	// member nick/role/timeout changes specifically, where the gateway
+	// listener bails on cold cache (no old state to diff against) and
+	// no pending entry ever arrives. On warm cache the gateway entry
+	// matches first and the fallback is discarded.
+	fallback *Entry
 }
 
 // pendingBuffer holds entries waiting for native-audit enrichment and
@@ -316,6 +325,69 @@ func TryEnrich(
 	match MatchMode,
 	maxMatches int,
 ) int {
+	return tryEnrich(guildID, eventType, targetID, requiredDetails, actorID, actorKind, actorUsername, reason, match, maxMatches, nil)
+}
+
+// TryEnrichWithFallback is TryEnrich plus a fallback Entry that is
+// committed if the enrichment is buffered and its TTL elapses without
+// consuming a pending entry. Use this for events the native audit log
+// fully describes on its own — moderator-driven member changes (nick,
+// role, timeout) where a cold gateway cache makes our own listener bail
+// and no pending entry will arrive.
+//
+// On warm cache the gateway pending entry matches first; the enrichment
+// is consumed inline and the fallback is dropped without being written.
+// On cold cache the buffered enrichment times out, expireEnrichment
+// commits the fallback, and the event is preserved with full attribution
+// from Discord's native side.
+//
+// The fallback path is only well-defined for MatchFirst — MatchAll can
+// serve N inline matches AND then commit the fallback at TTL, producing
+// a duplicate. If a non-MatchFirst match mode is passed with a non-nil
+// fallback, the fallback is dropped with a warning and the call falls
+// back to plain TryEnrich semantics.
+//
+// shouldLog is rechecked at fallback-commit time (the toggle could flip
+// between TryEnrich and TTL expiry), so a guild that disables audit
+// logging mid-window won't receive backdoor rows.
+func TryEnrichWithFallback(
+	guildID snowflake.ID,
+	eventType EventType,
+	targetID *snowflake.ID,
+	requiredDetails map[string]string,
+	actorID *snowflake.ID,
+	actorKind ActorKind,
+	actorUsername string,
+	reason string,
+	match MatchMode,
+	maxMatches int,
+	fallback Entry,
+) int {
+	return tryEnrich(guildID, eventType, targetID, requiredDetails, actorID, actorKind, actorUsername, reason, match, maxMatches, &fallback)
+}
+
+func tryEnrich(
+	guildID snowflake.ID,
+	eventType EventType,
+	targetID *snowflake.ID,
+	requiredDetails map[string]string,
+	actorID *snowflake.ID,
+	actorKind ActorKind,
+	actorUsername string,
+	reason string,
+	match MatchMode,
+	maxMatches int,
+	fallback *Entry,
+) int {
+	// MatchAll + fallback is unsupported: the enrichment can serve N
+	// inline matches AND then commit the fallback at TTL, producing a
+	// duplicate. Drop the fallback rather than introduce a quietly-wrong
+	// row. Only MatchFirst guarantees "inline match OR fallback, not both".
+	if fallback != nil && match != MatchFirst {
+		slog.Warn("audit: dropping fallback paired with non-MatchFirst — unsupported combination",
+			"guild_id", guildID, "event_type", eventType)
+		fallback = nil
+	}
 	// Clamp negative caps to "unlimited" so misbehaving callers can't
 	// accidentally disable the buffered-enrichment path with -1.
 	if maxMatches < 0 {
@@ -388,6 +460,7 @@ func TryEnrich(
 			reason:          reason,
 			match:           match,
 			remaining:       bufferRemaining,
+			fallback:        fallback,
 		}
 		en.timer = time.AfterFunc(pendingTTL, func() {
 			expireEnrichment(key, en)
@@ -458,9 +531,21 @@ func FlushPending() {
 	for _, list := range allEnrichments {
 		for _, en := range list {
 			en.mu.Lock()
+			alreadyExpired := en.expired
 			en.expired = true
 			en.timer.Stop()
+			fallback := en.fallback
 			en.mu.Unlock()
+			// On shutdown, preserve cold-cache fallbacks the same way
+			// expireEnrichment would have at TTL. Skip if the enrichment
+			// already expired (its expire path either committed the
+			// fallback already or there was no fallback to commit).
+			// shouldLog gate mirrors expireEnrichment's: a guild may
+			// have disabled audit logging between buffer time and the
+			// flush, and the fallback bypasses LogPending / Log.
+			if !alreadyExpired && fallback != nil && shouldLog(fallback.GuildID) {
+				commit(*fallback)
+			}
 		}
 	}
 }
@@ -507,10 +592,14 @@ func flushOne(pe *pendingEntry) {
 }
 
 // expireEnrichment removes an unconsumed enrichment from the buffer when
-// its TTL fires. No commit happens — an unmatched enrichment is just an
-// audit log entry Discord told us about that we never saw via gateway,
-// which we deliberately do not record (we only persist gateway-witnessed
-// events to keep one row per real-world action).
+// its TTL fires. By default no commit happens — an unmatched enrichment
+// is just a native audit log entry we never saw via gateway, which we
+// deliberately do not record (one row per real-world action).
+//
+// The exception is when the enrichment carries a fallback Entry (set by
+// TryEnrichWithFallback). That's the cold-cache moderator-action case:
+// the native side has full details and the gateway will never file a
+// pending entry, so we commit the fallback to preserve the event.
 func expireEnrichment(key pendingKey, en *pendingEnrichment) {
 	en.mu.Lock()
 	if en.expired {
@@ -518,12 +607,15 @@ func expireEnrichment(key pendingKey, en *pendingEnrichment) {
 		return
 	}
 	en.expired = true
+	fallback := en.fallback
 	en.mu.Unlock()
 
+	var stillInBuffer bool
 	pendingBuffer.mu.Lock()
 	list := pendingBuffer.enrichments[key]
 	for i, e := range list {
 		if e == en {
+			stillInBuffer = true
 			pendingBuffer.enrichments[key] = append(list[:i], list[i+1:]...)
 			if len(pendingBuffer.enrichments[key]) == 0 {
 				delete(pendingBuffer.enrichments, key)
@@ -532,6 +624,22 @@ func expireEnrichment(key pendingKey, en *pendingEnrichment) {
 		}
 	}
 	pendingBuffer.mu.Unlock()
+
+	// Only commit the fallback if this path was the one that removed the
+	// enrichment from the buffer. LogPending's findAndRemoveEnrichmentLocked
+	// runs under buffer.mu and may have already consumed the enrichment for
+	// a late-arriving gateway entry between en.mu being released and us
+	// re-acquiring buffer.mu — in that case the gateway side will commit
+	// the enriched row and the fallback would be a duplicate.
+	//
+	// Re-check shouldLog here even though TryEnrich was already called:
+	// the fallback commit bypasses LogPending / Log (which gate on the
+	// toggle), and a guild could have disabled audit logging between
+	// buffer time and TTL expiry. Without this gate, disabled guilds
+	// would receive backdoor rows.
+	if stillInBuffer && fallback != nil && shouldLog(fallback.GuildID) {
+		commit(*fallback)
+	}
 }
 
 // matchesTarget returns true when filterTarget matches entryTarget. nil
