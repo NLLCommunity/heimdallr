@@ -12,7 +12,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+func Register(r handler.Router) []discord.ApplicationCommandCreate {
 	r.Route(
 		"/kick", func(r handler.Router) {
 			r.Command("/with-message", KickWithMessageHandler)

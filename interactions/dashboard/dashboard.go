@@ -15,7 +15,7 @@ import (
 // authentication itself happens via Discord OAuth on the web side, so the
 // command stays open to everyone in the guild and the dashboard enforces
 // per-page access via OAuth + the configured PostsModRoleID setting.
-func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+func Register(r handler.Router) []discord.ApplicationCommandCreate {
 	r.Command("/dashboard", Handler)
 	return []discord.ApplicationCommandCreate{Command}
 }

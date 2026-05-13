@@ -15,7 +15,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+func Register(r handler.Router) []discord.ApplicationCommandCreate {
 	r.Command("/modmail-admin/create-button", ModmailAdminCreateButtonHandler)
 	r.Command("/modmail-admin/settings", ModmailSettingsHandler)
 	r.Component("/modmail/report-button/{role}/{channel}/{max-active}/{slow-mode}", ModmailReportButtonHandler)

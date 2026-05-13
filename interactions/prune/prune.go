@@ -20,7 +20,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+func Register(r handler.Router) []discord.ApplicationCommandCreate {
 	r.Command("/prune-pending-members", PruneHandler)
 	r.Component("/button/prune-members/confirm/{pruneID}", PruneConfirmHandler)
 	r.Component("/button/prune-members/cancel/{pruneID}", PruneCancelHandler)

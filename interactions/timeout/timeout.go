@@ -11,7 +11,7 @@ import (
 	"github.com/disgoorg/omit"
 )
 
-func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+func Register(r handler.Router) []discord.ApplicationCommandCreate {
 	r.Command("/timeout", TimeoutHandler)
 	return []discord.ApplicationCommandCreate{TimeoutCommand}
 }

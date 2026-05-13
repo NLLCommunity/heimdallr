@@ -18,7 +18,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+func Register(r handler.Router) []discord.ApplicationCommandCreate {
 	r.Command("/ban", BanHandler)
 	return []discord.ApplicationCommandCreate{BanCommand}
 }

@@ -5,7 +5,7 @@ import (
 	"github.com/disgoorg/disgo/handler"
 )
 
-func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+func Register(r handler.Router) []discord.ApplicationCommandCreate {
 	r.Command("/create-role-button", CreateRoleButtonHandler)
 	r.Component("/role/assign/{roleID}", RoleAssignButtonHandler)
 

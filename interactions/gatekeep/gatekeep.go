@@ -20,7 +20,7 @@ import (
 var activeApprovalProcesses = make(map[snowflake.ID]bool)
 var activeApprovalMutex = &sync.Mutex{}
 
-func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+func Register(r handler.Router) []discord.ApplicationCommandCreate {
 	r.Command("/approve", ApproveSlashCommandHandler)
 	r.Command("/Approve", ApproveUserCommandHandler)
 

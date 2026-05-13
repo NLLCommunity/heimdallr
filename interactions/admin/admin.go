@@ -11,7 +11,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+func Register(r handler.Router) []discord.ApplicationCommandCreate {
 	r.Route(
 		"/admin", func(r handler.Router) {
 			r.Component("/show-all-button", AdminShowAllButtonHandler)

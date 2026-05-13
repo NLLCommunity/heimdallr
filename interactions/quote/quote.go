@@ -20,7 +20,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+func Register(r handler.Router) []discord.ApplicationCommandCreate {
 	r.Command("/quote", QuoteHandler)
 	r.Command("/Copy to New Forum Thread", CreateForumPostHandler)
 	r.Modal("/quote/forum-post/{channelID}/{messageID}", CreateForumPostModalHandler)
