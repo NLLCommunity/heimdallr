@@ -45,12 +45,17 @@ func OnAuditMemberUpdate(e *events.GuildMemberUpdate) {
 	// yet), OldMember is the zero value: empty role list, nil timeout,
 	// nil nick, zero User.ID. We can't tell whether THIS event changed
 	// anything or just happened to fire for an already-timed-out /
-	// already-nicked member, so emitting any audit row here would falsely
-	// pin a state change to this event's timestamp. Bail entirely; the
-	// missed events on cold cache (rare; cache fills within the first
-	// gateway events) are still recoverable from Discord's native audit
-	// log if a moderator needs to cross-check actions taken during
-	// startup.
+	// already-nicked member, so bailing avoids falsely pinning pre-
+	// existing state to this event's timestamp.
+	//
+	// The cold-cache MODERATOR case is rescued by the native-enrichment
+	// listener: it calls TryEnrichWithFallback, so when no pending entry
+	// arrives (because we bailed here), the buffered enrichment's
+	// fallback Entry is committed at TTL — preserving the row with full
+	// attribution from Discord's Changes payload. Self-actions during
+	// cold cache still get lost (Discord doesn't audit self-changes),
+	// which is acceptable: the same gap exists in Discord's own audit
+	// log.
 	if old.User.ID == 0 {
 		return
 	}
