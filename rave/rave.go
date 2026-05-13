@@ -3,6 +3,8 @@ package rave
 import (
 	"errors"
 	"reflect"
+	"strings"
+	"unicode"
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
@@ -45,7 +47,7 @@ func ParseSlashCommandArgs[T any](e *handler.CommandEvent) (data *T, err error) 
 	data = new(T)
 	scid := e.SlashCommandInteractionData()
 
-	dataType := reflect.TypeFor[*T]()
+	dataType := reflect.TypeFor[T]()
 	dataValue := reflect.ValueOf(data)
 	dataElem := dataValue.Elem()
 
@@ -61,15 +63,15 @@ func ParseSlashCommandArgs[T any](e *handler.CommandEvent) (data *T, err error) 
 			continue
 		}
 
-		tag := targetField.Tag.Get("rave")
-		if tag == "" {
+		name, ok := optionName(targetField)
+		if !ok {
 			continue
 		}
 
 		baseType, ptrDepth := derefType(targetField.Type)
 
 		if g, ok := parserTypeGetters[baseType]; ok {
-			if v, ok := g(scid, tag); ok {
+			if v, ok := g(scid, name); ok {
 				setValue(targetFieldValue, v, ptrDepth)
 			}
 			continue
@@ -77,25 +79,27 @@ func ParseSlashCommandArgs[T any](e *handler.CommandEvent) (data *T, err error) 
 
 		switch baseType.Kind() {
 		case reflect.Bool:
-			if v, ok := scid.OptBool(tag); ok {
+			if v, ok := scid.OptBool(name); ok {
 				setValue(targetFieldValue, v, ptrDepth)
 			}
 		case reflect.Float32, reflect.Float64:
-			if v, ok := scid.OptFloat(tag); ok {
+			if v, ok := scid.OptFloat(name); ok {
 				setFloat(targetFieldValue, v, ptrDepth)
 			}
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-			if v, ok := scid.OptInt(tag); ok {
+			if v, ok := scid.OptInt(name); ok {
 				setInt(targetFieldValue, int64(v), ptrDepth)
 			}
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-			if v, ok := scid.OptInt(tag); ok {
+			if v, ok := scid.OptInt(name); ok {
 				setUint(targetFieldValue, uint64(v), ptrDepth)
 			}
 		case reflect.String:
-			if v, ok := scid.OptString(tag); ok {
+			if v, ok := scid.OptString(name); ok {
 				setValue(targetFieldValue, v, ptrDepth)
 			}
+		default:
+			// none
 		}
 	}
 
@@ -111,6 +115,42 @@ func ParseSlashCommandArgs[T any](e *handler.CommandEvent) (data *T, err error) 
 	// scid.String("a")  // => string
 
 	return
+}
+
+// optionName returns the discord option name to look up for a struct field,
+// and false if the field should be skipped. `rave:"-"` skips; `rave:"x"`
+// renames to "x"; absent/empty derives a kebab-case name from the field name
+// (e.g. TargetUser -> target-user, SnowflakeIDNow -> snowflake-id-now).
+func optionName(f reflect.StructField) (string, bool) {
+	tag, ok := f.Tag.Lookup("rave")
+	if ok && tag == "-" {
+		return "", false
+	}
+	if ok && tag != "" {
+		return tag, true
+	}
+	return pascalToKebab(f.Name), true
+}
+
+// pascalToKebab converts a PascalCase/camelCase identifier to kebab-case,
+// preserving acronym boundaries: a hyphen is inserted before an uppercase
+// rune when the previous rune is lowercase, or when the previous rune is
+// uppercase and the next rune is lowercase (the end of an acronym).
+func pascalToKebab(s string) string {
+	runes := []rune(s)
+	var b strings.Builder
+	b.Grow(len(s) + 4)
+	for i, r := range runes {
+		if i > 0 && unicode.IsUpper(r) {
+			prev := runes[i-1]
+			atAcronymEnd := unicode.IsUpper(prev) && i+1 < len(runes) && unicode.IsLower(runes[i+1])
+			if unicode.IsLower(prev) || atAcronymEnd {
+				b.WriteByte('-')
+			}
+		}
+		b.WriteRune(unicode.ToLower(r))
+	}
+	return b.String()
 }
 
 func derefType(t reflect.Type) (baseType reflect.Type, ptrDepth int) {
