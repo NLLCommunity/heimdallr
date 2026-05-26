@@ -38,6 +38,9 @@ func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
 			r.Command("/ban-footer", AdminBanFooterHandler)
 			r.Component("/ban-footer/button", AdminBanFooterButtonHandler)
 			r.Modal("/ban-footer/modal", AdminBanFooterModalHandler)
+
+			r.Command("/posts", AdminPostsHandler)
+			r.Command("/audit-log", AdminAuditLogHandler)
 		},
 	)
 
@@ -65,6 +68,8 @@ var AdminCommand = discord.SlashCommandCreate{
 		leaveMessageSubcommand,
 		antiSpamSubcommand,
 		banFooterSubcommand,
+		postsSubcommand,
+		auditLogSubcommand,
 	},
 }
 
@@ -86,10 +91,13 @@ func AdminInfoHandler(e *handler.CommandEvent) error {
 	gatekeepSettings := gatekeepInfo(settings)
 	joinLeaveSettings := joinLeaveInfo(settings)
 	antiSpamSettings := antiSpamInfo(settings)
+	postsSettings := postsInfo(settings)
+	auditLogSettings := auditLogInfo(settings)
 
 	message := fmt.Sprintf(
-		"# Server settings\n%s\n\n%s\n\n%s\n\n%s\n\n%s",
+		"# Server settings\n%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s\n\n%s",
 		modChannel, infractionSettings, gatekeepSettings, joinLeaveSettings, antiSpamSettings,
+		postsSettings, auditLogSettings,
 	)
 
 	return e.CreateMessage(
