@@ -1,7 +1,6 @@
 package web
 
 import (
-	"errors"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -9,41 +8,32 @@ import (
 
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
-	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
 
+	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
 	"github.com/NLLCommunity/heimdallr/web/templates/pages"
 )
 
-// handleGuilds renders the multi-guild picker that admins land on after
-// /admin-dashboard. It iterates every guild the bot is in, which makes any
-// per-guild Discord REST call a stampede risk for users in many guilds.
+// handleGuilds renders the multi-guild picker. The user's guild list comes
+// from Discord's "Get Current User Guilds" endpoint via the OAuth bearer
+// token — one REST call regardless of how many guilds the bot is in —
+// intersected with the bot's own guild set so we only show servers the
+// bot can actually render dashboards for.
 //
-// Cost-shaping decisions:
+// Tiles are labeled by access level:
 //
-//   - Only admin guilds are listed. Post-mods reach their dashboard via the
-//     /post-dashboard slash command, which generates a login link that
-//     bypasses /guilds entirely (handlers_auth.go redirects target=="posts"
-//     straight to /guild/{id}/posts). Listing post-mod guilds here would
-//     require a GetGuildCommandPermissions REST call per guild on a cold
-//     override cache.
-//   - For cached guilds, member lookup is cache-only — no GetMember REST
-//     fallback per guild. Disgo populates the member cache from gateway
-//     events; an admin who is active in their guild is essentially always
-//     cached. Admins who aren't can still navigate directly via URL or the
-//     slash command.
-//   - For *stuck* guilds (Disgo received the READY stub but never the
-//     GUILD_CREATE, or the guild was evicted by a GUILD_DELETE with
-//     unavailable=true and never restored) we fall back to GetGuild +
-//     GetMember. Stuck guilds aren't in client.Caches.Guilds() at all, so
-//     the cache loop above misses them entirely. The fallback is bounded by
-//     the size of UnreadyGuildIDs ∪ UnavailableGuildIDs, which is normally
-//     empty.
+//   - Admin: owner or PermissionAdministrator. Linked to /guild/{id}, the
+//     full settings dashboard.
+//   - Posts: holder of the guild's configured PostsModRoleID (only
+//     evaluated for non-admins, and only for guilds where an admin has
+//     opted in by setting the role). Linked directly to /guild/{id}/posts.
 //
-// Net effect: /guilds does zero Discord REST calls in steady state, and at
-// most one GetGuild + one GetMember per stuck guild ID otherwise.
-func handleGuilds(client *bot.Client) http.HandlerFunc {
+// The posts check is cheap when the user's member is cached, falls back
+// to a single GetMember REST call otherwise. The fallback is bounded by
+// "guilds where the bot is installed, the user isn't admin, and the
+// posts role is configured" — typically a small set.
+func handleGuilds(client *bot.Client, clientID snowflake.ID, clientSecret string, crypto *model.TokenCrypto) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := sessionFromContext(r.Context())
 		if session == nil {
@@ -51,92 +41,73 @@ func handleGuilds(client *bot.Client) http.HandlerFunc {
 			return
 		}
 
-		var guilds []pages.GuildData
-		seen := make(map[snowflake.ID]struct{})
-		appendGuild := func(id snowflake.ID, name string, iconPtr *string) {
-			if _, dup := seen[id]; dup {
-				return
-			}
-			seen[id] = struct{}{}
-			var icon string
-			if iconPtr != nil {
-				icon = *iconPtr
-			}
-			guilds = append(guilds, pages.GuildData{
-				ID:   id.String(),
-				Name: name,
-				Icon: icon,
-			})
+		accessToken, err := freshAccessToken(client, clientID, clientSecret, crypto, session)
+		if err != nil {
+			// Most likely refresh-token revocation — Discord answers
+			// 400 invalid_grant once the user removes the app from
+			// their authorized list. Send them through consent again.
+			slog.Info("guilds: freshAccessToken failed, redirecting through OAuth", "err", err)
+			http.Redirect(w, r, "/oauth/start", http.StatusSeeOther)
+			return
 		}
 
-		for guild := range client.Caches.Guilds() {
-			isAdmin := guild.OwnerID == session.UserID
-			if !isAdmin {
-				member, ok := client.Caches.Member(guild.ID, session.UserID)
-				if !ok {
-					continue
-				}
-				isAdmin = client.Caches.MemberPermissions(member).Has(discord.PermissionAdministrator)
-				if !isAdmin {
-					continue
-				}
-			}
-			appendGuild(guild.ID, guild.Name, guild.Icon)
+		userGuilds, err := client.Rest.GetCurrentUserGuilds(accessToken, 0, 0, 0, false)
+		if err != nil {
+			slog.Warn("guilds: GetCurrentUserGuilds failed", "err", err)
+			http.Error(w, "failed to load your servers", http.StatusBadGateway)
+			return
 		}
 
-		// Dedupe stuck IDs up front. The two source slices can overlap
-		// (e.g. a guild that became unavailable while still flagged
-		// unready), and the cache loop above may have already added the
-		// same ID. Without this, a duplicate would re-issue GetGuild +
-		// GetMember calls on every iteration, since `seen` is only written
-		// after a successful admin match below.
-		stuck := make(map[snowflake.ID]struct{})
+		// Snapshot the bot's guild set + cached guild metadata. Stuck
+		// guild IDs go into the set too so they can still be intersected,
+		// but they have no cached name/icon so the tile renders whatever
+		// the OAuth2Guild payload carried.
+		type cachedGuild struct {
+			Guild *discord.Guild
+		}
+		botGuilds := make(map[snowflake.ID]cachedGuild)
+		for g := range client.Caches.Guilds() {
+			gCopy := g
+			botGuilds[g.ID] = cachedGuild{Guild: &gCopy}
+		}
 		for _, id := range client.Caches.UnreadyGuildIDs() {
-			stuck[id] = struct{}{}
+			if _, ok := botGuilds[id]; !ok {
+				botGuilds[id] = cachedGuild{}
+			}
 		}
 		for _, id := range client.Caches.UnavailableGuildIDs() {
-			stuck[id] = struct{}{}
-		}
-		for gid := range stuck {
-			if _, dup := seen[gid]; dup {
-				continue
+			if _, ok := botGuilds[id]; !ok {
+				botGuilds[id] = cachedGuild{}
 			}
-			g, err := client.Rest.GetGuild(gid, false)
-			if err != nil {
-				// A 404 here means the bot no longer has access to the
-				// guild (kicked / left / banned) but Disgo still has the
-				// stale ID in its unready/unavailable set. That's an
-				// expected, recoverable state — debug rather than warn so
-				// it doesn't spam every /guilds hit. Anything else (rate
-				// limit, 5xx, auth failure) is worth surfacing.
-				if restStatusCode(err) == http.StatusNotFound {
-					slog.Debug("guilds: GetGuild fallback 404", "guild_id", gid)
-				} else {
-					slog.Warn("guilds: GetGuild fallback failed", "guild_id", gid, "err", err)
-				}
+		}
+
+		var guilds []pages.GuildData
+		for _, ug := range userGuilds {
+			cg, inBot := botGuilds[ug.ID]
+			if !inBot {
 				continue
 			}
 
-			isAdmin := g.OwnerID == session.UserID
-			if !isAdmin {
-				m, err := client.Rest.GetMember(gid, session.UserID)
-				if err != nil {
-					// 404 here is expected when the dashboard user simply
-					// isn't a member of this guild. Other statuses (rate
-					// limit, 5xx, 403) indicate a real problem and should
-					// be visible.
-					if restStatusCode(err) == http.StatusNotFound {
-						slog.Debug("guilds: GetMember fallback 404", "guild_id", gid, "user_id", session.UserID)
-					} else {
-						slog.Warn("guilds: GetMember fallback failed", "guild_id", gid, "user_id", session.UserID, "err", err)
-					}
-					continue
-				}
-				if !stuckGuildIsAdmin(g.Roles, m.RoleIDs, gid) {
-					continue
-				}
+			role := resolveGuildRole(client, cg.Guild, ug, session.UserID)
+			if role == "" {
+				continue
 			}
-			appendGuild(g.ID, g.Name, g.Icon)
+
+			name, icon := ug.Name, ug.Icon
+			if cg.Guild != nil {
+				name = cg.Guild.Name
+				icon = cg.Guild.Icon
+			}
+			var iconStr string
+			if icon != nil {
+				iconStr = *icon
+			}
+			guilds = append(guilds, pages.GuildData{
+				ID:   ug.ID.String(),
+				Name: name,
+				Icon: iconStr,
+				Role: role,
+			})
 		}
 
 		sort.Slice(guilds, func(i, j int) bool {
@@ -152,51 +123,37 @@ func handleGuilds(client *bot.Client) http.HandlerFunc {
 	}
 }
 
-// restStatusCode returns the HTTP status code from a disgo *rest.Error,
-// or 0 if err isn't a *rest.Error or has no associated response. Lets the
-// caller distinguish "expected 404" (e.g. user not in guild, bot kicked)
-// from "real problem" (rate limit, 5xx, auth) without unwrapping inline.
-func restStatusCode(err error) int {
-	var rerr *rest.Error
-	if errors.As(err, &rerr) && rerr.Response != nil {
-		return rerr.Response.StatusCode
-	}
-	return 0
-}
-
-// stuckGuildIsAdmin reports whether the dashboard user holds the
-// Administrator permission in a guild that isn't in the bot's local cache.
-// It mirrors disgo's cache-side MemberPermissions but operates purely on
-// the role slice from Rest.GetGuild and the member role-ID slice from
-// Rest.GetMember, since stuck guilds have no cached roles or members to
-// consult.
+// resolveGuildRole decides how to label a tile for the given user in the
+// given guild. Returns "" when the user has no access (don't show a tile
+// at all).
 //
-// The owner short-circuit is intentionally omitted — the caller already
-// checks OwnerID against the session user before invoking this. The
-// communication-disabled (timeout) degrade pass that the cache helper
-// applies is also skipped: it only matters for non-Administrator perms,
-// and Administrator overrides timeouts anyway.
-func stuckGuildIsAdmin(roles []discord.Role, memberRoleIDs []snowflake.ID, guildID snowflake.ID) bool {
-	rolesByID := make(map[snowflake.ID]discord.Role, len(roles))
-	for _, r := range roles {
-		rolesByID[r.ID] = r
+// Admin/owner short-circuits at the top so neither GetGuildSettings nor
+// GetMember runs in the common case. Posts-role evaluation requires the
+// guild to be in the cache (we need cached.Guild to test admin via
+// cached perms) — for stuck guilds we can't run the posts check, which
+// is acceptable: it's the same population that the bot has temporarily
+// lost gateway state for, and the user can re-navigate after Disgo
+// recovers.
+func resolveGuildRole(client *bot.Client, cached *discord.Guild, ug discord.OAuth2Guild, userID snowflake.ID) pages.GuildRole {
+	if ug.Owner || ug.Permissions.Has(discord.PermissionAdministrator) {
+		return pages.GuildRoleAdmin
 	}
-	// The @everyone role's ID equals the guild's ID. If it's missing from
-	// the payload (shouldn't happen, but Discord has surprised us before)
-	// the zero-value Role gives zero perms, which is the safe default.
-	perms := rolesByID[guildID].Permissions
-	if perms.Has(discord.PermissionAdministrator) {
-		return true
+	if cached == nil {
+		return ""
 	}
-	for _, rid := range memberRoleIDs {
-		r, ok := rolesByID[rid]
-		if !ok {
-			continue
-		}
-		perms = perms.Add(r.Permissions)
-		if perms.Has(discord.PermissionAdministrator) {
-			return true
-		}
+	settings, err := model.GetGuildSettings(ug.ID)
+	if err != nil || settings.PostsModRoleID == 0 {
+		return ""
 	}
-	return false
+	member := guildMember(client, ug.ID, userID)
+	if member == nil {
+		return ""
+	}
+	if isGuildAdminMember(client, *cached, member) {
+		return pages.GuildRoleAdmin
+	}
+	if hasPostsModRole(settings, member) {
+		return pages.GuildRolePosts
+	}
+	return ""
 }

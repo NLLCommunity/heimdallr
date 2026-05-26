@@ -20,118 +20,152 @@ func tokenHash(token string) string {
 }
 
 const (
-	loginCodeExpiry = 5 * time.Minute
-	SessionExpiry   = 24 * time.Hour
+	// oauthStateExpiry must cover the time between /oauth/start issuing
+	// the state row and the user completing the Discord consent screen.
+	// Discord's authorize page typically completes in seconds, but we
+	// leave headroom for users who get prompted to re-auth against
+	// Discord itself before the consent step.
+	oauthStateExpiry = 10 * time.Minute
+	SessionExpiry    = 24 * time.Hour
 )
 
-type DashboardLoginCode struct {
-	Code     string `gorm:"primaryKey"`
+// DashboardOAuthState gates the Discord OAuth redirect against CSRF:
+//
+//   - The state token is the primary key. /oauth/start generates a fresh
+//     random token, stores this row, and includes the token in both the
+//     authorize URL and a short-lived browser cookie. /oauth/callback
+//     must see both — DB row + matching cookie — before exchanging the
+//     code, which prevents login-CSRF (an attacker-crafted authorize
+//     URL pasted to a victim's browser).
+//   - ReturnTo carries the originally-requested URL across the redirect
+//     so a deep-link visit lands the user where they intended after
+//     OAuth completes. Empty means "/guilds".
+//
+// Rows are single-use: ConsumeOAuthState deletes the row atomically.
+type DashboardOAuthState struct {
+	State     string `gorm:"primaryKey"`
+	ReturnTo  string
+	ExpiresAt time.Time
+}
+
+// DashboardSession stores both the local session record and the user's
+// Discord OAuth tokens. AccessTokenEnc / RefreshTokenEnc are AES-256-GCM
+// ciphertexts produced by TokenCrypto; the plaintext only exists inside
+// the request that fetched it. TokenExpiresAt is the absolute time the
+// access token stops working, so handlers can decide whether to refresh
+// without round-tripping through Discord first.
+type DashboardSession struct {
+	Token           string       `gorm:"primaryKey"`
+	UserID          snowflake.ID `gorm:"index"`
+	Username        string
+	Avatar          string
+	ExpiresAt       time.Time
+	AccessTokenEnc  string
+	RefreshTokenEnc string
+	TokenExpiresAt  time.Time
+}
+
+// SessionIdentity bundles the user info captured from Discord's
+// /users/@me response. /oauth/callback builds this from the OAuth user
+// after exchanging the code, then hands it to CreateAdminSession.
+type SessionIdentity struct {
 	UserID   snowflake.ID
 	Username string
 	Avatar   string
-	// Target is the dashboard the post-login redirect should land on.
-	// "admin" (default) → /guilds. "posts" → /guild/{GuildID}/posts.
-	Target string `gorm:"default:'admin'"`
-	// GuildID is the calling guild ID for slash commands that have one
-	// (e.g. /post-dashboard). Zero for /admin-dashboard, which lets the
-	// user pick a guild on the next page.
-	GuildID   snowflake.ID
-	ExpiresAt time.Time
 }
 
-type DashboardSession struct {
-	Token     string       `gorm:"primaryKey"`
-	UserID    snowflake.ID `gorm:"index"`
-	Username  string
-	Avatar    string
-	ExpiresAt time.Time
-}
-
-func CreateLoginCode(userID snowflake.ID, username, avatar, target string, guildID snowflake.ID) (string, error) {
-	if target == "" {
-		target = "admin"
-	}
+// CreateOAuthState records a fresh state token with the optional
+// return-to URL and returns the token for use in the authorize URL.
+// ConsumeOAuthState validates and deletes the row on the OAuth callback.
+func CreateOAuthState(returnTo string) (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
 		return "", err
 	}
-	code := hex.EncodeToString(b)
-
-	loginCode := DashboardLoginCode{
-		Code:      code,
-		UserID:    userID,
-		Username:  username,
-		Avatar:    avatar,
-		Target:    target,
-		GuildID:   guildID,
-		ExpiresAt: time.Now().Add(loginCodeExpiry),
+	state := hex.EncodeToString(b)
+	row := DashboardOAuthState{
+		State:     state,
+		ReturnTo:  returnTo,
+		ExpiresAt: time.Now().Add(oauthStateExpiry),
 	}
-	if err := DB.Create(&loginCode).Error; err != nil {
+	if err := DB.Create(&row).Error; err != nil {
 		return "", err
 	}
-	return code, nil
+	return state, nil
 }
 
-// ExchangeLoginCode atomically consumes the code and creates a session.
-// It also returns the redirect Target ("admin" | "posts") and GuildID
-// (zero when not applicable) that were stored on the code, so the caller
-// can route the user to the right landing page.
-func ExchangeLoginCode(code string) (*DashboardSession, string, snowflake.ID, error) {
-	var session *DashboardSession
-	var target string
-	var guildID snowflake.ID
-
+// ConsumeOAuthState atomically validates and deletes the state row.
+func ConsumeOAuthState(state string) (*DashboardOAuthState, error) {
+	var out *DashboardOAuthState
 	err := DB.Transaction(func(tx *gorm.DB) error {
-		var loginCode DashboardLoginCode
-		if err := tx.Where("code = ? AND expires_at > ?", code, time.Now()).First(&loginCode).Error; err != nil {
-			return errors.New("invalid or expired login code")
+		var row DashboardOAuthState
+		if err := tx.Where("state = ? AND expires_at > ?", state, time.Now()).First(&row).Error; err != nil {
+			return errors.New("invalid or expired oauth state")
 		}
-
-		// Atomically delete the login code and verify we actually deleted it.
-		// If RowsAffected == 0, a concurrent request already consumed it.
-		result := tx.Delete(&loginCode)
+		result := tx.Delete(&row)
 		if result.Error != nil {
 			return result.Error
 		}
 		if result.RowsAffected == 0 {
-			return errors.New("invalid or expired login code")
+			return errors.New("invalid or expired oauth state")
 		}
-
-		target = loginCode.Target
-		guildID = loginCode.GuildID
-
-		b := make([]byte, 32)
-		if _, err := rand.Read(b); err != nil {
-			return err
-		}
-		rawToken := hex.EncodeToString(b)
-
-		dbSession := DashboardSession{
-			Token:     tokenHash(rawToken),
-			UserID:    loginCode.UserID,
-			Username:  loginCode.Username,
-			Avatar:    loginCode.Avatar,
-			ExpiresAt: time.Now().Add(SessionExpiry),
-		}
-		if err := tx.Create(&dbSession).Error; err != nil {
-			return err
-		}
-
-		// Return the raw token to the caller for use in the session cookie.
-		// The DB record holds only the hash.
-		session = &DashboardSession{
-			Token:     rawToken,
-			UserID:    dbSession.UserID,
-			Username:  dbSession.Username,
-			Avatar:    dbSession.Avatar,
-			ExpiresAt: dbSession.ExpiresAt,
-		}
+		out = &row
 		return nil
 	})
 	if err != nil {
-		return nil, "", 0, err
+		return nil, err
 	}
-	return session, target, guildID, nil
+	return out, nil
+}
+
+// CreateAdminSession mints a DashboardSession from the OAuth-verified
+// identity and already-sealed tokens. Callers seal the tokens via
+// TokenCrypto so this package never touches the encryption key.
+//
+// Returns the raw cookie token; the DB row stores only its hash.
+func CreateAdminSession(id SessionIdentity, sealedAccess, sealedRefresh string, tokenExpiresAt time.Time) (*DashboardSession, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return nil, err
+	}
+	rawToken := hex.EncodeToString(b)
+	dbSession := DashboardSession{
+		Token:           tokenHash(rawToken),
+		UserID:          id.UserID,
+		Username:        id.Username,
+		Avatar:          id.Avatar,
+		ExpiresAt:       time.Now().Add(SessionExpiry),
+		AccessTokenEnc:  sealedAccess,
+		RefreshTokenEnc: sealedRefresh,
+		TokenExpiresAt:  tokenExpiresAt,
+	}
+	if err := DB.Create(&dbSession).Error; err != nil {
+		return nil, err
+	}
+	return &DashboardSession{
+		Token:           rawToken,
+		UserID:          dbSession.UserID,
+		Username:        dbSession.Username,
+		Avatar:          dbSession.Avatar,
+		ExpiresAt:       dbSession.ExpiresAt,
+		AccessTokenEnc:  dbSession.AccessTokenEnc,
+		RefreshTokenEnc: dbSession.RefreshTokenEnc,
+		TokenExpiresAt:  dbSession.TokenExpiresAt,
+	}, nil
+}
+
+// UpdateSessionTokens overwrites the encrypted tokens for an existing
+// session (used after a successful refresh). The DB row is keyed by the
+// stored hash, so callers pass the hashed Token from the in-context
+// session — NOT the raw cookie value.
+func UpdateSessionTokens(tokenHashed string, sealedAccess, sealedRefresh string, tokenExpiresAt time.Time) error {
+	return DB.Model(&DashboardSession{}).
+		Where("token = ?", tokenHashed).
+		Updates(map[string]any{
+			"access_token_enc":  sealedAccess,
+			"refresh_token_enc": sealedRefresh,
+			"token_expires_at":  tokenExpiresAt,
+		}).Error
 }
 
 func GetSession(token string) (*DashboardSession, error) {
@@ -148,8 +182,8 @@ func DeleteSession(token string) error {
 
 func CleanExpiredSessions() error {
 	now := time.Now()
-	if err := DB.Where("expires_at <= ?", now).Delete(&DashboardLoginCode{}).Error; err != nil {
-		return fmt.Errorf("clean expired login codes: %w", err)
+	if err := DB.Where("expires_at <= ?", now).Delete(&DashboardOAuthState{}).Error; err != nil {
+		return fmt.Errorf("clean expired oauth states: %w", err)
 	}
 	if err := DB.Where("expires_at <= ?", now).Delete(&DashboardSession{}).Error; err != nil {
 		return fmt.Errorf("clean expired sessions: %w", err)

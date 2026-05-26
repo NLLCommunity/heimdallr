@@ -13,8 +13,23 @@ import (
 	"golang.org/x/time/rate"
 )
 
-func TestRedirectToLogin_BrowserNavigationGets303(t *testing.T) {
+// A browser deep-linking to /guild/{id} must be sent through /oauth/start
+// with a return_to so they land on the requested page after Discord
+// consent, instead of being dumped on /guilds.
+func TestRedirectToLogin_DeepLinkGoesThroughOAuthStart(t *testing.T) {
 	req := httptest.NewRequest("GET", "/guild/123", nil)
+	rec := httptest.NewRecorder()
+	redirectToLogin(rec, req)
+	assert.Equal(t, http.StatusSeeOther, rec.Code)
+	assert.Equal(t, "/oauth/start?return_to=%2Fguild%2F123", rec.Header().Get("Location"))
+}
+
+// Non-deep-link entries (POSTs, unrelated paths) should land on /login
+// rather than auto-kicking through OAuth — surprising users hitting
+// arbitrary bookmarks is worse than asking them to click the login
+// button.
+func TestRedirectToLogin_NonDeepLinkGoesToLogin(t *testing.T) {
+	req := httptest.NewRequest("POST", "/guild/123/settings/mod-channel", nil)
 	rec := httptest.NewRecorder()
 	redirectToLogin(rec, req)
 	assert.Equal(t, http.StatusSeeOther, rec.Code)
@@ -87,7 +102,7 @@ func TestAuthMiddleware_SkipsPublicPaths(t *testing.T) {
 
 	// `/` is intentionally not public — handleRoot relies on the session
 	// being injected by this middleware to decide /guilds vs /login.
-	for _, path := range []string{"/login", "/callback", "/static/css/custom.css"} {
+	for _, path := range []string{"/login", "/oauth/start", "/oauth/callback", "/static/css/custom.css"} {
 		called = false
 		req := httptest.NewRequest("GET", path, nil)
 		rec := httptest.NewRecorder()

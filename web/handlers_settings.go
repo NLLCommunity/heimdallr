@@ -17,7 +17,6 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/snowflake/v2"
 
-	"github.com/NLLCommunity/heimdallr/interactions/post_dashboard"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 	"github.com/NLLCommunity/heimdallr/web/templates/components"
@@ -158,17 +157,19 @@ func handleDashboard(client *bot.Client) http.HandlerFunc {
 
 		// If the user is a post-mod but not an admin, send them to /posts
 		// rather than 403'ing — they have *some* access to this guild.
-		// Owner-shortcut + a single guildMember lookup feeds both
-		// isGuildAdminMember and canUsePostDashboardForMember, so we don't
-		// pay two REST round-trips on cache miss.
+		// Owner-shortcut + a single guildMember lookup feeds the admin
+		// check, after which the cached settings answer the posts-role
+		// question without an extra Discord round-trip.
 		if parsedID, err := snowflake.Parse(guildIDStr); err == nil {
 			if guild, ok := client.Caches.Guild(parsedID); ok && session != nil &&
 				guild.OwnerID != session.UserID {
 				if member := guildMember(client, parsedID, session.UserID); member != nil &&
-					!isGuildAdminMember(client, guild, member) &&
-					canUsePostDashboardForMember(client, guild, member, post_dashboard.CommandID(), post_dashboard.DefaultMemberPerm) {
-					http.Redirect(w, r, "/guild/"+parsedID.String()+"/posts", http.StatusSeeOther)
-					return
+					!isGuildAdminMember(client, guild, member) {
+					if settings, err := model.GetGuildSettings(parsedID); err == nil &&
+						hasPostsModRole(settings, member) {
+						http.Redirect(w, r, "/guild/"+parsedID.String()+"/posts", http.StatusSeeOther)
+						return
+					}
 				}
 			}
 		}
@@ -280,6 +281,13 @@ func allSettingsSections(guildID string, settings *model.GuildSettings, ms *mode
 		}).Render(ctx, w); err != nil {
 			return err
 		}
+		if err := partials.SettingsPosts(partials.PostsData{
+			GuildID: guildID,
+			ModRole: idStr(settings.PostsModRoleID),
+			Roles:   roles,
+		}).Render(ctx, w); err != nil {
+			return err
+		}
 		if err := partials.SettingsAuditLog(buildAuditLogSettingsData(guildID, settings)).Render(ctx, w); err != nil {
 			return err
 		}
@@ -288,6 +296,62 @@ func allSettingsSections(guildID string, settings *model.GuildSettings, ms *mode
 }
 
 // --- POST handlers ---
+
+// handleSavePosts persists the per-guild PostsModRoleID. Admin-gated:
+// only admins can choose who gets non-admin posts access, otherwise a
+// post-mod could escalate themselves by changing the role to one of
+// their own.
+func handleSavePosts(client *bot.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		guildIDStr := r.PathValue("id")
+		guildID, ok := checkGuildAdmin(w, r, client, guildIDStr)
+		if !ok {
+			return
+		}
+
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form data", http.StatusBadRequest)
+			return
+		}
+		settings, err := model.GetGuildSettings(guildID)
+		if err != nil {
+			renderSafe(w, r, partials.SettingsPosts(partials.PostsData{
+				GuildID: guildIDStr, SaveError: "Failed to load settings.",
+			}))
+			return
+		}
+
+		renderPostsError := func(message string) {
+			renderSafe(w, r, partials.SettingsPosts(partials.PostsData{
+				GuildID:   guildIDStr,
+				ModRole:   idStr(settings.PostsModRoleID),
+				Roles:     guildRoles(client, guildID),
+				SaveError: message,
+			}))
+		}
+
+		modRole, err := parseSnowflakeOrZero(r.FormValue("mod_role"))
+		if err != nil {
+			renderPostsError("Invalid role ID.")
+			return
+		}
+		settings.PostsModRoleID = modRole
+		if err := model.SetGuildSettings(settings); err != nil {
+			slog.Error("failed to save posts settings", "error", err)
+			renderPostsError("Failed to save settings.")
+			return
+		}
+		logSettingsUpdate(sessionFromContext(r.Context()), guildID, "posts",
+			map[string]any{"mod_role": idStr(settings.PostsModRoleID)})
+
+		renderSafe(w, r, partials.SettingsPosts(partials.PostsData{
+			GuildID:     guildIDStr,
+			ModRole:     idStr(settings.PostsModRoleID),
+			Roles:       guildRoles(client, guildID),
+			SaveSuccess: true,
+		}))
+	}
+}
 
 func handleSaveModChannel(client *bot.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

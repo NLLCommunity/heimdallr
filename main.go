@@ -25,14 +25,13 @@ import (
 	_ "github.com/NLLCommunity/heimdallr/config"
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/interactions/admin"
-	"github.com/NLLCommunity/heimdallr/interactions/admin_dashboard"
 	"github.com/NLLCommunity/heimdallr/interactions/ban"
+	"github.com/NLLCommunity/heimdallr/interactions/dashboard"
 	"github.com/NLLCommunity/heimdallr/interactions/gatekeep"
 	"github.com/NLLCommunity/heimdallr/interactions/infractions"
 	"github.com/NLLCommunity/heimdallr/interactions/kick"
 	"github.com/NLLCommunity/heimdallr/interactions/modmail"
 	"github.com/NLLCommunity/heimdallr/interactions/ping"
-	"github.com/NLLCommunity/heimdallr/interactions/post_dashboard"
 	"github.com/NLLCommunity/heimdallr/interactions/prune"
 	"github.com/NLLCommunity/heimdallr/interactions/quote"
 	"github.com/NLLCommunity/heimdallr/interactions/role_button"
@@ -109,9 +108,8 @@ func main() {
 
 	commandInteractions := []interactions.ApplicationCommandRegisterFunc{
 		admin.Register,
-		admin_dashboard.Register,
-		post_dashboard.Register,
 		ban.Register,
+		dashboard.Register,
 		gatekeep.Register,
 		infractions.Register,
 		kick.Register,
@@ -182,21 +180,6 @@ func main() {
 	)
 	if err != nil {
 		panic(fmt.Errorf("failed to sync commands: %w", err))
-	}
-
-	// Record the /post-dashboard command ID so the web dashboard can fetch
-	// per-guild permission overrides immediately, instead of waiting for a
-	// non-admin user to discover the dashboard via the slash command first.
-	var registered []discord.ApplicationCommand
-	if len(devGuilds) > 0 {
-		registered, err = client.Rest.GetGuildCommands(client.ApplicationID, devGuilds[0], false)
-	} else {
-		registered, err = client.Rest.GetGlobalCommands(client.ApplicationID, false)
-	}
-	if err != nil {
-		slog.Warn("failed to fetch registered commands; /post-dashboard ID will be captured on first use", "error", err)
-	} else {
-		post_dashboard.SetCommandID(registered)
 	}
 
 	err = client.OpenGateway(context.Background())

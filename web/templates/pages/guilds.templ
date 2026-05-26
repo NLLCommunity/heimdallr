@@ -6,10 +6,22 @@ import (
 	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
 )
 
+// GuildRole tags each tile with the access level the picker resolved for
+// the session user. Admin tiles link into the full settings dashboard;
+// Posts tiles deep-link directly to the posts page since post-mods don't
+// have access to anything else.
+type GuildRole string
+
+const (
+	GuildRoleAdmin GuildRole = "Admin"
+	GuildRolePosts GuildRole = "Posts"
+)
+
 type GuildData struct {
 	ID   string
 	Name string
 	Icon string
+	Role GuildRole
 }
 
 // initialFor returns the first non-whitespace rune of name as a string, or
@@ -27,8 +39,8 @@ templ Guilds(nav layouts.NavData, guilds []GuildData) {
 		<h2>Select a Server</h2>
 		if len(guilds) == 0 {
 			<p>
-				No servers found where you have administrator permissions.
-				If you only need to manage posts, use the <code>/post-dashboard</code> command in the relevant server instead.
+				No servers found where you have administrator permissions
+				or a posts-mod role configured by an admin.
 			</p>
 		}
 		<div class="grid">
@@ -39,11 +51,11 @@ templ Guilds(nav layouts.NavData, guilds []GuildData) {
 	}
 }
 
-// guildTile renders one admin-server tile. The /guilds list is admin-only
-// (see handlers_guild.go for why); post-mods reach their dashboard via the
-// /post-dashboard slash command, which redirects past this page entirely.
+// guildTile renders one server tile. Admin tiles link into the settings
+// dashboard; posts tiles deep-link to the posts page since post-mods
+// don't have access to anything else.
 templ guildTile(g GuildData) {
-	<a href={ templ.SafeURL("/guild/" + g.ID) } style="text-decoration: none;">
+	<a href={ tileHref(g) } style="text-decoration: none;">
 		<article style="text-align: center;">
 			if g.Icon != "" {
 				<img
@@ -56,7 +68,17 @@ templ guildTile(g GuildData) {
 					{ initialFor(g.Name) }
 				</div>
 			}
-			<h3>{ g.Name } <small><span class="badge">Admin</span></small></h3>
+			<h3>{ g.Name } <small><span class="badge">{ string(g.Role) }</span></small></h3>
 		</article>
 	</a>
+}
+
+// tileHref routes admin tiles into the settings dashboard and posts
+// tiles directly into the posts page — post-mods would otherwise hit a
+// 403 on /guild/{id} since the dashboard requires admin.
+func tileHref(g GuildData) templ.SafeURL {
+	if g.Role == GuildRolePosts {
+		return templ.SafeURL("/guild/" + g.ID + "/posts")
+	}
+	return templ.SafeURL("/guild/" + g.ID)
 }

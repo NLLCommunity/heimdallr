@@ -46,6 +46,13 @@ type GuildSettings struct {
 	BanFooter           string
 	AlwaysSendBanFooter bool
 
+	// PostsModRoleID grants a single role the ability to manage posts in
+	// the web dashboard. Zero means "admins only" — there is no implicit
+	// default, so post-mod access requires an admin to opt in by setting
+	// the role on the settings page. Replaces the prior reliance on
+	// Discord's per-command permission overrides for /post-dashboard.
+	PostsModRoleID snowflake.ID
+
 	// AuditLogEnabled is the master per-guild toggle for the bot's audit
 	// log. When false, no rows are written for the guild. Disabling it
 	// does not prune existing rows — those follow the retention schedule.

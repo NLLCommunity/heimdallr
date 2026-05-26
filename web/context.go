@@ -111,16 +111,14 @@ func idStr(id snowflake.ID) string {
 	return id.String()
 }
 
-// checkGuildPostMod verifies the session user can access the post dashboard
-// for the given guild — i.e., they're an admin OR they pass the
-// /post-dashboard command's permission check. Mirrors checkGuildAdmin's
-// error semantics. The caller passes the cached command ID + default perm
-// so this helper doesn't need a global registry of slash commands.
+// checkGuildPostMod verifies the session user can access the post
+// dashboard for the given guild — admin OR holder of the guild's
+// configured PostsModRoleID. Mirrors checkGuildAdmin's error semantics.
 //
-// Also returns isAdmin so callers populating nav data don't have to re-run
-// isGuildAdmin (which would repeat the member fetch this function already
-// performed, costing a second REST round-trip on cache miss).
-func checkGuildPostMod(w http.ResponseWriter, r *http.Request, client *bot.Client, guildIDStr string, postDashboardCmdID snowflake.ID, defaultPerm discord.Permissions) (guildID snowflake.ID, isAdmin, ok bool) {
+// Also returns isAdmin so callers populating nav data don't have to
+// re-run the admin check (which would repeat the member fetch and pay
+// for a second REST round-trip on cache miss).
+func checkGuildPostMod(w http.ResponseWriter, r *http.Request, client *bot.Client, guildIDStr string) (guildID snowflake.ID, isAdmin, ok bool) {
 	session := sessionFromContext(r.Context())
 	if session == nil {
 		redirectToLogin(w, r)
@@ -139,19 +137,20 @@ func checkGuildPostMod(w http.ResponseWriter, r *http.Request, client *bot.Clien
 		return 0, false, false
 	}
 
-	// Owner short-circuit avoids the member fetch entirely for the common
-	// guild-owner case.
+	// Owner short-circuit avoids the member fetch entirely for the
+	// common guild-owner case.
 	if guild.OwnerID == session.UserID {
 		return guildID, true, true
 	}
 
-	// Single member fetch feeds both the admin check and the post-mod
-	// override resolver — matches the pattern in handleDashboard.
+	// One member fetch feeds both the admin check and the posts-role
+	// check below.
 	member := guildMember(client, guildID, session.UserID)
 	if isGuildAdminMember(client, guild, member) {
 		return guildID, true, true
 	}
-	if canUsePostDashboardForMember(client, guild, member, postDashboardCmdID, defaultPerm) {
+	settings, err := model.GetGuildSettings(guildID)
+	if err == nil && hasPostsModRole(settings, member) {
 		return guildID, false, true
 	}
 

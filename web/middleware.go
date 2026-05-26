@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"slices"
 	"strings"
 	"sync"
@@ -17,8 +18,11 @@ import (
 )
 
 const (
-	exchangeCodeRatePerMinute = 1
-	exchangeCodeBurst         = 5
+	// /oauth/start creates a state row + cookie per call. The limit
+	// must accommodate a real human re-trying a flaky network without
+	// being so high that an attacker can grow the state table.
+	oauthStartRatePerMinute = 6
+	oauthStartBurst         = 10
 	// Sandbox sends are admin-only but still rate-limited per session user
 	// so a single admin can't drain the bot's Discord quota by spamming the
 	// sandbox. ~10/min steady, burst 5 is generous for testing message
@@ -36,6 +40,28 @@ const (
 	maxRequestBodyBytes       int64 = 1 << 20 // 1 MiB
 )
 
+// loginDestination computes where to send an unauthenticated request:
+// /oauth/start with a return_to parameter when the originally-requested
+// path is a guild deep-link that survived our allowlist, /login
+// otherwise. Returning to a known landing page when no deep-link applies
+// avoids surprising the user by silently kicking them through OAuth on
+// a bookmark click — they see the login page and click the button
+// explicitly.
+func loginDestination(r *http.Request) string {
+	if r.Method != http.MethodGet {
+		return "/login"
+	}
+	candidate := r.URL.Path
+	if r.URL.RawQuery != "" {
+		candidate += "?" + r.URL.RawQuery
+	}
+	if safe := safeReturnTo(candidate); safe != "" {
+		v := url.Values{"return_to": []string{safe}}
+		return "/oauth/start?" + v.Encode()
+	}
+	return "/login"
+}
+
 // redirectToLogin steers an unauthenticated request to the login page in a
 // way each kind of caller can actually handle:
 //   - HTMX requests get HX-Redirect (HTMX swallows 3xx silently and would
@@ -44,10 +70,11 @@ const (
 //     for JSON) get 401 with a small JSON body. Without this, fetch() follows
 //     the 303 to /login and the JS sees a 200 HTML response, which it
 //     mistakes for success.
-//   - Browser navigations get a normal 303 to /login.
+//   - Browser navigations get a normal 303 to the login destination.
 func redirectToLogin(w http.ResponseWriter, r *http.Request) {
+	dest := loginDestination(r)
 	if r.Header.Get("HX-Request") == "true" {
-		w.Header().Set("HX-Redirect", "/login")
+		w.Header().Set("HX-Redirect", dest)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -57,7 +84,7 @@ func redirectToLogin(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`{"error":"not signed in","login_url":"/login"}`))
 		return
 	}
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
 // isAJAXRequest is true when the request signals that it expects a structured
@@ -85,7 +112,7 @@ func authMiddleware(next http.Handler) http.Handler {
 		// on the session, which means it needs the session injected by this
 		// middleware first.
 		path := r.URL.Path
-		if path == "/login" || path == "/callback" ||
+		if path == "/login" || path == "/oauth/start" || path == "/oauth/callback" ||
 			strings.HasPrefix(path, "/static/") {
 			next.ServeHTTP(w, r)
 			return

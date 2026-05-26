@@ -1,0 +1,41 @@
+package partials
+
+import "github.com/NLLCommunity/heimdallr/web/templates/components"
+
+type PostsData struct {
+	GuildID     string
+	ModRole     string
+	Roles       []components.RoleInfo
+	SaveSuccess bool
+	SaveError   string
+}
+
+templ SettingsPosts(data PostsData) {
+	<section id="posts">
+		<h3>Posts</h3>
+		<form
+			method="POST"
+			action={ templ.SafeURL("/guild/" + data.GuildID + "/settings/posts") }
+			hx-post={ "/guild/" + data.GuildID + "/settings/posts" }
+			hx-target="#posts"
+			hx-swap="outerHTML"
+			x-data="formTracker()" @input="checkDirty()" @change="checkDirty()"
+		>
+			if data.SaveSuccess {
+				@components.SaveSuccessMarker()
+			}
+			if data.SaveError != "" {
+				@components.AlertError(data.SaveError)
+			}
+			@components.RoleSelect("mod_role", "Posts mod role", data.Roles, data.ModRole)
+			<p>
+				<small>
+					Members with this role can manage posts in the dashboard
+					(create, edit, publish). Admins always have access regardless
+					of this setting. Leave blank to restrict posts to admins only.
+				</small>
+			</p>
+			@components.SaveButton()
+		</form>
+	</section>
+}
