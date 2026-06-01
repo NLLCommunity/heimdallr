@@ -56,3 +56,18 @@ func TestHasPostsModRole_EmptyRoleList(t *testing.T) {
 	s := &model.GuildSettings{PostsModRoleID: testRoleA}
 	assert.False(t, hasPostsModRole(s, memberWithRoles()))
 }
+
+// @everyone's role ID equals the guild ID, but Discord never lists it in
+// member.RoleIDs. Storing PostsModRoleID == guildID would therefore look
+// like "grant access to everyone" but actually grants it to no one.
+// Both the web settings handler and the slash command refuse it at save
+// time, so this case shouldn't appear in practice — but if a legacy row
+// ever slips through, the check below documents the resulting behaviour
+// (deny, not allow) so future contributors don't paper over it.
+func TestHasPostsModRole_EveryoneIsNotAMatch(t *testing.T) {
+	s := &model.GuildSettings{PostsModRoleID: testGuildID}
+	// Member with no roles — @everyone is implicit, but RoleIDs is empty.
+	assert.False(t, hasPostsModRole(s, memberWithRoles()))
+	// Member with other roles — still no match.
+	assert.False(t, hasPostsModRole(s, memberWithRoles(testRoleA, testRoleB)))
+}

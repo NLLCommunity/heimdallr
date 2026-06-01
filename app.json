@@ -25,6 +25,18 @@
       "description": "Public https URL of the dashboard (e.g. https://your-app.herokuapp.com). Used for OAuth redirects and the CORS allowed origin.",
       "required": true
     },
+    "HEIMDALLR_DASHBOARD_TOKEN_ENCRYPTION_KEY": {
+      "description": "AES-256-GCM key (base64-encoded 32 bytes) used to encrypt OAuth tokens at rest. Generate with `openssl rand -base64 32`. The dashboard refuses to start without this — there is no fallback.",
+      "required": true
+    },
+    "HEIMDALLR_DISCORD_CLIENT_ID": {
+      "description": "OAuth2 client ID for the bot's Discord application (from the Developer Portal). Public — appears in authorize URLs.",
+      "required": true
+    },
+    "HEIMDALLR_DISCORD_CLIENT_SECRET": {
+      "description": "OAuth2 client secret for the bot's Discord application. Treat as sensitive. Required for the dashboard's Discord login flow. The OAuth redirect URI must be registered as `${HEIMDALLR_DASHBOARD_BASE_URL}/oauth/callback` on the application's OAuth2 page.",
+      "required": true
+    },
     "HEIMDALLR_WEB_TRUSTED_PROXIES": {
       "description": "Space-separated CIDRs trusted to set X-Forwarded-For. On Heroku, set to \"0.0.0.0/0 ::/0\" — Heroku's router always appends the real client IP to XFF (and its own IPs aren't stable), so trusting the entire address space is the documented pattern. clientIP() returns the rightmost XFF entry in this case, so client-spoofed leading values are still ignored.",
       "value": "0.0.0.0/0 ::/0",

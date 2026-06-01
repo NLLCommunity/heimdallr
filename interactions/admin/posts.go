@@ -59,6 +59,16 @@ func AdminPostsHandler(e *handler.CommandEvent) error {
 
 	modRole, hasModRole := data.OptRole("mod-role")
 	if hasModRole {
+		// @everyone's role ID equals the guild ID. Discord's role
+		// picker lets users pick it, but it's never present in
+		// member.RoleIDs — picking it would silently grant access to
+		// no one. Surface the error rather than persist a setting that
+		// looks effective but isn't.
+		if modRole.ID == guild.ID {
+			return e.CreateMessage(interactions.EphemeralMessageContent(
+				"@everyone cannot be used as the posts mod role. To grant access to everyone, pick a role that all members have.",
+			))
+		}
 		settings.PostsModRoleID = modRole.ID
 		message += fmt.Sprintf("Posts mod role set to <@&%d>\n", modRole.ID)
 	}

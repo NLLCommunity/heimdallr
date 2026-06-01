@@ -23,6 +23,24 @@ base_url = "http://localhost:8484" # Web dashboard URL
 # In production, terminate TLS at a reverse proxy (e.g. nginx, Caddy)
 # in front of the web dashboard and set base_url to an https:// URL.
 
+# AES-256-GCM key (base64) for encrypting OAuth tokens at rest.
+# Generate with: openssl rand -base64 32
+# The dashboard refuses to start without this — there is no fallback.
+token_encryption_key = "INSERT_BASE64_32_BYTES_HERE"
+
+[discord]
+# OAuth2 application credentials from the Discord developer portal
+# (https://discord.com/developers/applications). client_id is public;
+# client_secret is sensitive — prefer setting it via the
+# HEIMDALLR_DISCORD_CLIENT_SECRET environment variable instead of
+# committing it to disk.
+#
+# The OAuth redirect URI is derived as `${dashboard.base_url}/oauth/callback`
+# and must be added to the application's OAuth2 redirect list on Discord's
+# developer portal before logins will work.
+client_id = "INSERT_CLIENT_ID_HERE"
+client_secret = "INSERT_CLIENT_SECRET_HERE"
+
 [audit_log]
 # Maximum retention windows allowed per category, in days. Per-guild
 # settings may set values up to (but not above) these; 0 means "no

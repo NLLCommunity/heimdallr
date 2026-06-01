@@ -26,19 +26,19 @@ var auditLogSubcommand = discord.ApplicationCommandOptionSubCommand{
 		},
 		discord.ApplicationCommandOptionInt{
 			Name:        "message-retention",
-			Description: "Per-guild override for message-event retention in days (0 = forever, only when bot ceiling is also 0)",
+			Description: "Override message-event retention in days. 0 = forever (only if bot ceiling is 0).",
 			Required:    false,
 			MinValue:    new(0),
 		},
 		discord.ApplicationCommandOptionInt{
 			Name:        "member-retention",
-			Description: "Per-guild override for member-event retention in days (0 = forever, only when bot ceiling is also 0)",
+			Description: "Override member-event retention in days. 0 = forever (only if bot ceiling is 0).",
 			Required:    false,
 			MinValue:    new(0),
 		},
 		discord.ApplicationCommandOptionInt{
 			Name:        "guild-retention",
-			Description: "Per-guild override for guild-event retention in days (0 = forever, only when bot ceiling is also 0)",
+			Description: "Override guild-event retention in days. 0 = forever (only if bot ceiling is 0).",
 			Required:    false,
 			MinValue:    new(0),
 		},

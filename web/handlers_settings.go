@@ -128,6 +128,25 @@ func groupChannels(all []components.ChannelInfo) []components.ChannelGroup {
 	return groups
 }
 
+// rolesWithoutEveryone removes the @everyone role from the list. The
+// @everyone role's ID equals the guild's ID, but @everyone is never
+// present in member.RoleIDs — picking it as a permission role silently
+// grants access to no one. Used by settings panels where the chosen
+// role gates access via a RoleIDs lookup (notably posts).
+//
+// guildIDStr is taken as a string so callers can pass the route-bound
+// path value directly without parsing.
+func rolesWithoutEveryone(roles []components.RoleInfo, guildIDStr string) []components.RoleInfo {
+	out := make([]components.RoleInfo, 0, len(roles))
+	for _, r := range roles {
+		if r.ID == guildIDStr {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
 // guildRoles returns a list of roles for the guild from cache, sorted to
 // match Discord's display order: highest position first, then by name. The
 // cache iterator has non-deterministic order.
@@ -284,7 +303,10 @@ func allSettingsSections(guildID string, settings *model.GuildSettings, ms *mode
 		if err := partials.SettingsPosts(partials.PostsData{
 			GuildID: guildID,
 			ModRole: idStr(settings.PostsModRoleID),
-			Roles:   roles,
+			// @everyone (whose role ID equals the guild ID) is filtered out:
+			// it's never present in member.RoleIDs, so picking it would
+			// silently grant access to no one. See hasPostsModRole.
+			Roles: rolesWithoutEveryone(roles, guildID),
 		}).Render(ctx, w); err != nil {
 			return err
 		}
@@ -325,7 +347,7 @@ func handleSavePosts(client *bot.Client) http.HandlerFunc {
 			renderSafe(w, r, partials.SettingsPosts(partials.PostsData{
 				GuildID:   guildIDStr,
 				ModRole:   idStr(settings.PostsModRoleID),
-				Roles:     guildRoles(client, guildID),
+				Roles:     rolesWithoutEveryone(guildRoles(client, guildID), guildIDStr),
 				SaveError: message,
 			}))
 		}
@@ -333,6 +355,14 @@ func handleSavePosts(client *bot.Client) http.HandlerFunc {
 		modRole, err := parseSnowflakeOrZero(r.FormValue("mod_role"))
 		if err != nil {
 			renderPostsError("Invalid role ID.")
+			return
+		}
+		// @everyone's role ID equals the guild ID, but @everyone is never
+		// in member.RoleIDs — picking it would silently grant access to
+		// no one. The UI filters it out, but defend-in-depth at the save
+		// layer too in case a hand-crafted POST sneaks it past.
+		if modRole == guildID {
+			renderPostsError("@everyone cannot be used as the posts mod role. To grant access to everyone, pick a role that all members have.")
 			return
 		}
 		settings.PostsModRoleID = modRole
@@ -347,7 +377,7 @@ func handleSavePosts(client *bot.Client) http.HandlerFunc {
 		renderSafe(w, r, partials.SettingsPosts(partials.PostsData{
 			GuildID:     guildIDStr,
 			ModRole:     idStr(settings.PostsModRoleID),
-			Roles:       guildRoles(client, guildID),
+			Roles:       rolesWithoutEveryone(guildRoles(client, guildID), guildIDStr),
 			SaveSuccess: true,
 		}))
 	}
