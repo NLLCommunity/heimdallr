@@ -57,19 +57,3 @@ func hasPostsModRole(settings *model.GuildSettings, member *discord.Member) bool
 	}
 	return slices.Contains(member.RoleIDs, settings.PostsModRoleID)
 }
-
-// canManagePostsForMember is the single source of truth for "may this
-// member touch posts in this guild": admin/owner short-circuit, then
-// posts-role membership. Both the guild picker (handleGuilds) and the
-// posts handlers go through this so the picker can't promise a tile
-// the handler would refuse.
-//
-// Settings are loaded by the caller and passed in, because the picker
-// already pages through every candidate guild and would otherwise issue
-// duplicate GetGuildSettings round-trips.
-func canManagePostsForMember(client *bot.Client, guild discord.Guild, member *discord.Member, settings *model.GuildSettings) bool {
-	if isGuildAdminMember(client, guild, member) {
-		return true
-	}
-	return hasPostsModRole(settings, member)
-}

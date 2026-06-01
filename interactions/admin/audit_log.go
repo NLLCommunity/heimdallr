@@ -173,7 +173,7 @@ func applyRetentionOption(
 		// Defensive: MinValue: 0 on the option already blocks this at
 		// Discord's edge, but a malicious or buggy client could still
 		// send a negative.
-		return "", false, fmt.Errorf("%s retention must be a non-negative whole number.", label)
+		return "", false, fmt.Errorf("%s retention must be a non-negative whole number", label)
 	}
 	v := uint(raw)
 	ceiling := uintFromConfig(configKey)
@@ -188,10 +188,10 @@ func applyRetentionOption(
 		return fmt.Sprintf("%s retention override set to %d days.\n", label, v), true, nil
 	}
 	if v == 0 {
-		return "", false, fmt.Errorf("%s retention may not be 0 (forever) — the bot ceiling is %d days.", label, ceiling)
+		return "", false, fmt.Errorf("%s retention may not be 0 (forever) — the bot ceiling is %d days", label, ceiling)
 	}
 	if v > ceiling {
-		return "", false, fmt.Errorf("%s retention may not exceed the bot ceiling of %d days.", label, ceiling)
+		return "", false, fmt.Errorf("%s retention may not exceed the bot ceiling of %d days", label, ceiling)
 	}
 	*target = &v
 	return fmt.Sprintf("%s retention override set to %d days.\n", label, v), true, nil
