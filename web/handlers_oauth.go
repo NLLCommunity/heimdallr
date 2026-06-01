@@ -83,7 +83,7 @@ func safeReturnTo(raw string) string {
 	}
 	// Reject control characters that could split headers before they
 	// reach path.Clean (which preserves them).
-	if strings.ContainsAny(u.Path, "\x00\r\n") {
+	if strings.ContainsAny(u.Path, "\x00\r\n") || strings.ContainsAny(u.RawQuery, "\x00\r\n") {
 		return ""
 	}
 	// path.Clean collapses "..", ".", and double-slash segments so a
@@ -99,7 +99,11 @@ func safeReturnTo(raw string) string {
 	// Re-encode to drop fragments and normalize separators.
 	out := cleaned
 	if u.RawQuery != "" {
-		out += "?" + u.RawQuery
+		q, err := url.ParseQuery(u.RawQuery)
+		if err != nil {
+			return ""
+		}
+		out += "?" + q.Encode()
 	}
 	return out
 }

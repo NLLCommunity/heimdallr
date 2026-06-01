@@ -9,9 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// withTestAEAD swaps in a fixed cipher.AEAD for the duration of a test
-// helper, bypassing the config-driven NewTokenCrypto so the round-trip
-// tests don't depend on the viper-backed key.
+// newTestTokenCrypto builds a TokenCrypto with a deterministic AES-256-GCM
+// key, bypassing the config-driven NewTokenCrypto so the round-trip tests
+// don't depend on the viper-backed key.
 func newTestTokenCrypto(t *testing.T) *TokenCrypto {
 	t.Helper()
 	// Use AES-256-GCM via NewTokenCrypto's normal codepath would require
