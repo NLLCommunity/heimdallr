@@ -25,8 +25,19 @@ func TestSafeReturnTo(t *testing.T) {
 		{"/static/foo.js", ""},
 		{"/login", ""},
 		{"/", ""},
+		// Refused: path traversal. Browsers resolve "/guild/../login"
+		// client-side to "/login", which is same-origin but not what
+		// the /guild/ allowlist was meant to cover. path.Clean catches
+		// these before the prefix check.
+		{"/guild/../login", ""},
+		{"/guild/../../etc/passwd", ""},
+		{"/guild/12345/../../static/foo.js", ""},
 		// Refused: control characters that could split headers.
 		{"/guild/12345\r\nX-Evil: x", ""},
+		// Allowed but normalized: redundant "." and "//" segments are
+		// cleaned through, the result must still start with /guild/.
+		{"/guild/./12345", "/guild/12345"},
+		{"/guild//12345", "/guild/12345"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.in, func(t *testing.T) {

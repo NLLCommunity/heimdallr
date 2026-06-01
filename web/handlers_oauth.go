@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"path"
 	"strings"
 	"time"
 
@@ -80,17 +81,23 @@ func safeReturnTo(raw string) string {
 	if u.Scheme != "" || u.Host != "" {
 		return ""
 	}
-	// Must start with /guild/ exactly. Reject ".." path traversal and
-	// any non-printable characters; path.Clean handles the former, the
-	// strings.ContainsAny check handles the latter.
-	if !strings.HasPrefix(u.Path, "/guild/") {
-		return ""
-	}
+	// Reject control characters that could split headers before they
+	// reach path.Clean (which preserves them).
 	if strings.ContainsAny(u.Path, "\x00\r\n") {
 		return ""
 	}
+	// path.Clean collapses "..", ".", and double-slash segments so a
+	// crafted input like "/guild/../login" becomes "/login" and fails
+	// the prefix check below. Without this, the browser would resolve
+	// the traversal client-side and land the user on a path the
+	// allowlist was meant to exclude — still same-origin, but not what
+	// we promised the caller.
+	cleaned := path.Clean(u.Path)
+	if !strings.HasPrefix(cleaned, "/guild/") {
+		return ""
+	}
 	// Re-encode to drop fragments and normalize separators.
-	out := u.Path
+	out := cleaned
 	if u.RawQuery != "" {
 		out += "?" + u.RawQuery
 	}
