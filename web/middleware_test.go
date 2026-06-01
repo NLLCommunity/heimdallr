@@ -81,6 +81,23 @@ func TestRedirectToLogin_AJAXRequestGets401JSON(t *testing.T) {
 	}
 }
 
+// An AJAX GET to a guild deep-link must put the same /oauth/start
+// destination into the JSON body's login_url that a browser navigation
+// would receive in the Location header. Clients that surface login_url
+// to the user (or auto-navigate) would otherwise lose the deep-link
+// and end up on /login instead of returning to the original page after
+// consent.
+func TestRedirectToLogin_AJAXDeepLinkPreservesReturnTo(t *testing.T) {
+	req := httptest.NewRequest("GET", "/guild/123", nil)
+	req.Header.Set("Accept", "application/json")
+	rec := httptest.NewRecorder()
+	redirectToLogin(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"login_url":"/oauth/start?return_to=%2Fguild%2F123"`,
+		"AJAX 401 body must mirror the browser-redirect destination, not collapse to /login")
+}
+
 func TestRedirectToLogin_HTMXBeatsAJAX(t *testing.T) {
 	// HTMX requests can also be sent with X-Requested-With (some setups), but
 	// HX-Request is the more specific signal — HTMX needs HX-Redirect, not 401.

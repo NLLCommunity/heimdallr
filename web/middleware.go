@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
@@ -81,7 +82,17 @@ func redirectToLogin(w http.ResponseWriter, r *http.Request) {
 	if isAJAXRequest(r) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write([]byte(`{"error":"not signed in","login_url":"/login"}`))
+		// login_url must match the same destination the browser branch
+		// uses; clients rely on this to recover from a 401, and if we
+		// always pointed them at /login they'd lose the deep-link
+		// (return_to) that loginDestination computed for the original
+		// GET. json.Marshal handles escaping of the encoded query
+		// string in dest.
+		body, _ := json.Marshal(map[string]string{
+			"error":     "not signed in",
+			"login_url": dest,
+		})
+		_, _ = w.Write(body)
 		return
 	}
 	http.Redirect(w, r, dest, http.StatusSeeOther)

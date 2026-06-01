@@ -20,9 +20,7 @@ import (
 // abstraction.
 //
 // Construction reads the key once from config (dashboard.token_encryption_key)
-// and panics on a missing or wrong-length key, because the only sensible
-// response to a misconfigured key on a process that is about to write user
-// tokens is to refuse to start.
+// and errors on a missing or wrong-length key.
 type TokenCrypto struct {
 	aead cipher.AEAD
 }
