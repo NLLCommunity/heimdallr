@@ -1,6 +1,7 @@
 package web
 
 import (
+	"errors"
 	"log/slog"
 	"net/http"
 	"sort"
@@ -8,12 +9,22 @@ import (
 
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
 	"github.com/NLLCommunity/heimdallr/web/templates/pages"
 )
+
+// isUnauthorizedRest reports whether err is a Discord REST 401, meaning
+// the bearer token was revoked or invalidated upstream even though it
+// has not expired locally.
+func isUnauthorizedRest(err error) bool {
+	var restErr *rest.Error
+	return errors.As(err, &restErr) && restErr.Response != nil &&
+		restErr.Response.StatusCode == http.StatusUnauthorized
+}
 
 // handleGuilds renders the multi-guild picker. The user's guild list comes
 // from Discord's "Get Current User Guilds" endpoint via the OAuth bearer
@@ -53,6 +64,17 @@ func handleGuilds(client *bot.Client, clientID snowflake.ID, clientSecret string
 
 		userGuilds, err := client.Rest.GetCurrentUserGuilds(accessToken, 0, 0, 0, false)
 		if err != nil {
+			// freshAccessToken only checks the local TokenExpiresAt, so a
+			// token the user revoked upstream (Discord's Authorized Apps
+			// page) still reaches this call and comes back 401. Without
+			// this branch the user is stranded on a 502 on every visit
+			// until local expiry; sending them through consent again is
+			// the same recovery the refresh-failure path uses.
+			if isUnauthorizedRest(err) {
+				slog.Info("guilds: access token rejected by Discord, redirecting through OAuth", "err", err)
+				http.Redirect(w, r, "/oauth/start", http.StatusSeeOther)
+				return
+			}
 			slog.Warn("guilds: GetCurrentUserGuilds failed", "err", err)
 			http.Error(w, "failed to load your servers", http.StatusBadGateway)
 			return
