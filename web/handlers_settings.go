@@ -176,19 +176,15 @@ func handleDashboard(client *bot.Client) http.HandlerFunc {
 
 		// If the user is a post-mod but not an admin, send them to /posts
 		// rather than 403'ing — they have *some* access to this guild.
-		// Owner-shortcut + a single guildMember lookup feeds the admin
-		// check, after which the cached settings answer the posts-role
-		// question without an extra Discord round-trip.
+		// Owner-shortcut + a single guildMember lookup feeds the shared
+		// access resolver.
 		if parsedID, err := snowflake.Parse(guildIDStr); err == nil {
 			if guild, ok := client.Caches.Guild(parsedID); ok && session != nil &&
 				guild.OwnerID != session.UserID {
-				if member := guildMember(client, parsedID, session.UserID); member != nil &&
-					!isGuildAdminMember(client, guild, member) {
-					if settings, err := model.GetGuildSettings(parsedID); err == nil &&
-						hasPostsModRole(settings, member) {
-						http.Redirect(w, r, "/guild/"+parsedID.String()+"/posts", http.StatusSeeOther)
-						return
-					}
+				member := guildMember(client, parsedID, session.UserID)
+				if guildAccessLevel(client, guild, member) == guildAccessPosts {
+					http.Redirect(w, r, "/guild/"+parsedID.String()+"/posts", http.StatusSeeOther)
+					return
 				}
 			}
 		}

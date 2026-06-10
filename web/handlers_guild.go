@@ -149,10 +149,10 @@ func resolveGuildRole(client *bot.Client, cached *discord.Guild, ug discord.OAut
 	if member == nil {
 		return ""
 	}
-	if isGuildAdminMember(client, *cached, member) {
+	switch memberAccessLevel(client, *cached, member, settings.PostsModRoleID) {
+	case guildAccessAdmin:
 		return pages.GuildRoleAdmin
-	}
-	if hasPostsModRole(settings, member) {
+	case guildAccessPosts:
 		return pages.GuildRolePosts
 	}
 	return ""

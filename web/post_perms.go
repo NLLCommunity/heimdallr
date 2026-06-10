@@ -46,14 +46,15 @@ func isGuildAdminMember(client *bot.Client, guild discord.Guild, member *discord
 	return client.Caches.MemberPermissions(*member).Has(discord.PermissionAdministrator)
 }
 
-// hasPostsModRole reports whether the member holds the guild's configured
-// posts-mod role. Returns false when no role is configured, when the member
-// is nil, or when the member lacks the role. Callers should fold this
-// together with the admin check via canManagePostsForMember rather than
-// using it standalone — admins must always pass the access check
-// regardless of whether the role is configured or held.
-func hasPostsModRole(settings *model.GuildSettings, member *discord.Member) bool {
-	if settings == nil || settings.PostsModRoleID == 0 || member == nil {
+// hasPostsModRole reports whether the member holds the configured
+// posts-mod role. Returns false when no role is configured (roleID 0),
+// when the member is nil, when the member is timed out, or when the
+// member lacks the role. Callers should fold this together with the
+// admin check via memberAccessLevel rather than using it standalone -
+// admins must always pass the access check regardless of whether the
+// role is configured or held.
+func hasPostsModRole(postsModRoleID snowflake.ID, member *discord.Member) bool {
+	if postsModRoleID == 0 || member == nil {
 		return false
 	}
 	// A timed-out (communication-disabled) member must not keep posts
@@ -67,5 +68,44 @@ func hasPostsModRole(settings *model.GuildSettings, member *discord.Member) bool
 	if member.CommunicationDisabledUntil != nil && member.CommunicationDisabledUntil.After(time.Now()) {
 		return false
 	}
-	return slices.Contains(member.RoleIDs, settings.PostsModRoleID)
+	return slices.Contains(member.RoleIDs, postsModRoleID)
+}
+
+// guildAccess is the dashboard access tier for a member in a guild.
+type guildAccess int
+
+const (
+	guildAccessNone guildAccess = iota
+	guildAccessPosts
+	guildAccessAdmin
+)
+
+// memberAccessLevel is the single definition of the dashboard access
+// rule: owner or Administrator gets Admin, a holder of the configured
+// posts-mod role gets Posts, anyone else gets None. Every gate (the
+// /guilds picker, checkGuildPostMod, handleDashboard's post-mod
+// redirect) must resolve access through this or guildAccessLevel so
+// the rule cannot drift between them.
+func memberAccessLevel(client *bot.Client, guild discord.Guild, member *discord.Member, postsModRoleID snowflake.ID) guildAccess {
+	if isGuildAdminMember(client, guild, member) {
+		return guildAccessAdmin
+	}
+	if hasPostsModRole(postsModRoleID, member) {
+		return guildAccessPosts
+	}
+	return guildAccessNone
+}
+
+// guildAccessLevel is memberAccessLevel with the posts-mod role loaded
+// from guild settings. Settings are only consulted when the member is
+// not an admin, keeping the common admin path free of DB work.
+func guildAccessLevel(client *bot.Client, guild discord.Guild, member *discord.Member) guildAccess {
+	if isGuildAdminMember(client, guild, member) {
+		return guildAccessAdmin
+	}
+	settings, err := model.GetGuildSettings(guild.ID)
+	if err != nil {
+		return guildAccessNone
+	}
+	return memberAccessLevel(client, guild, member, settings.PostsModRoleID)
 }

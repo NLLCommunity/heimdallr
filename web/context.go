@@ -144,13 +144,12 @@ func checkGuildPostMod(w http.ResponseWriter, r *http.Request, client *bot.Clien
 	}
 
 	// One member fetch feeds both the admin check and the posts-role
-	// check below.
+	// check inside guildAccessLevel.
 	member := guildMember(client, guildID, session.UserID)
-	if isGuildAdminMember(client, guild, member) {
+	switch guildAccessLevel(client, guild, member) {
+	case guildAccessAdmin:
 		return guildID, true, true
-	}
-	settings, err := model.GetGuildSettings(guildID)
-	if err == nil && hasPostsModRole(settings, member) {
+	case guildAccessPosts:
 		return guildID, false, true
 	}
 
