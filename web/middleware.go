@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/netip"
 	"net/url"
+	"path"
 	"slices"
 	"strings"
 	"sync"
@@ -125,16 +126,41 @@ func isAJAXRequest(r *http.Request) bool {
 // second hand-maintained list to drift out of sync.
 type publicPaths map[string]bool
 
-func (p publicPaths) match(path string) bool {
-	if p[path] {
+// match reports whether rawPath is auth-exempt. The path is normalized
+// first: the middleware runs before the mux, so it sees raw paths, and
+// matching those against prefix entries like "/static/" would treat
+// "/static/../guilds" as public. net/http's ServeMux clean-and-redirect
+// means such a request only ever reaches a 307 today, but the auth
+// decision must hold on its own instead of leaning on that downstream
+// behavior.
+func (p publicPaths) match(rawPath string) bool {
+	reqPath := cleanRequestPath(rawPath)
+	if p[reqPath] {
 		return true
 	}
 	for pattern := range p {
-		if strings.HasSuffix(pattern, "/") && strings.HasPrefix(path, pattern) {
+		if strings.HasSuffix(pattern, "/") && strings.HasPrefix(reqPath, pattern) {
 			return true
 		}
 	}
 	return false
+}
+
+// cleanRequestPath normalizes a request path the same way net/http's
+// ServeMux does before routing: path.Clean, with a trailing slash
+// preserved so prefix entries ("/static/") still match their root.
+func cleanRequestPath(p string) string {
+	if p == "" {
+		return "/"
+	}
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	cleaned := path.Clean(p)
+	if strings.HasSuffix(p, "/") && cleaned != "/" {
+		cleaned += "/"
+	}
+	return cleaned
 }
 
 // authMiddleware checks the session cookie and injects the session into context.

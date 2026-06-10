@@ -130,7 +130,9 @@ func TestAuthMiddleware_SkipsPublicPaths(t *testing.T) {
 
 	// `/` is intentionally not public — handleRoot relies on the session
 	// being injected by this middleware to decide /guilds vs /login.
-	for _, path := range []string{"/login", "/oauth/start", "/oauth/callback", "/static/css/custom.css"} {
+	// "/static/" itself must stay public: normalization preserves the
+	// trailing slash, so the prefix entry still matches its own root.
+	for _, path := range []string{"/login", "/oauth/start", "/oauth/callback", "/static/css/custom.css", "/static/"} {
 		called = false
 		req := httptest.NewRequest("GET", path, nil)
 		rec := httptest.NewRecorder()
@@ -154,6 +156,25 @@ func TestAuthMiddleware_RootRequiresAuth(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 	assert.Equal(t, http.StatusSeeOther, rec.Code)
 	assert.Equal(t, "/login", rec.Header().Get("Location"))
+}
+
+// Traversal and double-slash variants of public prefixes must not skip
+// the session check: the middleware sees raw paths (it runs before the
+// mux), and "/static/../guilds" would otherwise prefix-match the public
+// "/static/" entry. ServeMux's own clean-and-redirect keeps protected
+// handlers from executing on such paths today, but the auth decision
+// must be correct without relying on that.
+func TestAuthMiddleware_UncleanPathsAreNotPublic(t *testing.T) {
+	handler := authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("handler should not be called without a session for %s", r.URL.Path)
+	}), testPublicPaths)
+
+	for _, p := range []string{"/static/../guilds", "/static/..", "/static/../../guild/123", "//static/../guilds"} {
+		req := httptest.NewRequest("GET", p, nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusSeeOther, rec.Code, "path %s must require auth", p)
+	}
 }
 
 func TestAuthMiddleware_RedirectsWithoutCookie(t *testing.T) {
