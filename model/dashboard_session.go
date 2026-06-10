@@ -179,6 +179,18 @@ func GetSession(token string) (*DashboardSession, error) {
 	return &session, nil
 }
 
+// GetSessionByHash reloads a session row by its stored (already hashed)
+// token - the Token field of a session loaded via GetSession. The
+// token-refresh path uses it to re-check TokenExpiresAt under the
+// refresh lock without access to the raw cookie value.
+func GetSessionByHash(tokenHashed string) (*DashboardSession, error) {
+	var session DashboardSession
+	if err := DB.Where("token = ? AND expires_at > ?", tokenHashed, time.Now()).First(&session).Error; err != nil {
+		return nil, errors.New("invalid or expired session")
+	}
+	return &session, nil
+}
+
 func DeleteSession(token string) error {
 	return DB.Where("token = ?", tokenHash(token)).Delete(&DashboardSession{}).Error
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/snowflake/v2"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/NLLCommunity/heimdallr/model"
 )
@@ -346,6 +347,20 @@ func sealTokenPair(crypto *model.TokenCrypto, tok *discord.AccessTokenResponse) 
 	return sealedAccess, sealedRefresh, nil
 }
 
+// tokenRefreshGroup serializes token refreshes per session. Discord
+// rotates the refresh token on every use, so two concurrent refreshes
+// for the same session race: the loser exchanges an already-rotated
+// token, gets invalid_grant, and a slower UpdateSessionTokens write
+// could persist the revoked pair, forcing the user through a full
+// re-consent. Keys are session token hashes; entries exist only for
+// the duration of a flight, so the group cannot grow unboundedly.
+var tokenRefreshGroup singleflight.Group
+
+// tokenExpirySlack is how close to expiry a stored access token may be
+// before we refresh instead of handing it out, so a token cannot
+// expire mid-request.
+const tokenExpirySlack = 30 * time.Second
+
 // freshAccessToken returns a usable plaintext access token for the given
 // session, refreshing it via Discord if the stored token is expired.
 //
@@ -354,29 +369,46 @@ func sealTokenPair(crypto *model.TokenCrypto, tok *discord.AccessTokenResponse) 
 // fails (revoked grant, network error), the caller is expected to
 // redirect the user back through OAuth — there's no fall-back path
 // because the entire point of the OAuth flow is user-scope access.
+//
+// Refreshes are single-flighted per session: concurrent requests share
+// one Discord round-trip, and a request that arrives just after a
+// completed flight re-reads the row inside its own flight and uses the
+// fresh tokens instead of burning the rotated refresh token.
 func freshAccessToken(client *bot.Client, clientID snowflake.ID, clientSecret string, crypto *model.TokenCrypto, session *model.DashboardSession) (string, error) {
-	// 30s of slack so we don't hand out a token that expires mid-request.
-	if time.Until(session.TokenExpiresAt) > 30*time.Second {
+	if time.Until(session.TokenExpiresAt) > tokenExpirySlack {
 		return crypto.Open(session.AccessTokenEnc)
 	}
-	refreshToken, err := crypto.Open(session.RefreshTokenEnc)
+	token, err, _ := tokenRefreshGroup.Do(session.Token, func() (any, error) {
+		// Re-read the row: our in-memory session was loaded before the
+		// lock, so a refresh that completed in the meantime is only
+		// visible in the DB.
+		row := session
+		if fresh, err := model.GetSessionByHash(session.Token); err == nil {
+			if time.Until(fresh.TokenExpiresAt) > tokenExpirySlack {
+				return crypto.Open(fresh.AccessTokenEnc)
+			}
+			row = fresh
+		}
+		refreshToken, err := crypto.Open(row.RefreshTokenEnc)
+		if err != nil {
+			return nil, err
+		}
+		tok, err := client.Rest.RefreshAccessToken(clientID, clientSecret, refreshToken)
+		if err != nil {
+			return nil, err
+		}
+		sealedAccess, sealedRefresh, err := sealTokenPair(crypto, tok)
+		if err != nil {
+			return nil, err
+		}
+		newExpiry := time.Now().Add(tok.ExpiresIn)
+		if err := model.UpdateSessionTokens(session.Token, sealedAccess, sealedRefresh, newExpiry); err != nil {
+			return nil, err
+		}
+		return tok.AccessToken, nil
+	})
 	if err != nil {
 		return "", err
 	}
-	tok, err := client.Rest.RefreshAccessToken(clientID, clientSecret, refreshToken)
-	if err != nil {
-		return "", err
-	}
-	sealedAccess, sealedRefresh, err := sealTokenPair(crypto, tok)
-	if err != nil {
-		return "", err
-	}
-	newExpiry := time.Now().Add(tok.ExpiresIn)
-	if err := model.UpdateSessionTokens(session.Token, sealedAccess, sealedRefresh, newExpiry); err != nil {
-		return "", err
-	}
-	session.AccessTokenEnc = sealedAccess
-	session.RefreshTokenEnc = sealedRefresh
-	session.TokenExpiresAt = newExpiry
-	return tok.AccessToken, nil
+	return token.(string), nil
 }
