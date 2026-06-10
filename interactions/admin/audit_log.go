@@ -6,7 +6,6 @@ import (
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/spf13/viper"
 
 	"github.com/NLLCommunity/heimdallr/audit"
 	"github.com/NLLCommunity/heimdallr/interactions"
@@ -153,13 +152,10 @@ func AdminAuditLogHandler(e *handler.CommandEvent) error {
 }
 
 // applyRetentionOption reads a retention option from the command data,
-// validates it against the bot ceiling, and writes the resulting *uint
-// into target. Returns (statusLine, applied, validationError).
-//
-// The ceiling rules mirror the dashboard handler's parseRetentionField:
-// when the bot ceiling is finite, the override must be > 0 and <= ceiling;
-// when the bot ceiling is 0 ("forever"), any value is allowed and 0
-// stores nil so a future ceiling change can't strand an invalid row.
+// validates it via the shared scheduled_tasks rules (the same ones the
+// dashboard's parseRetentionField uses, so the two write paths cannot
+// drift apart), and writes the resulting *uint into target. Returns
+// (statusLine, applied, validationError).
 func applyRetentionOption(
 	data discord.SlashCommandInteractionData,
 	optName, configKey, label string,
@@ -176,24 +172,16 @@ func applyRetentionOption(
 		return "", false, fmt.Errorf("%s retention must be a non-negative whole number", label)
 	}
 	v := uint(raw)
-	ceiling := uintFromConfig(configKey)
-	if ceiling == 0 {
-		if v == 0 {
-			// "forever" with no ceiling collapses to nil, same as the
-			// dashboard. Keeps stored rows portable across ceiling changes.
-			*target = nil
-			return fmt.Sprintf("%s retention override cleared (was 0 with no ceiling).\n", label), true, nil
-		}
-		*target = &v
-		return fmt.Sprintf("%s retention override set to %d days.\n", label, v), true, nil
+	override, err := scheduled_tasks.ValidateRetentionOverride(configKey, label, v)
+	if err != nil {
+		return "", false, err
 	}
-	if v == 0 {
-		return "", false, fmt.Errorf("%s retention may not be 0 (forever) — the bot ceiling is %d days", label, ceiling)
+	*target = override
+	if override == nil {
+		// "forever" with no ceiling collapses to nil, same as the
+		// dashboard. Keeps stored rows portable across ceiling changes.
+		return fmt.Sprintf("%s retention override cleared (was 0 with no ceiling).\n", label), true, nil
 	}
-	if v > ceiling {
-		return "", false, fmt.Errorf("%s retention may not exceed the bot ceiling of %d days", label, ceiling)
-	}
-	*target = &v
 	return fmt.Sprintf("%s retention override set to %d days.\n", label, v), true, nil
 }
 
@@ -234,17 +222,6 @@ func retentionLine(label, configKey string, override *uint) string {
 	}
 
 	return fmt.Sprintf("**%s retention:** override=%s, effective=%s", label, overrideStr, effective)
-}
-
-// uintFromConfig is a local copy of the dashboard helper. Keeping it
-// here avoids importing web from interactions, which would invert the
-// dependency direction the rest of the codebase uses.
-func uintFromConfig(key string) uint {
-	v := viper.GetInt(key)
-	if v < 0 {
-		return 0
-	}
-	return uint(v)
 }
 
 // uintPtrString renders *uint as either the decimal value or "" so the

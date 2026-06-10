@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/disgoorg/disgo/bot"
-	"github.com/spf13/viper"
 
 	"github.com/NLLCommunity/heimdallr/audit"
 	"github.com/NLLCommunity/heimdallr/model"
@@ -20,9 +19,9 @@ import (
 // guild's current explicit value (or empty when using defaults), so that
 // re-rendering preserves what the user has saved.
 func buildAuditLogSettingsData(guildID string, settings *model.GuildSettings) partials.AuditLogSettingsData {
-	maxMessage := uintFromConfig("audit_log.message_retention_days")
-	maxMember := uintFromConfig("audit_log.member_retention_days")
-	maxGuild := uintFromConfig("audit_log.guild_retention_days")
+	maxMessage := scheduled_tasks.RetentionCeilingDays("audit_log.message_retention_days")
+	maxMember := scheduled_tasks.RetentionCeilingDays("audit_log.member_retention_days")
+	maxGuild := scheduled_tasks.RetentionCeilingDays("audit_log.guild_retention_days")
 
 	return partials.AuditLogSettingsData{
 		GuildID: guildID,
@@ -67,14 +66,6 @@ func effectiveRetentionLabel(configKey string, override *uint) string {
 	return strconv.FormatUint(uint64(days), 10) + " days"
 }
 
-func uintFromConfig(key string) uint {
-	v := viper.GetInt(key)
-	if v < 0 {
-		return 0
-	}
-	return uint(v)
-}
-
 func ptrUintToString(p *uint) string {
 	if p == nil {
 		return ""
@@ -106,9 +97,9 @@ func handleSaveAuditLog(client *bot.Client) http.HandlerFunc {
 			renderSafe(w, r, partials.SettingsAuditLog(partials.AuditLogSettingsData{
 				GuildID:                 guildIDStr,
 				SaveError:               "Failed to load settings.",
-				MaxMessageRetentionDays: uintFromConfig("audit_log.message_retention_days"),
-				MaxMemberRetentionDays:  uintFromConfig("audit_log.member_retention_days"),
-				MaxGuildRetentionDays:   uintFromConfig("audit_log.guild_retention_days"),
+				MaxMessageRetentionDays: scheduled_tasks.RetentionCeilingDays("audit_log.message_retention_days"),
+				MaxMemberRetentionDays:  scheduled_tasks.RetentionCeilingDays("audit_log.member_retention_days"),
+				MaxGuildRetentionDays:   scheduled_tasks.RetentionCeilingDays("audit_log.guild_retention_days"),
 			}))
 			return
 		}
@@ -174,12 +165,10 @@ func handleSaveAuditLog(client *bot.Client) http.HandlerFunc {
 	}
 }
 
-// parseRetentionField turns "" into nil (= use default), a valid uint into
-// a guild override, and rejects values above the bot ceiling. 0 is allowed
-// only when the bot ceiling is also 0 (forever); even then it normalizes
-// to nil since "override = forever" is indistinguishable from "no override
-// when the ceiling is forever" — and persisting the explicit 0 would leave
-// an invalid stored value if the operator later lowers the ceiling.
+// parseRetentionField turns "" into nil (= use default) and otherwise
+// applies the shared override rules from scheduled_tasks - the same ones
+// the /admin audit-log command uses - so the two write paths cannot
+// drift apart.
 func parseRetentionField(raw, configKey, label string) (*uint, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -189,24 +178,7 @@ func parseRetentionField(raw, configKey, label string) (*uint, error) {
 	if err != nil {
 		return nil, &settingsValidationError{label + " retention must be a non-negative whole number."}
 	}
-	v := uint(n)
-	ceiling := uintFromConfig(configKey)
-	if ceiling == 0 {
-		if v == 0 {
-			// "forever" with no ceiling is the same as no override —
-			// collapse to nil so a future finite ceiling doesn't strand
-			// this row with an invalid saved value.
-			return nil, nil
-		}
-		return &v, nil
-	}
-	if v == 0 {
-		return nil, &settingsValidationError{label + " retention may not be 0 (forever) — the bot ceiling is " + strconv.FormatUint(uint64(ceiling), 10) + " days."}
-	}
-	if v > ceiling {
-		return nil, &settingsValidationError{label + " retention may not exceed the bot ceiling of " + strconv.FormatUint(uint64(ceiling), 10) + " days."}
-	}
-	return &v, nil
+	return scheduled_tasks.ValidateRetentionOverride(configKey, label, uint(n))
 }
 
 type settingsValidationError struct{ msg string }
