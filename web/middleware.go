@@ -19,11 +19,14 @@ import (
 )
 
 const (
-	// /oauth/start creates a state row + cookie per call. The limit
-	// must accommodate a real human re-trying a flaky network without
-	// being so high that an attacker can grow the state table.
-	oauthStartRatePerMinute = 6
-	oauthStartBurst         = 10
+	// /oauth/start creates a state row + cookie per call and
+	// /oauth/callback opens a state-consuming transaction; both share
+	// one per-IP budget. The limit must accommodate a real human
+	// re-trying a flaky network (a full login costs two hits: start +
+	// callback) without being so high that an attacker can grow the
+	// state table or hammer the DB.
+	oauthRatePerMinute = 6
+	oauthBurst         = 10
 	// Sandbox sends are admin-only but still rate-limited per session user
 	// so a single admin can't drain the bot's Discord quota by spamming the
 	// sandbox. ~10/min steady, burst 5 is generous for testing message

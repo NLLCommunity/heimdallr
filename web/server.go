@@ -120,18 +120,23 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	// /oauth/start creates a state row + cookie per call, so an
 	// unauthenticated attacker spraying it would otherwise grow the
 	// state table unboundedly until the 15-minute janitor catches up.
-	// Per-IP limiter keeps this cheap.
-	oauthStartLimiter := newKeyedRateLimiter(
-		rate.Every(time.Minute/oauthStartRatePerMinute),
-		oauthStartBurst,
+	// /oauth/callback is just as unauthenticated and opens a
+	// write-capable ConsumeOAuthState transaction per request - the
+	// state-cookie equality check is attacker-satisfiable since the
+	// client controls both cookie and query param - so it shares the
+	// same per-IP budget.
+	oauthLimiter := newKeyedRateLimiter(
+		rate.Every(time.Minute/oauthRatePerMinute),
+		oauthBurst,
 	)
 
 	// Middleware chain: mux → auth → body limit → rate limit → CORS.
 	withAuth := authMiddleware(mux)
 	withBodyLimit := bodyLimitMiddleware(withAuth)
 	withRateLimit := rateLimitMiddleware(
-		oauthStartLimiter, trustedProxies,
+		oauthLimiter, trustedProxies,
 		rateLimitRule{Method: http.MethodGet, Path: "/oauth/start"},
+		rateLimitRule{Method: http.MethodGet, Path: "/oauth/callback"},
 	)(withBodyLimit)
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins: []string{allowedOrigin},
@@ -169,7 +174,7 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 				if err := model.CleanExpiredSessions(); err != nil {
 					slog.Warn("session cleanup failed", "error", err)
 				}
-				oauthStartLimiter.cleanup(rateLimiterTTL)
+				oauthLimiter.cleanup(rateLimiterTTL)
 				sandboxLimiter.cleanup(rateLimiterTTL)
 				postsLimiter.cleanup(rateLimiterTTL)
 			}
