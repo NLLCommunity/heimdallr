@@ -136,19 +136,32 @@ func handleGuilds(client *bot.Client, clientID snowflake.ID, clientSecret string
 // given guild. Returns "" when the user has no access (don't show a tile
 // at all).
 //
-// Admin/owner short-circuits at the top so neither GetGuildSettings nor
-// GetMember runs in the common case. Posts-role evaluation requires the
-// guild to be in the cache (we need cached.Guild to test admin via
-// cached perms) — for stuck guilds we can't run the posts check, which
-// is acceptable: it's the same population that the bot has temporarily
-// lost gateway state for, and the user can re-navigate after Disgo
-// recovers.
+// Admin/owner short-circuits before GetGuildSettings and GetMember so
+// neither runs in the common case. Posts-role evaluation requires the
+// guild to be in the cache (we need cached perms to test admin) — for
+// stuck guilds we can't run the posts check, which is acceptable: it's
+// the same population that the bot has temporarily lost gateway state
+// for, and the user can re-navigate after Disgo recovers.
 func resolveGuildRole(client *bot.Client, cached *discord.Guild, ug discord.OAuth2Guild, userID snowflake.ID) pages.GuildRole {
-	if ug.Owner || ug.Permissions.Has(discord.PermissionAdministrator) {
+	isAdmin := ug.Owner || ug.Permissions.Has(discord.PermissionAdministrator)
+	if cached == nil {
+		// Stuck (unready/unavailable) guild: the unready/unavailable
+		// sets can keep holding guilds the bot was kicked from while
+		// gateway state is stale, and the OAuth payload alone would
+		// advertise an Admin tile that 403s on click ("bot is not in
+		// this guild"). REST-verify membership before showing the tile,
+		// like the pre-OAuth picker did. Bounded by the user's stuck
+		// admin guilds, normally zero.
+		if !isAdmin {
+			return ""
+		}
+		if _, err := client.Rest.GetGuild(ug.ID, false); err != nil {
+			return ""
+		}
 		return pages.GuildRoleAdmin
 	}
-	if cached == nil {
-		return ""
+	if isAdmin {
+		return pages.GuildRoleAdmin
 	}
 	settings, err := model.GetGuildSettings(ug.ID)
 	if err != nil || settings.PostsModRoleID == 0 {
