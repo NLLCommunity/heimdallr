@@ -194,6 +194,24 @@ func handleOAuthCallback(
 	secureCookie bool,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		// Every failure exits through one of these two helpers so the
+		// destination and shape stay uniform: bounceToLogin for "retry
+		// the login" conditions (logged at Warn unless the message is
+		// empty), failLogin for server-side faults that a retry will not
+		// fix. If the bounce destination ever needs to carry an error
+		// hint (e.g. /login?error=oauth), this is the single place to
+		// change.
+		bounceToLogin := func(msg string, args ...any) {
+			if msg != "" {
+				slog.Warn("oauth: "+msg, args...)
+			}
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+		}
+		failLogin := func(msg string, err error) {
+			slog.Error("oauth: "+msg, "err", err)
+			http.Error(w, "failed to finish login", http.StatusInternalServerError)
+		}
+
 		code := r.URL.Query().Get("code")
 		state := r.URL.Query().Get("state")
 
@@ -212,57 +230,52 @@ func handleOAuthCallback(
 		}
 
 		// Discord sends ?error=access_denied&error_description=... when
-		// the user clicks "Cancel" on consent. Treat as a normal bounce.
+		// the user clicks "Cancel" on consent. Treat as a normal bounce;
+		// Info because it is a user choice, not a fault.
 		if errParam := r.URL.Query().Get("error"); errParam != "" {
 			slog.Info("oauth: user cancelled consent",
 				"error", errParam,
 				"description", r.URL.Query().Get("error_description"),
 			)
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			bounceToLogin("")
 			return
 		}
 		if code == "" || state == "" {
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			bounceToLogin("")
 			return
 		}
 
 		if stateIdx < 0 {
-			slog.Warn("oauth: state cookie mismatch on callback")
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			bounceToLogin("state cookie mismatch on callback")
 			return
 		}
 
 		stateRow, err := model.ConsumeOAuthState(state)
 		if err != nil {
-			slog.Warn("oauth: invalid state on callback", "err", err)
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			bounceToLogin("invalid state on callback", "err", err)
 			return
 		}
 
 		tok, err := client.Rest.GetAccessToken(clientID, clientSecret, code, redirectURI)
 		if err != nil {
-			slog.Warn("oauth: token exchange failed", "err", err)
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			bounceToLogin("token exchange failed", "err", err)
 			return
 		}
 
 		me, err := client.Rest.GetCurrentUser(tok.AccessToken)
 		if err != nil {
-			slog.Warn("oauth: GetCurrentUser failed after token exchange", "err", err)
-			http.Redirect(w, r, "/login", http.StatusSeeOther)
+			bounceToLogin("GetCurrentUser failed after token exchange", "err", err)
 			return
 		}
 
 		sealedAccess, err := crypto.Seal(tok.AccessToken)
 		if err != nil {
-			slog.Error("oauth: seal access token failed", "err", err)
-			http.Error(w, "failed to finish login", http.StatusInternalServerError)
+			failLogin("seal access token failed", err)
 			return
 		}
 		sealedRefresh, err := crypto.Seal(tok.RefreshToken)
 		if err != nil {
-			slog.Error("oauth: seal refresh token failed", "err", err)
-			http.Error(w, "failed to finish login", http.StatusInternalServerError)
+			failLogin("seal refresh token failed", err)
 			return
 		}
 
@@ -281,8 +294,7 @@ func handleOAuthCallback(
 			time.Now().Add(tok.ExpiresIn),
 		)
 		if err != nil {
-			slog.Error("oauth: failed to create admin session", "err", err)
-			http.Error(w, "failed to finish login", http.StatusInternalServerError)
+			failLogin("failed to create admin session", err)
 			return
 		}
 
