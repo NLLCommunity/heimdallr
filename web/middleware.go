@@ -117,17 +117,35 @@ func isAJAXRequest(r *http.Request) bool {
 	return strings.Contains(accept, "application/json")
 }
 
+// publicPaths records the routes that skip the auth middleware's
+// session check. Entries ending in "/" match as prefixes (e.g.
+// "/static/"); everything else matches exactly. StartServer fills this
+// at route-registration time via its handlePublic helper, so a route
+// is auth-exempt if and only if it was mounted as public - there is no
+// second hand-maintained list to drift out of sync.
+type publicPaths map[string]bool
+
+func (p publicPaths) match(path string) bool {
+	if p[path] {
+		return true
+	}
+	for pattern := range p {
+		if strings.HasSuffix(pattern, "/") && strings.HasPrefix(path, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
 // authMiddleware checks the session cookie and injects the session into context.
 // Unauthenticated requests to protected paths are redirected to /login.
-func authMiddleware(next http.Handler) http.Handler {
+func authMiddleware(next http.Handler, public publicPaths) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip auth for public paths. `/` is intentionally NOT public — it's
 		// the post-login landing handler that decides /guilds vs /login based
 		// on the session, which means it needs the session injected by this
 		// middleware first.
-		path := r.URL.Path
-		if path == "/login" || path == "/oauth/start" || path == "/oauth/callback" ||
-			strings.HasPrefix(path, "/static/") {
+		if public.match(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}

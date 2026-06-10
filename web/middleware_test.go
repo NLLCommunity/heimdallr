@@ -110,12 +110,23 @@ func TestRedirectToLogin_HTMXBeatsAJAX(t *testing.T) {
 	assert.Equal(t, "/login", rec.Header().Get("HX-Redirect"))
 }
 
+// testPublicPaths mirrors the set StartServer registers via its
+// handlePublic helper. The middleware tests exercise the matcher
+// semantics (exact entries plus trailing-slash prefixes); which routes
+// are public is decided at registration time in server.go.
+var testPublicPaths = publicPaths{
+	"/login":          true,
+	"/oauth/start":    true,
+	"/oauth/callback": true,
+	"/static/":        true,
+}
+
 func TestAuthMiddleware_SkipsPublicPaths(t *testing.T) {
 	called := false
 	handler := authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}))
+	}), testPublicPaths)
 
 	// `/` is intentionally not public — handleRoot relies on the session
 	// being injected by this middleware to decide /guilds vs /login.
@@ -136,7 +147,7 @@ func TestAuthMiddleware_SkipsPublicPaths(t *testing.T) {
 func TestAuthMiddleware_RootRequiresAuth(t *testing.T) {
 	handler := authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler should not be called without a session")
-	}))
+	}), testPublicPaths)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rec := httptest.NewRecorder()
@@ -148,7 +159,7 @@ func TestAuthMiddleware_RootRequiresAuth(t *testing.T) {
 func TestAuthMiddleware_RedirectsWithoutCookie(t *testing.T) {
 	handler := authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler should not be called")
-	}))
+	}), testPublicPaths)
 
 	req := httptest.NewRequest("GET", "/guilds", nil)
 	rec := httptest.NewRecorder()
@@ -162,7 +173,7 @@ func TestAuthMiddleware_RedirectsWithoutCookie(t *testing.T) {
 func TestAuthMiddleware_HTMXRequest_UsesHXRedirect(t *testing.T) {
 	handler := authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler should not be called")
-	}))
+	}), testPublicPaths)
 
 	req := httptest.NewRequest("GET", "/guilds", nil)
 	req.Header.Set("HX-Request", "true")

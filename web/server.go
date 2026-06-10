@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/disgoorg/disgo/bot"
@@ -57,13 +58,28 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 
 	mux := http.NewServeMux()
 
+	// handlePublic mounts a route AND records it as auth-exempt in one
+	// step, so the public-path list the auth middleware consults cannot
+	// drift from what is actually registered. Patterns ending in "/"
+	// are prefix-matched by the middleware (e.g. /static/).
+	public := publicPaths{}
+	handlePublic := func(pattern string, h http.Handler) {
+		mux.Handle(pattern, h)
+		if _, path, ok := strings.Cut(pattern, " "); ok {
+			public[path] = true
+		} else {
+			public[pattern] = true
+		}
+	}
+
 	// Auth routes. /oauth/start is public (it's the entry point for
 	// first-time logins from /login as well as the post-login redirect
-	// target for deep-links).
+	// target for deep-links). `/` is intentionally NOT public: it's the
+	// post-login landing handler and needs the session injected.
 	mux.HandleFunc("GET /", handleRoot)
-	mux.HandleFunc("GET /login", handleLogin)
-	mux.HandleFunc("GET /oauth/start", handleOAuthStart(oauthClientID, oauthRedirect, secureCookie))
-	mux.HandleFunc("GET /oauth/callback", handleOAuthCallback(client, oauthClientID, oauthClientSecret, oauthRedirect, tokenCrypto, secureCookie))
+	handlePublic("GET /login", http.HandlerFunc(handleLogin))
+	handlePublic("GET /oauth/start", handleOAuthStart(oauthClientID, oauthRedirect, secureCookie))
+	handlePublic("GET /oauth/callback", handleOAuthCallback(client, oauthClientID, oauthClientSecret, oauthRedirect, tokenCrypto, secureCookie))
 	mux.HandleFunc("GET /logout", handleLogout(secureCookie))
 
 	// Guild routes.
@@ -115,7 +131,7 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	mux.HandleFunc("POST /guild/{id}/posts/{postID}/delete", handlePostDelete(client, postsLimiter))
 
 	// Static files.
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(getStaticFS())))
+	handlePublic("GET /static/", http.StripPrefix("/static/", http.FileServer(getStaticFS())))
 
 	// /oauth/start creates a state row + cookie per call, so an
 	// unauthenticated attacker spraying it would otherwise grow the
@@ -131,7 +147,7 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	)
 
 	// Middleware chain: mux → auth → body limit → rate limit → CORS.
-	withAuth := authMiddleware(mux)
+	withAuth := authMiddleware(mux, public)
 	withBodyLimit := bodyLimitMiddleware(withAuth)
 	withRateLimit := rateLimitMiddleware(
 		oauthLimiter, trustedProxies,
