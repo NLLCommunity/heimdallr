@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
@@ -25,32 +26,52 @@ var oauthScopes = []discord.OAuth2Scope{
 	discord.OAuth2ScopeGuilds,
 }
 
-// oauthStateCookieName is the short-lived cookie that pins the OAuth
-// state to the user agent. /oauth/start sets it; /oauth/callback compares
-// its value to the state query parameter and refuses any mismatch. Without
-// this, an attacker could craft an authorize URL and email it to a victim
-// to log the victim into the attacker's account (login-CSRF).
+// oauthStateCookieName is the short-lived cookie that pins OAuth states
+// to the user agent. /oauth/start appends to it; /oauth/callback
+// requires the state query parameter to be one of its values and
+// refuses any mismatch. Without this, an attacker could craft an
+// authorize URL and email it to a victim to log the victim into the
+// attacker's account (login-CSRF).
+//
+// The cookie holds up to oauthStateCookieMaxStates outstanding states
+// ("|"-joined) rather than a single value: a logged-out user opening
+// two dashboard deep-links starts two flows, and with one slot the
+// second /oauth/start would clobber the first tab's state, failing its
+// callback despite a valid DB state row.
 const oauthStateCookieName = "heimdallr_oauth_state"
 
-// makeOAuthStateCookie builds the oauth-state cookie. An empty value
-// produces an expiring cookie so the browser deletes it. Set and clear
-// must agree on Name and Path or the browser never removes the cookie;
-// routing both through this constructor (the same pattern as
-// makeSessionCookie) guarantees they cannot drift.
-func makeOAuthStateCookie(value string, secure bool) *http.Cookie {
+const oauthStateCookieMaxStates = 4
+
+// makeOAuthStateCookie builds the oauth-state cookie carrying the given
+// outstanding states. An empty list produces an expiring cookie so the
+// browser deletes it. Set and clear must agree on Name and Path or the
+// browser never removes the cookie; routing both through this
+// constructor (the same pattern as makeSessionCookie) guarantees they
+// cannot drift.
+func makeOAuthStateCookie(states []string, secure bool) *http.Cookie {
 	c := &http.Cookie{
 		Name:     oauthStateCookieName,
-		Value:    value,
+		Value:    strings.Join(states, "|"),
 		Path:     "/oauth/",
 		MaxAge:   600,
 		HttpOnly: true,
 		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 	}
-	if value == "" {
+	if len(states) == 0 {
 		c.MaxAge = -1
 	}
 	return c
+}
+
+// readOAuthStateCookie returns the outstanding state tokens from the
+// request's oauth-state cookie, or nil when absent.
+func readOAuthStateCookie(r *http.Request) []string {
+	c, err := r.Cookie(oauthStateCookieName)
+	if err != nil || c.Value == "" {
+		return nil
+	}
+	return strings.Split(c.Value, "|")
 }
 
 // oauthRedirectURI returns the absolute redirect URI Discord sends the
@@ -142,7 +163,16 @@ func handleOAuthStart(clientID snowflake.ID, redirectURI string, secureCookie bo
 			http.Error(w, "failed to start login", http.StatusInternalServerError)
 			return
 		}
-		http.SetCookie(w, makeOAuthStateCookie(state, secureCookie))
+		// Append to any states already outstanding so a second tab's
+		// flow does not invalidate the first tab's. The cap keeps an
+		// abusive client from growing the cookie unboundedly; evicting
+		// the oldest state just fails that flow's callback, same as
+		// expiry would.
+		states := append(readOAuthStateCookie(r), state)
+		if len(states) > oauthStateCookieMaxStates {
+			states = states[len(states)-oauthStateCookieMaxStates:]
+		}
+		http.SetCookie(w, makeOAuthStateCookie(states, secureCookie))
 		http.Redirect(w, r, buildAuthorizeURL(clientID, redirectURI, state), http.StatusSeeOther)
 	}
 }
@@ -164,13 +194,22 @@ func handleOAuthCallback(
 	secureCookie bool,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Always clear the state cookie, success or failure - never let
-		// it survive the callback. This must happen before any
-		// http.Redirect or http.Error call: those flush the response
-		// headers, and net/http silently drops header mutations after
-		// WriteHeader, so a deferred SetCookie would never reach the
-		// browser.
-		http.SetCookie(w, makeOAuthStateCookie("", secureCookie))
+		code := r.URL.Query().Get("code")
+		state := r.URL.Query().Get("state")
+
+		// Consume this flow's state from the cookie, success or failure
+		// - it must never survive its own callback, while states from
+		// other still-pending flows (e.g. a second tab) stay valid.
+		// This must happen before any http.Redirect or http.Error call:
+		// those flush the response headers, and net/http silently drops
+		// header mutations after WriteHeader, so a deferred SetCookie
+		// would never reach the browser.
+		cookieStates := readOAuthStateCookie(r)
+		stateIdx := slices.Index(cookieStates, state)
+		if state != "" && stateIdx >= 0 {
+			remaining := slices.Delete(slices.Clone(cookieStates), stateIdx, stateIdx+1)
+			http.SetCookie(w, makeOAuthStateCookie(remaining, secureCookie))
+		}
 
 		// Discord sends ?error=access_denied&error_description=... when
 		// the user clicks "Cancel" on consent. Treat as a normal bounce.
@@ -182,15 +221,12 @@ func handleOAuthCallback(
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
-		code := r.URL.Query().Get("code")
-		state := r.URL.Query().Get("state")
 		if code == "" || state == "" {
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return
 		}
 
-		cookieState, err := r.Cookie(oauthStateCookieName)
-		if err != nil || cookieState.Value == "" || cookieState.Value != state {
+		if stateIdx < 0 {
 			slog.Warn("oauth: state cookie mismatch on callback")
 			http.Redirect(w, r, "/login", http.StatusSeeOther)
 			return

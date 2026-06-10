@@ -1,6 +1,35 @@
 package web
 
-import "testing"
+import (
+	"net/http/httptest"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+// The state cookie carries every outstanding flow's state so parallel
+// login tabs don't invalidate each other; what one request writes the
+// callback must read back intact.
+func TestOAuthStateCookie_RoundTrip(t *testing.T) {
+	req := httptest.NewRequest("GET", "/oauth/callback", nil)
+	req.AddCookie(makeOAuthStateCookie([]string{"s1", "s2"}, false))
+	assert.Equal(t, []string{"s1", "s2"}, readOAuthStateCookie(req))
+
+	assert.Nil(t, readOAuthStateCookie(httptest.NewRequest("GET", "/oauth/callback", nil)),
+		"absent cookie must read as no outstanding states")
+}
+
+// An empty state list must produce the expiring form of the cookie so
+// the browser deletes it, and both forms must agree on Name and Path -
+// otherwise the clear never removes what the set created.
+func TestOAuthStateCookie_EmptyListExpires(t *testing.T) {
+	set := makeOAuthStateCookie([]string{"s1"}, true)
+	clear := makeOAuthStateCookie(nil, true)
+	assert.Equal(t, -1, clear.MaxAge)
+	assert.Positive(t, set.MaxAge)
+	assert.Equal(t, set.Name, clear.Name)
+	assert.Equal(t, set.Path, clear.Path)
+}
 
 // safeReturnTo gates what's allowed back through the OAuth dance. The
 // goal is to deep-link dashboard URLs the user just clicked, not to
