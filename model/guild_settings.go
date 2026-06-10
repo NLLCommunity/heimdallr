@@ -127,7 +127,7 @@ func GetPostsModRoles(guildIDs []snowflake.ID) (map[snowflake.ID]snowflake.ID, e
 // unrelated settings saves fail for a guild with a legacy bad row.
 func ValidatePostsModRole(guildID, roleID snowflake.ID) error {
 	if roleID != 0 && roleID == guildID {
-		return errors.New("@everyone cannot be used as the posts mod role. To grant access to everyone, pick a role that all members have.")
+		return errors.New("@everyone cannot be used as the posts mod role. To grant access to everyone, pick a role that all members have")
 	}
 	return nil
 }
