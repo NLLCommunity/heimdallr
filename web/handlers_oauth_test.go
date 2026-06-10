@@ -4,8 +4,25 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/disgoorg/disgo/discord"
 	"github.com/stretchr/testify/assert"
 )
+
+// A token exchange must grant every scope the dashboard needs - a
+// mid-flow scope=identify edit would otherwise mint a session whose
+// /guilds loads all fail downstream.
+func TestHasRequiredScopes(t *testing.T) {
+	assert.True(t, hasRequiredScopes([]discord.OAuth2Scope{
+		discord.OAuth2ScopeIdentify, discord.OAuth2ScopeGuilds,
+	}))
+	// Extra scopes are fine; missing ones are not.
+	assert.True(t, hasRequiredScopes([]discord.OAuth2Scope{
+		discord.OAuth2ScopeGuilds, discord.OAuth2ScopeIdentify, discord.OAuth2ScopeEmail,
+	}))
+	assert.False(t, hasRequiredScopes([]discord.OAuth2Scope{discord.OAuth2ScopeIdentify}))
+	assert.False(t, hasRequiredScopes([]discord.OAuth2Scope{discord.OAuth2ScopeGuilds}))
+	assert.False(t, hasRequiredScopes(nil))
+}
 
 // The state cookie carries every outstanding flow's state so parallel
 // login tabs don't invalidate each other; what one request writes the

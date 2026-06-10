@@ -100,6 +100,19 @@ func buildAuthorizeURL(clientID snowflake.ID, redirectURI, state string) string 
 	})
 }
 
+// hasRequiredScopes reports whether the scopes granted at the token
+// exchange cover everything in oauthScopes. Discord normally echoes the
+// requested scopes back, but the authorize URL's scope parameter is
+// user-editable mid-flow.
+func hasRequiredScopes(granted []discord.OAuth2Scope) bool {
+	for _, want := range oauthScopes {
+		if !slices.Contains(granted, want) {
+			return false
+		}
+	}
+	return true
+}
+
 // safeReturnTo validates and normalizes a return-to URL submitted via
 // query parameter. Returns the canonical relative path or "" if the
 // input is unsafe (absolute URL, scheme/host present, missing /guild/
@@ -259,6 +272,18 @@ func handleOAuthCallback(
 		tok, err := client.Rest.GetAccessToken(clientID, clientSecret, code, redirectURI)
 		if err != nil {
 			bounceToLogin("token exchange failed", "err", err)
+			return
+		}
+
+		// The state binds the browser but not the scope parameter, so a
+		// user can edit scope=identify into the authorize URL mid-flow.
+		// A session minted from such a token lacks the guilds scope and
+		// every later /guilds load surfaces as an opaque failure instead
+		// of a clean re-consent prompt - reject it here. Only the
+		// tamperer is affected, so this is robustness, not privilege
+		// escalation.
+		if !hasRequiredScopes(tok.Scope) {
+			bounceToLogin("token exchange granted insufficient scopes", "scopes", tok.Scope)
 			return
 		}
 
