@@ -40,10 +40,9 @@ func isUnauthorizedRest(err error) bool {
 //     evaluated for non-admins, and only for guilds where an admin has
 //     opted in by setting the role). Linked directly to /guild/{id}/posts.
 //
-// The posts check is cheap when the user's member is cached, falls back
-// to a single GetMember REST call otherwise. The fallback is bounded by
-// "guilds where the bot is installed, the user isn't admin, and the
-// posts role is configured" — typically a small set.
+// The posts check is cache-only: a cold member cache hides the tile for
+// that load rather than paying a REST GetMember per guild, and the
+// per-guild gates still resolve access fully on direct navigation.
 func handleGuilds(client *bot.Client, clientID snowflake.ID, clientSecret string, crypto *model.TokenCrypto) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := sessionFromContext(r.Context())
@@ -156,11 +155,18 @@ func handleGuilds(client *bot.Client, clientID snowflake.ID, clientSecret string
 			if !ok {
 				continue
 			}
-			member := guildMember(client, c.ug.ID, session.UserID)
-			if member == nil {
+			// Cache-only member lookup: a REST fallback here would fan
+			// out into N sequential GetMember calls under the bot's
+			// shared global rate limit whenever member caches are cold,
+			// degrading the bot's moderation features just because users
+			// refreshed the picker. On a miss the guild simply shows no
+			// tile this load; the per-guild gates (checkGuildPostMod)
+			// still do the full lookup when the user navigates directly.
+			member, ok := client.Caches.Member(c.ug.ID, session.UserID)
+			if !ok {
 				continue
 			}
-			switch memberAccessLevel(client, c.cached, member, roleID) {
+			switch memberAccessLevel(client, c.cached, &member, roleID) {
 			case guildAccessAdmin:
 				addTile(c.ug, &c.cached, pages.GuildRoleAdmin)
 			case guildAccessPosts:
