@@ -80,45 +80,32 @@ func handleGuilds(client *bot.Client, clientID snowflake.ID, clientSecret string
 			return
 		}
 
-		// Snapshot the bot's guild set + cached guild metadata. Stuck
-		// guild IDs go into the set too so they can still be intersected,
-		// but they have no cached name/icon so the tile renders whatever
-		// the OAuth2Guild payload carried.
-		type cachedGuild struct {
-			Guild *discord.Guild
-		}
-		botGuilds := make(map[snowflake.ID]cachedGuild)
-		for g := range client.Caches.Guilds() {
-			gCopy := g
-			botGuilds[g.ID] = cachedGuild{Guild: &gCopy}
-		}
-		for _, id := range client.Caches.UnreadyGuildIDs() {
-			if _, ok := botGuilds[id]; !ok {
-				botGuilds[id] = cachedGuild{}
-			}
-		}
-		for _, id := range client.Caches.UnavailableGuildIDs() {
-			if _, ok := botGuilds[id]; !ok {
-				botGuilds[id] = cachedGuild{}
-			}
-		}
-
+		// Intersect the user's guilds with the bot's via direct cache
+		// lookups - the user holds at most 200 guilds, while snapshotting
+		// the bot's entire guild cache would scale per-request work (and
+		// allocations) with bot size instead. Stuck (unready/unavailable)
+		// guilds still count as "bot is in the guild" but have no cached
+		// metadata, so their tiles render whatever the OAuth2Guild
+		// payload carried.
 		var guilds []pages.GuildData
 		for _, ug := range userGuilds {
-			cg, inBot := botGuilds[ug.ID]
-			if !inBot {
+			var cachedPtr *discord.Guild
+			if cached, inCache := client.Caches.Guild(ug.ID); inCache {
+				cachedPtr = &cached
+			} else if !client.Caches.IsGuildUnready(ug.ID) && !client.Caches.IsGuildUnavailable(ug.ID) {
+				// Not cached and not stuck: the bot is not in this guild.
 				continue
 			}
 
-			role := resolveGuildRole(client, cg.Guild, ug, session.UserID)
+			role := resolveGuildRole(client, cachedPtr, ug, session.UserID)
 			if role == "" {
 				continue
 			}
 
 			name, icon := ug.Name, ug.Icon
-			if cg.Guild != nil {
-				name = cg.Guild.Name
-				icon = cg.Guild.Icon
+			if cachedPtr != nil {
+				name = cachedPtr.Name
+				icon = cachedPtr.Icon
 			}
 			var iconStr string
 			if icon != nil {
