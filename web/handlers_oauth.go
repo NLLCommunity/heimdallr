@@ -32,6 +32,27 @@ var oauthScopes = []discord.OAuth2Scope{
 // to log the victim into the attacker's account (login-CSRF).
 const oauthStateCookieName = "heimdallr_oauth_state"
 
+// makeOAuthStateCookie builds the oauth-state cookie. An empty value
+// produces an expiring cookie so the browser deletes it. Set and clear
+// must agree on Name and Path or the browser never removes the cookie;
+// routing both through this constructor (the same pattern as
+// makeSessionCookie) guarantees they cannot drift.
+func makeOAuthStateCookie(value string, secure bool) *http.Cookie {
+	c := &http.Cookie{
+		Name:     oauthStateCookieName,
+		Value:    value,
+		Path:     "/oauth/",
+		MaxAge:   600,
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+	}
+	if value == "" {
+		c.MaxAge = -1
+	}
+	return c
+}
+
 // oauthRedirectURI returns the absolute redirect URI Discord sends the
 // user back to after consent. Built from dashboard.base_url +
 // "/oauth/callback"; must match a redirect URI configured on the
@@ -121,15 +142,7 @@ func handleOAuthStart(clientID snowflake.ID, redirectURI string, secureCookie bo
 			http.Error(w, "failed to start login", http.StatusInternalServerError)
 			return
 		}
-		http.SetCookie(w, &http.Cookie{
-			Name:     oauthStateCookieName,
-			Value:    state,
-			Path:     "/oauth/",
-			MaxAge:   600,
-			HttpOnly: true,
-			Secure:   secureCookie,
-			SameSite: http.SameSiteLaxMode,
-		})
+		http.SetCookie(w, makeOAuthStateCookie(state, secureCookie))
 		http.Redirect(w, r, buildAuthorizeURL(clientID, redirectURI, state), http.StatusSeeOther)
 	}
 }
@@ -157,15 +170,7 @@ func handleOAuthCallback(
 		// headers, and net/http silently drops header mutations after
 		// WriteHeader, so a deferred SetCookie would never reach the
 		// browser.
-		http.SetCookie(w, &http.Cookie{
-			Name:     oauthStateCookieName,
-			Value:    "",
-			Path:     "/oauth/",
-			MaxAge:   -1,
-			HttpOnly: true,
-			Secure:   secureCookie,
-			SameSite: http.SameSiteLaxMode,
-		})
+		http.SetCookie(w, makeOAuthStateCookie("", secureCookie))
 
 		// Discord sends ?error=access_denied&error_description=... when
 		// the user clicks "Cancel" on consent. Treat as a normal bounce.
