@@ -151,9 +151,13 @@ func handleOAuthCallback(
 	secureCookie bool,
 ) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Always clear the state cookie before returning, success or
-		// failure — never let it survive the callback.
-		defer http.SetCookie(w, &http.Cookie{
+		// Always clear the state cookie, success or failure - never let
+		// it survive the callback. This must happen before any
+		// http.Redirect or http.Error call: those flush the response
+		// headers, and net/http silently drops header mutations after
+		// WriteHeader, so a deferred SetCookie would never reach the
+		// browser.
+		http.SetCookie(w, &http.Cookie{
 			Name:     oauthStateCookieName,
 			Value:    "",
 			Path:     "/oauth/",
