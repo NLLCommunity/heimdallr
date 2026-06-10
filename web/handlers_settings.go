@@ -357,12 +357,12 @@ func handleSavePosts(client *bot.Client) http.HandlerFunc {
 			renderPostsError("Invalid role ID.")
 			return
 		}
-		// @everyone's role ID equals the guild ID, but @everyone is never
-		// in member.RoleIDs — picking it would silently grant access to
-		// no one. The UI filters it out, but defend-in-depth at the save
-		// layer too in case a hand-crafted POST sneaks it past.
-		if modRole == guildID {
-			renderPostsError("@everyone cannot be used as the posts mod role. To grant access to everyone, pick a role that all members have.")
+		// The UI filters @everyone out, but defend-in-depth at the save
+		// layer too in case a hand-crafted POST sneaks it past. The
+		// shared model check keeps this rule and its message in lockstep
+		// with the /admin posts command.
+		if err := model.ValidatePostsModRole(guildID, modRole); err != nil {
+			renderPostsError(err.Error())
 			return
 		}
 		settings.PostsModRoleID = modRole

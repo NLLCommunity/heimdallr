@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"log/slog"
 	"time"
 
@@ -89,6 +90,21 @@ func SetGuildSettings(settings *GuildSettings) error {
 	res := DB.Save(settings)
 	if res.Error != nil {
 		return res.Error
+	}
+	return nil
+}
+
+// ValidatePostsModRole rejects @everyone as the posts-mod role. The
+// @everyone role's ID equals the guild's ID, but @everyone is never
+// present in member.RoleIDs, so persisting it would silently grant
+// access to no one. Every writer of PostsModRoleID (dashboard save
+// handler and /admin posts command) must call this before
+// SetGuildSettings; the returned message is user-facing. It is not
+// enforced inside SetGuildSettings itself because that would also make
+// unrelated settings saves fail for a guild with a legacy bad row.
+func ValidatePostsModRole(guildID, roleID snowflake.ID) error {
+	if roleID != 0 && roleID == guildID {
+		return errors.New("@everyone cannot be used as the posts mod role. To grant access to everyone, pick a role that all members have.")
 	}
 	return nil
 }
