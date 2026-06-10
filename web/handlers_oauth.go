@@ -293,14 +293,9 @@ func handleOAuthCallback(
 			return
 		}
 
-		sealedAccess, err := crypto.Seal(tok.AccessToken)
+		sealedAccess, sealedRefresh, err := sealTokenPair(crypto, tok)
 		if err != nil {
-			failLogin("seal access token failed", err)
-			return
-		}
-		sealedRefresh, err := crypto.Seal(tok.RefreshToken)
-		if err != nil {
-			failLogin("seal refresh token failed", err)
+			failLogin("seal token pair failed", err)
 			return
 		}
 
@@ -334,6 +329,23 @@ func handleOAuthCallback(
 	}
 }
 
+// sealTokenPair encrypts the access/refresh pair from a token exchange
+// or refresh response. Both the callback and the refresh path must seal
+// tokens identically (e.g. if sealing ever binds extra context like the
+// session ID as AAD); keeping the pair in one place prevents the two
+// writers from diverging.
+func sealTokenPair(crypto *model.TokenCrypto, tok *discord.AccessTokenResponse) (sealedAccess, sealedRefresh string, err error) {
+	sealedAccess, err = crypto.Seal(tok.AccessToken)
+	if err != nil {
+		return "", "", err
+	}
+	sealedRefresh, err = crypto.Seal(tok.RefreshToken)
+	if err != nil {
+		return "", "", err
+	}
+	return sealedAccess, sealedRefresh, nil
+}
+
 // freshAccessToken returns a usable plaintext access token for the given
 // session, refreshing it via Discord if the stored token is expired.
 //
@@ -355,11 +367,7 @@ func freshAccessToken(client *bot.Client, clientID snowflake.ID, clientSecret st
 	if err != nil {
 		return "", err
 	}
-	sealedAccess, err := crypto.Seal(tok.AccessToken)
-	if err != nil {
-		return "", err
-	}
-	sealedRefresh, err := crypto.Seal(tok.RefreshToken)
+	sealedAccess, sealedRefresh, err := sealTokenPair(crypto, tok)
 	if err != nil {
 		return "", err
 	}
