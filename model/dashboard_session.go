@@ -151,16 +151,10 @@ func CreateAdminSession(id SessionIdentity, sealedAccess, sealedRefresh string, 
 	if err := DB.Create(&dbSession).Error; err != nil {
 		return nil, err
 	}
-	return &DashboardSession{
-		Token:           rawToken,
-		UserID:          dbSession.UserID,
-		Username:        dbSession.Username,
-		Avatar:          dbSession.Avatar,
-		ExpiresAt:       dbSession.ExpiresAt,
-		AccessTokenEnc:  dbSession.AccessTokenEnc,
-		RefreshTokenEnc: dbSession.RefreshTokenEnc,
-		TokenExpiresAt:  dbSession.TokenExpiresAt,
-	}, nil
+	// The caller gets the raw token (for the cookie) in place of the
+	// stored hash; every other field matches the row just written.
+	dbSession.Token = rawToken
+	return &dbSession, nil
 }
 
 // UpdateSessionTokens overwrites the encrypted tokens for an existing
