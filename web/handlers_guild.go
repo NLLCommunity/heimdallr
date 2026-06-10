@@ -80,32 +80,11 @@ func handleGuilds(client *bot.Client, clientID snowflake.ID, clientSecret string
 			return
 		}
 
-		// Intersect the user's guilds with the bot's via direct cache
-		// lookups - the user holds at most 200 guilds, while snapshotting
-		// the bot's entire guild cache would scale per-request work (and
-		// allocations) with bot size instead. Stuck (unready/unavailable)
-		// guilds still count as "bot is in the guild" but have no cached
-		// metadata, so their tiles render whatever the OAuth2Guild
-		// payload carried.
 		var guilds []pages.GuildData
-		for _, ug := range userGuilds {
-			var cachedPtr *discord.Guild
-			if cached, inCache := client.Caches.Guild(ug.ID); inCache {
-				cachedPtr = &cached
-			} else if !client.Caches.IsGuildUnready(ug.ID) && !client.Caches.IsGuildUnavailable(ug.ID) {
-				// Not cached and not stuck: the bot is not in this guild.
-				continue
-			}
-
-			role := resolveGuildRole(client, cachedPtr, ug, session.UserID)
-			if role == "" {
-				continue
-			}
-
+		addTile := func(ug discord.OAuth2Guild, cached *discord.Guild, role pages.GuildRole) {
 			name, icon := ug.Name, ug.Icon
-			if cachedPtr != nil {
-				name = cachedPtr.Name
-				icon = cachedPtr.Icon
+			if cached != nil {
+				name, icon = cached.Name, cached.Icon
 			}
 			var iconStr string
 			if icon != nil {
@@ -117,6 +96,76 @@ func handleGuilds(client *bot.Client, clientID snowflake.ID, clientSecret string
 				Icon: iconStr,
 				Role: role,
 			})
+		}
+
+		// First pass: intersect the user's guilds with the bot's via
+		// direct cache lookups - the user holds at most 200 guilds,
+		// while snapshotting the bot's entire guild cache would scale
+		// per-request work with bot size instead. Admin tiles resolve
+		// straight from the OAuth payload; non-admin guilds become
+		// posts-role candidates for the batched settings lookup below.
+		type postsCandidate struct {
+			ug     discord.OAuth2Guild
+			cached discord.Guild
+		}
+		var candidates []postsCandidate
+		var candidateIDs []snowflake.ID
+		for _, ug := range userGuilds {
+			isAdmin := ug.Owner || ug.Permissions.Has(discord.PermissionAdministrator)
+			cached, inCache := client.Caches.Guild(ug.ID)
+			if !inCache {
+				if !client.Caches.IsGuildUnready(ug.ID) && !client.Caches.IsGuildUnavailable(ug.ID) {
+					// Not cached and not stuck: the bot is not in this guild.
+					continue
+				}
+				// Stuck (unready/unavailable) guild: the posts check
+				// needs cached state, so only admins get a tile - and
+				// only after REST-verifying membership, since the stuck
+				// sets can keep holding guilds the bot was kicked from
+				// while gateway state is stale. Bounded by the user's
+				// stuck admin guilds, normally zero. The tile renders
+				// whatever the OAuth2Guild payload carried.
+				if !isAdmin {
+					continue
+				}
+				if _, err := client.Rest.GetGuild(ug.ID, false); err != nil {
+					continue
+				}
+				addTile(ug, nil, pages.GuildRoleAdmin)
+				continue
+			}
+			if isAdmin {
+				addTile(ug, &cached, pages.GuildRoleAdmin)
+				continue
+			}
+			candidates = append(candidates, postsCandidate{ug: ug, cached: cached})
+			candidateIDs = append(candidateIDs, ug.ID)
+		}
+
+		// One read-only query answers "which of these guilds configured
+		// a posts-mod role" for the whole page, instead of a per-guild
+		// FirstOrCreate that both round-trips N times and inserts empty
+		// settings rows for unconfigured guilds on a pure read path.
+		postsRoles, err := model.GetPostsModRoles(candidateIDs)
+		if err != nil {
+			// Degrade to admin-only tiles rather than failing the page.
+			slog.Warn("guilds: failed to load posts-mod roles", "err", err)
+		}
+		for _, c := range candidates {
+			roleID, ok := postsRoles[c.ug.ID]
+			if !ok {
+				continue
+			}
+			member := guildMember(client, c.ug.ID, session.UserID)
+			if member == nil {
+				continue
+			}
+			switch memberAccessLevel(client, c.cached, member, roleID) {
+			case guildAccessAdmin:
+				addTile(c.ug, &c.cached, pages.GuildRoleAdmin)
+			case guildAccessPosts:
+				addTile(c.ug, &c.cached, pages.GuildRolePosts)
+			}
 		}
 
 		sort.Slice(guilds, func(i, j int) bool {
@@ -132,50 +181,3 @@ func handleGuilds(client *bot.Client, clientID snowflake.ID, clientSecret string
 	}
 }
 
-// resolveGuildRole decides how to label a tile for the given user in the
-// given guild. Returns "" when the user has no access (don't show a tile
-// at all).
-//
-// Admin/owner short-circuits before GetGuildSettings and GetMember so
-// neither runs in the common case. Posts-role evaluation requires the
-// guild to be in the cache (we need cached perms to test admin) — for
-// stuck guilds we can't run the posts check, which is acceptable: it's
-// the same population that the bot has temporarily lost gateway state
-// for, and the user can re-navigate after Disgo recovers.
-func resolveGuildRole(client *bot.Client, cached *discord.Guild, ug discord.OAuth2Guild, userID snowflake.ID) pages.GuildRole {
-	isAdmin := ug.Owner || ug.Permissions.Has(discord.PermissionAdministrator)
-	if cached == nil {
-		// Stuck (unready/unavailable) guild: the unready/unavailable
-		// sets can keep holding guilds the bot was kicked from while
-		// gateway state is stale, and the OAuth payload alone would
-		// advertise an Admin tile that 403s on click ("bot is not in
-		// this guild"). REST-verify membership before showing the tile,
-		// like the pre-OAuth picker did. Bounded by the user's stuck
-		// admin guilds, normally zero.
-		if !isAdmin {
-			return ""
-		}
-		if _, err := client.Rest.GetGuild(ug.ID, false); err != nil {
-			return ""
-		}
-		return pages.GuildRoleAdmin
-	}
-	if isAdmin {
-		return pages.GuildRoleAdmin
-	}
-	settings, err := model.GetGuildSettings(ug.ID)
-	if err != nil || settings.PostsModRoleID == 0 {
-		return ""
-	}
-	member := guildMember(client, ug.ID, userID)
-	if member == nil {
-		return ""
-	}
-	switch memberAccessLevel(client, *cached, member, settings.PostsModRoleID) {
-	case guildAccessAdmin:
-		return pages.GuildRoleAdmin
-	case guildAccessPosts:
-		return pages.GuildRolePosts
-	}
-	return ""
-}

@@ -94,6 +94,29 @@ func SetGuildSettings(settings *GuildSettings) error {
 	return nil
 }
 
+// GetPostsModRoles returns the configured posts-mod role for each of
+// the given guilds that has one set. Read-only, single query: guilds
+// with no settings row or with PostsModRoleID == 0 are simply absent
+// from the result. Use this instead of per-guild GetGuildSettings
+// (which is a FirstOrCreate and inserts empty rows) on read paths that
+// span many guilds, such as the /guilds picker.
+func GetPostsModRoles(guildIDs []snowflake.ID) (map[snowflake.ID]snowflake.ID, error) {
+	roles := make(map[snowflake.ID]snowflake.ID, len(guildIDs))
+	if len(guildIDs) == 0 {
+		return roles, nil
+	}
+	var rows []GuildSettings
+	if err := DB.Select("guild_id", "posts_mod_role_id").
+		Where("guild_id IN ? AND posts_mod_role_id <> 0", guildIDs).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		roles[row.GuildID] = row.PostsModRoleID
+	}
+	return roles, nil
+}
+
 // ValidatePostsModRole rejects @everyone as the posts-mod role. The
 // @everyone role's ID equals the guild's ID, but @everyone is never
 // present in member.RoleIDs, so persisting it would silently grant
