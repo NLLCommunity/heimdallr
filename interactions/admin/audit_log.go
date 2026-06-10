@@ -102,35 +102,29 @@ func AdminAuditLogHandler(e *handler.CommandEvent) error {
 		message += fmt.Sprintf("Audit log enabled set to %s\n", utils.Iif(enabled, "yes", "no"))
 	}
 
-	if msg, ok, err := applyRetentionOption(
-		data, "message-retention", "audit_log.message_retention_days", "Message",
-		&settings.AuditMessageRetentionDays,
-	); err != nil {
-		return e.CreateMessage(interactions.EphemeralMessageContent(err.Error()))
-	} else if ok {
-		message += msg
+	retentionOptions := []struct {
+		optName   string
+		configKey string
+		label     string
+		target    **uint
+	}{
+		{"message-retention", "audit_log.message_retention_days", "Message", &settings.AuditMessageRetentionDays},
+		{"member-retention", "audit_log.member_retention_days", "Member", &settings.AuditMemberRetentionDays},
+		{"guild-retention", "audit_log.guild_retention_days", "Guild", &settings.AuditGuildRetentionDays},
 	}
-	if msg, ok, err := applyRetentionOption(
-		data, "member-retention", "audit_log.member_retention_days", "Member",
-		&settings.AuditMemberRetentionDays,
-	); err != nil {
-		return e.CreateMessage(interactions.EphemeralMessageContent(err.Error()))
-	} else if ok {
-		message += msg
-	}
-	if msg, ok, err := applyRetentionOption(
-		data, "guild-retention", "audit_log.guild_retention_days", "Guild",
-		&settings.AuditGuildRetentionDays,
-	); err != nil {
-		return e.CreateMessage(interactions.EphemeralMessageContent(err.Error()))
-	} else if ok {
-		message += msg
+	hasRetention := false
+	for _, opt := range retentionOptions {
+		msg, applied, err := applyRetentionOption(data, opt.optName, opt.configKey, opt.label, opt.target)
+		if err != nil {
+			return e.CreateMessage(interactions.EphemeralMessageContent(err.Error()))
+		}
+		if applied {
+			message += msg
+			hasRetention = true
+		}
 	}
 
-	_, hasMessageRet := data.OptInt("message-retention")
-	_, hasMemberRet := data.OptInt("member-retention")
-	_, hasGuildRet := data.OptInt("guild-retention")
-	if !utils.Any(hasEnabled, hasMessageRet, hasMemberRet, hasGuildRet, hasReset) {
+	if !utils.Any(hasEnabled, hasRetention, hasReset) {
 		return e.CreateMessage(interactions.EphemeralMessageContent(auditLogInfo(settings)))
 	}
 
