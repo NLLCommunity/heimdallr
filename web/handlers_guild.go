@@ -186,4 +186,3 @@ func handleGuilds(client *bot.Client, clientID snowflake.ID, clientSecret string
 		renderSafe(w, r, pages.Guilds(nav, guilds))
 	}
 }
-
