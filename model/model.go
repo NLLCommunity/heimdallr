@@ -41,7 +41,9 @@ func InitDB(path string) (*gorm.DB, error) {
 	if err == nil {
 		// Drop the legacy login-code table left over from the magic-link
 		// auth flow. Ignored if it never existed (fresh installs).
-		_ = db.Migrator().DropTable("dashboard_login_codes")
+		if dropErr := db.Migrator().DropTable("dashboard_login_codes"); dropErr != nil {
+			slog.Warn("failed to drop legacy dashboard_login_codes table", "error", dropErr)
+		}
 	}
 	if err != nil {
 		slog.Error("failed to migrate database", "error", err)

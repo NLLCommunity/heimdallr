@@ -103,9 +103,9 @@ func guildAccessLevel(client *bot.Client, guild discord.Guild, member *discord.M
 	if isGuildAdminMember(client, guild, member) {
 		return guildAccessAdmin
 	}
-	settings, err := model.GetGuildSettings(guild.ID)
+	postsRoles, err := model.GetPostsModRoles([]snowflake.ID{guild.ID})
 	if err != nil {
 		return guildAccessNone
 	}
-	return memberAccessLevel(client, guild, member, settings.PostsModRoleID)
+	return memberAccessLevel(client, guild, member, postsRoles[guild.ID])
 }
