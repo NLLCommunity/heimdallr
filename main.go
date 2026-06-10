@@ -203,8 +203,22 @@ func main() {
 
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	<-s
-	slog.Info("Shutdown signal received")
+	webFailed := false
+	select {
+	case <-s:
+		slog.Info("Shutdown signal received")
+	case <-webDone:
+		// Every admin path depends on the dashboard now, and StartServer
+		// fails fast on missing OAuth config (discord.client_id,
+		// discord.client_secret, dashboard.token_encryption_key). A web
+		// server that died on its own must not leave a healthy-looking
+		// bot running with no dashboard and a single log line - run the
+		// normal shutdown sequence and exit non-zero so supervisors and
+		// upgrading self-hosters see the failure immediately. The error
+		// itself was already logged by the goroutine above.
+		webFailed = true
+		slog.Error("Web server exited unexpectedly; shutting down")
+	}
 	removeTempBansTask.Stop()
 	removeStalePrunesTask.Stop()
 	pruneAuditLogTask.Stop()
@@ -229,6 +243,9 @@ func main() {
 	// Now that the web server has drained, the REST client can go.
 	// client.Close also calls Gateway.Close, which is idempotent.
 	client.Close(context.Background())
+	if webFailed {
+		os.Exit(1)
+	}
 }
 
 func getLogLevel(level string) slog.Level {
