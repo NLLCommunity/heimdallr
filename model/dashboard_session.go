@@ -19,6 +19,17 @@ func tokenHash(token string) string {
 	return hex.EncodeToString(h[:])
 }
 
+// newRandomToken returns a fresh hex-encoded 256-bit random token. Both
+// OAuth state tokens and session tokens are minted through this so their
+// entropy and encoding cannot silently diverge.
+func newRandomToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b), nil
+}
+
 const (
 	// oauthStateExpiry must cover the time between /oauth/start issuing
 	// the state row and the user completing the Discord consent screen.
@@ -78,11 +89,10 @@ type SessionIdentity struct {
 // return-to URL and returns the token for use in the authorize URL.
 // ConsumeOAuthState validates and deletes the row on the OAuth callback.
 func CreateOAuthState(returnTo string) (string, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
+	state, err := newRandomToken()
+	if err != nil {
 		return "", err
 	}
-	state := hex.EncodeToString(b)
 	row := DashboardOAuthState{
 		State:     state,
 		ReturnTo:  returnTo,
@@ -124,11 +134,10 @@ func ConsumeOAuthState(state string) (*DashboardOAuthState, error) {
 //
 // Returns the raw cookie token; the DB row stores only its hash.
 func CreateAdminSession(id SessionIdentity, sealedAccess, sealedRefresh string, tokenExpiresAt time.Time) (*DashboardSession, error) {
-	b := make([]byte, 32)
-	if _, err := rand.Read(b); err != nil {
+	rawToken, err := newRandomToken()
+	if err != nil {
 		return nil, err
 	}
-	rawToken := hex.EncodeToString(b)
 	dbSession := DashboardSession{
 		Token:           tokenHash(rawToken),
 		UserID:          id.UserID,
