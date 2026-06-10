@@ -137,11 +137,6 @@ func safeReturnTo(raw string) string {
 	if u.Scheme != "" || u.Host != "" {
 		return ""
 	}
-	// Reject control characters that could split headers before they
-	// reach path.Clean (which preserves them).
-	if strings.ContainsAny(u.Path, "\x00\r\n") || strings.ContainsAny(u.RawQuery, "\x00\r\n") {
-		return ""
-	}
 	// path.Clean collapses "..", ".", and double-slash segments so a
 	// crafted input like "/guild/../login" becomes "/login" and fails
 	// the prefix check below. Without this, the browser would resolve
@@ -152,16 +147,23 @@ func safeReturnTo(raw string) string {
 	if !strings.HasPrefix(cleaned, "/guild/") {
 		return ""
 	}
-	// Re-encode to drop fragments and normalize separators.
-	out := cleaned
+	// Rebuild the output through url.URL so the stdlib percent-encodes
+	// every unsafe byte (EscapedPath keeps "/" literal, so legitimate
+	// paths come out unchanged, and fragments are dropped). This is one
+	// encoding guarantee instead of a hand-rolled denylist: url.Parse
+	// above already rejects raw control characters, but
+	// percent-encoded ones (%0d, %09, %7f, ...) decode into u.Path and
+	// a denylist has to enumerate them all - the previous \x00\r\n list
+	// emitted the rest raw.
+	out := url.URL{Path: cleaned}
 	if u.RawQuery != "" {
 		q, err := url.ParseQuery(u.RawQuery)
 		if err != nil {
 			return ""
 		}
-		out += "?" + q.Encode()
+		out.RawQuery = q.Encode()
 	}
-	return out
+	return out.String()
 }
 
 // handleOAuthStart kicks off the OAuth handshake. Public route — no
