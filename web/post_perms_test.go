@@ -2,6 +2,7 @@ package web
 
 import (
 	"testing"
+	"time"
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/snowflake/v2"
@@ -55,6 +56,28 @@ func TestHasPostsModRole_MemberLacksRole(t *testing.T) {
 func TestHasPostsModRole_EmptyRoleList(t *testing.T) {
 	s := &model.GuildSettings{PostsModRoleID: testRoleA}
 	assert.False(t, hasPostsModRole(s, memberWithRoles()))
+}
+
+// A timed-out (communication-disabled) member must lose posts access for
+// the duration of the timeout: Discord strips their permissions, and the
+// dashboard gate has to match instead of letting a muted moderator keep
+// publishing posts through the bot.
+func TestHasPostsModRole_TimedOutMemberDenied(t *testing.T) {
+	s := &model.GuildSettings{PostsModRoleID: testRoleA}
+	member := memberWithRoles(testRoleA)
+	until := time.Now().Add(time.Hour)
+	member.CommunicationDisabledUntil = &until
+	assert.False(t, hasPostsModRole(s, member))
+}
+
+// An expired timeout must not keep denying access - only a timestamp in
+// the future counts as communication-disabled.
+func TestHasPostsModRole_ExpiredTimeoutAllowed(t *testing.T) {
+	s := &model.GuildSettings{PostsModRoleID: testRoleA}
+	member := memberWithRoles(testRoleA)
+	until := time.Now().Add(-time.Hour)
+	member.CommunicationDisabledUntil = &until
+	assert.True(t, hasPostsModRole(s, member))
 }
 
 // @everyone's role ID equals the guild ID, but Discord never lists it in

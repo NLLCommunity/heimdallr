@@ -2,6 +2,7 @@ package web
 
 import (
 	"slices"
+	"time"
 
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
@@ -53,6 +54,17 @@ func isGuildAdminMember(client *bot.Client, guild discord.Guild, member *discord
 // regardless of whether the role is configured or held.
 func hasPostsModRole(settings *model.GuildSettings, member *discord.Member) bool {
 	if settings == nil || settings.PostsModRoleID == 0 || member == nil {
+		return false
+	}
+	// A timed-out (communication-disabled) member must not keep posts
+	// access: Discord strips their guild permissions for the duration,
+	// and the dashboard gate has to match. The old permission path went
+	// through Caches.MemberPermissions, which disgo degrades to
+	// ViewChannel|ReadMessageHistory during a timeout; a bare RoleIDs
+	// lookup would silently bypass that. Admins are unaffected (Discord
+	// does not let members with Administrator be timed out), mirroring
+	// how MemberPermissions degrades non-admins only.
+	if member.CommunicationDisabledUntil != nil && member.CommunicationDisabledUntil.After(time.Now()) {
 		return false
 	}
 	return slices.Contains(member.RoleIDs, settings.PostsModRoleID)
