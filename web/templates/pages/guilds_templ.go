@@ -14,10 +14,22 @@ import (
 	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
 )
 
+// GuildRole tags each tile with the access level the picker resolved for
+// the session user. Admin tiles link into the full settings dashboard;
+// Posts tiles deep-link directly to the posts page since post-mods don't
+// have access to anything else.
+type GuildRole string
+
+const (
+	GuildRoleAdmin GuildRole = "Admin"
+	GuildRolePosts GuildRole = "Posts"
+)
+
 type GuildData struct {
 	ID   string
 	Name string
 	Icon string
+	Role GuildRole
 }
 
 // initialFor returns the first non-whitespace rune of name as a string, or
@@ -68,7 +80,7 @@ func Guilds(nav layouts.NavData, guilds []GuildData) templ.Component {
 				return templ_7745c5c3_Err
 			}
 			if len(guilds) == 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<p>No servers found where you have administrator permissions. If you only need to manage posts, use the <code>/post-dashboard</code> command in the relevant server instead.</p>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "<p>No servers found where you have administrator permissions or a posts-mod role configured by an admin.</p>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -97,9 +109,9 @@ func Guilds(nav layouts.NavData, guilds []GuildData) templ.Component {
 	})
 }
 
-// guildTile renders one admin-server tile. The /guilds list is admin-only
-// (see handlers_guild.go for why); post-mods reach their dashboard via the
-// /post-dashboard slash command, which redirects past this page entirely.
+// guildTile renders one server tile. Admin tiles link into the settings
+// dashboard; posts tiles deep-link to the posts page since post-mods
+// don't have access to anything else.
 func guildTile(g GuildData) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -126,9 +138,9 @@ func guildTile(g GuildData) templ.Component {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var4 templ.SafeURL
-		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/guild/" + g.ID))
+		templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(tileHref(g))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 46, Col: 42}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 58, Col: 22}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 		if templ_7745c5c3_Err != nil {
@@ -146,7 +158,7 @@ func guildTile(g GuildData) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs("https://cdn.discordapp.com/icons/" + g.ID + "/" + g.Icon + ".png?size=128")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 50, Col: 86}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 62, Col: 86}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -159,7 +171,7 @@ func guildTile(g GuildData) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(g.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 51, Col: 17}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 63, Col: 17}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -177,7 +189,7 @@ func guildTile(g GuildData) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(initialFor(g.Name))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 56, Col: 25}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 68, Col: 25}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -195,18 +207,41 @@ func guildTile(g GuildData) templ.Component {
 		var templ_7745c5c3_Var8 string
 		templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(g.Name)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 59, Col: 15}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 71, Col: 15}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, " <small><span class=\"badge\">Admin</span></small></h3></article></a>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, " <small><span class=\"badge\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		var templ_7745c5c3_Var9 string
+		templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(string(g.Role))
+		if templ_7745c5c3_Err != nil {
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/guilds.templ`, Line: 71, Col: 61}
+		}
+		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</span></small></h3></article></a>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		return nil
 	})
+}
+
+// tileHref routes admin tiles into the settings dashboard and posts
+// tiles directly into the posts page — post-mods would otherwise hit a
+// 403 on /guild/{id} since the dashboard requires admin.
+func tileHref(g GuildData) templ.SafeURL {
+	if g.Role == GuildRolePosts {
+		return templ.SafeURL("/guild/" + g.ID + "/posts")
+	}
+	return templ.SafeURL("/guild/" + g.ID)
 }
 
 var _ = templruntime.GeneratedTemplate

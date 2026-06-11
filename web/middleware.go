@@ -1,10 +1,13 @@
 package web
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"net/http"
 	"net/netip"
+	"net/url"
+	"path"
 	"slices"
 	"strings"
 	"sync"
@@ -17,8 +20,14 @@ import (
 )
 
 const (
-	exchangeCodeRatePerMinute = 1
-	exchangeCodeBurst         = 5
+	// /oauth/start creates a state row + cookie per call and
+	// /oauth/callback opens a state-consuming transaction; both share
+	// one per-IP budget. The limit must accommodate a real human
+	// re-trying a flaky network (a full login costs two hits: start +
+	// callback) without being so high that an attacker can grow the
+	// state table or hammer the DB.
+	oauthRatePerMinute = 6
+	oauthBurst         = 10
 	// Sandbox sends are admin-only but still rate-limited per session user
 	// so a single admin can't drain the bot's Discord quota by spamming the
 	// sandbox. ~10/min steady, burst 5 is generous for testing message
@@ -36,6 +45,28 @@ const (
 	maxRequestBodyBytes       int64 = 1 << 20 // 1 MiB
 )
 
+// loginDestination computes where to send an unauthenticated request:
+// /oauth/start with a return_to parameter when the originally-requested
+// path is a guild deep-link that survived our allowlist, /login
+// otherwise. Returning to a known landing page when no deep-link applies
+// avoids surprising the user by silently kicking them through OAuth on
+// a bookmark click — they see the login page and click the button
+// explicitly.
+func loginDestination(r *http.Request) string {
+	if r.Method != http.MethodGet {
+		return "/login"
+	}
+	candidate := r.URL.Path
+	if r.URL.RawQuery != "" {
+		candidate += "?" + r.URL.RawQuery
+	}
+	if safe := safeReturnTo(candidate); safe != "" {
+		v := url.Values{"return_to": []string{safe}}
+		return "/oauth/start?" + v.Encode()
+	}
+	return "/login"
+}
+
 // redirectToLogin steers an unauthenticated request to the login page in a
 // way each kind of caller can actually handle:
 //   - HTMX requests get HX-Redirect (HTMX swallows 3xx silently and would
@@ -44,20 +75,31 @@ const (
 //     for JSON) get 401 with a small JSON body. Without this, fetch() follows
 //     the 303 to /login and the JS sees a 200 HTML response, which it
 //     mistakes for success.
-//   - Browser navigations get a normal 303 to /login.
+//   - Browser navigations get a normal 303 to the login destination.
 func redirectToLogin(w http.ResponseWriter, r *http.Request) {
+	dest := loginDestination(r)
 	if r.Header.Get("HX-Request") == "true" {
-		w.Header().Set("HX-Redirect", "/login")
+		w.Header().Set("HX-Redirect", dest)
 		w.WriteHeader(http.StatusOK)
 		return
 	}
 	if isAJAXRequest(r) {
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		w.WriteHeader(http.StatusUnauthorized)
-		_, _ = w.Write([]byte(`{"error":"not signed in","login_url":"/login"}`))
+		// login_url must match the same destination the browser branch
+		// uses; clients rely on this to recover from a 401, and if we
+		// always pointed them at /login they'd lose the deep-link
+		// (return_to) that loginDestination computed for the original
+		// GET. json.Marshal handles escaping of the encoded query
+		// string in dest.
+		body, _ := json.Marshal(map[string]string{
+			"error":     "not signed in",
+			"login_url": dest,
+		})
+		_, _ = w.Write(body)
 		return
 	}
-	http.Redirect(w, r, "/login", http.StatusSeeOther)
+	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
 // isAJAXRequest is true when the request signals that it expects a structured
@@ -76,17 +118,60 @@ func isAJAXRequest(r *http.Request) bool {
 	return strings.Contains(accept, "application/json")
 }
 
+// publicPaths records the routes that skip the auth middleware's
+// session check. Entries ending in "/" match as prefixes (e.g.
+// "/static/"); everything else matches exactly. StartServer fills this
+// at route-registration time via its handlePublic helper, so a route
+// is auth-exempt if and only if it was mounted as public - there is no
+// second hand-maintained list to drift out of sync.
+type publicPaths map[string]bool
+
+// match reports whether rawPath is auth-exempt. The path is normalized
+// first: the middleware runs before the mux, so it sees raw paths, and
+// matching those against prefix entries like "/static/" would treat
+// "/static/../guilds" as public. net/http's ServeMux clean-and-redirect
+// means such a request only ever reaches a 307 today, but the auth
+// decision must hold on its own instead of leaning on that downstream
+// behavior.
+func (p publicPaths) match(rawPath string) bool {
+	reqPath := cleanRequestPath(rawPath)
+	if p[reqPath] {
+		return true
+	}
+	for pattern := range p {
+		if strings.HasSuffix(pattern, "/") && strings.HasPrefix(reqPath, pattern) {
+			return true
+		}
+	}
+	return false
+}
+
+// cleanRequestPath normalizes a request path the same way net/http's
+// ServeMux does before routing: path.Clean, with a trailing slash
+// preserved so prefix entries ("/static/") still match their root.
+func cleanRequestPath(p string) string {
+	if p == "" {
+		return "/"
+	}
+	if !strings.HasPrefix(p, "/") {
+		p = "/" + p
+	}
+	cleaned := path.Clean(p)
+	if strings.HasSuffix(p, "/") && cleaned != "/" {
+		cleaned += "/"
+	}
+	return cleaned
+}
+
 // authMiddleware checks the session cookie and injects the session into context.
 // Unauthenticated requests to protected paths are redirected to /login.
-func authMiddleware(next http.Handler) http.Handler {
+func authMiddleware(next http.Handler, public publicPaths) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Skip auth for public paths. `/` is intentionally NOT public — it's
 		// the post-login landing handler that decides /guilds vs /login based
 		// on the session, which means it needs the session injected by this
 		// middleware first.
-		path := r.URL.Path
-		if path == "/login" || path == "/callback" ||
-			strings.HasPrefix(path, "/static/") {
+		if public.match(r.URL.Path) {
 			next.ServeHTTP(w, r)
 			return
 		}

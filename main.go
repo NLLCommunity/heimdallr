@@ -25,14 +25,13 @@ import (
 	_ "github.com/NLLCommunity/heimdallr/config"
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/interactions/admin"
-	"github.com/NLLCommunity/heimdallr/interactions/admin_dashboard"
 	"github.com/NLLCommunity/heimdallr/interactions/ban"
+	"github.com/NLLCommunity/heimdallr/interactions/dashboard"
 	"github.com/NLLCommunity/heimdallr/interactions/gatekeep"
 	"github.com/NLLCommunity/heimdallr/interactions/infractions"
 	"github.com/NLLCommunity/heimdallr/interactions/kick"
 	"github.com/NLLCommunity/heimdallr/interactions/modmail"
 	"github.com/NLLCommunity/heimdallr/interactions/ping"
-	"github.com/NLLCommunity/heimdallr/interactions/post_dashboard"
 	"github.com/NLLCommunity/heimdallr/interactions/prune"
 	"github.com/NLLCommunity/heimdallr/interactions/quote"
 	"github.com/NLLCommunity/heimdallr/interactions/role_button"
@@ -109,9 +108,8 @@ func main() {
 
 	commandInteractions := []interactions.ApplicationCommandRegisterFunc{
 		admin.Register,
-		admin_dashboard.Register,
-		post_dashboard.Register,
 		ban.Register,
+		dashboard.Register,
 		gatekeep.Register,
 		infractions.Register,
 		kick.Register,
@@ -184,21 +182,6 @@ func main() {
 		panic(fmt.Errorf("failed to sync commands: %w", err))
 	}
 
-	// Record the /post-dashboard command ID so the web dashboard can fetch
-	// per-guild permission overrides immediately, instead of waiting for a
-	// non-admin user to discover the dashboard via the slash command first.
-	var registered []discord.ApplicationCommand
-	if len(devGuilds) > 0 {
-		registered, err = client.Rest.GetGuildCommands(client.ApplicationID, devGuilds[0], false)
-	} else {
-		registered, err = client.Rest.GetGlobalCommands(client.ApplicationID, false)
-	}
-	if err != nil {
-		slog.Warn("failed to fetch registered commands; /post-dashboard ID will be captured on first use", "error", err)
-	} else {
-		post_dashboard.SetCommandID(registered)
-	}
-
 	err = client.OpenGateway(context.Background())
 	if err != nil {
 		panic(fmt.Errorf("failed to open gateway: %w", err))
@@ -220,8 +203,22 @@ func main() {
 
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
-	<-s
-	slog.Info("Shutdown signal received")
+	webFailed := false
+	select {
+	case <-s:
+		slog.Info("Shutdown signal received")
+	case <-webDone:
+		// Every admin path depends on the dashboard now, and StartServer
+		// fails fast on missing OAuth config (discord.client_id,
+		// discord.client_secret, dashboard.token_encryption_key). A web
+		// server that died on its own must not leave a healthy-looking
+		// bot running with no dashboard and a single log line - run the
+		// normal shutdown sequence and exit non-zero so supervisors and
+		// upgrading self-hosters see the failure immediately. The error
+		// itself was already logged by the goroutine above.
+		webFailed = true
+		slog.Error("Web server exited unexpectedly; shutting down")
+	}
 	removeTempBansTask.Stop()
 	removeStalePrunesTask.Stop()
 	pruneAuditLogTask.Stop()
@@ -246,6 +243,9 @@ func main() {
 	// Now that the web server has drained, the REST client can go.
 	// client.Close also calls Gateway.Close, which is idempotent.
 	client.Close(context.Background())
+	if webFailed {
+		os.Exit(1)
+	}
 }
 
 func getLogLevel(level string) slog.Level {

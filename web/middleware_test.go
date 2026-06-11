@@ -13,8 +13,23 @@ import (
 	"golang.org/x/time/rate"
 )
 
-func TestRedirectToLogin_BrowserNavigationGets303(t *testing.T) {
+// A browser deep-linking to /guild/{id} must be sent through /oauth/start
+// with a return_to so they land on the requested page after Discord
+// consent, instead of being dumped on /guilds.
+func TestRedirectToLogin_DeepLinkGoesThroughOAuthStart(t *testing.T) {
 	req := httptest.NewRequest("GET", "/guild/123", nil)
+	rec := httptest.NewRecorder()
+	redirectToLogin(rec, req)
+	assert.Equal(t, http.StatusSeeOther, rec.Code)
+	assert.Equal(t, "/oauth/start?return_to=%2Fguild%2F123", rec.Header().Get("Location"))
+}
+
+// Non-deep-link entries (POSTs, unrelated paths) should land on /login
+// rather than auto-kicking through OAuth — surprising users hitting
+// arbitrary bookmarks is worse than asking them to click the login
+// button.
+func TestRedirectToLogin_NonDeepLinkGoesToLogin(t *testing.T) {
+	req := httptest.NewRequest("POST", "/guild/123/settings/mod-channel", nil)
 	rec := httptest.NewRecorder()
 	redirectToLogin(rec, req)
 	assert.Equal(t, http.StatusSeeOther, rec.Code)
@@ -66,6 +81,23 @@ func TestRedirectToLogin_AJAXRequestGets401JSON(t *testing.T) {
 	}
 }
 
+// An AJAX GET to a guild deep-link must put the same /oauth/start
+// destination into the JSON body's login_url that a browser navigation
+// would receive in the Location header. Clients that surface login_url
+// to the user (or auto-navigate) would otherwise lose the deep-link
+// and end up on /login instead of returning to the original page after
+// consent.
+func TestRedirectToLogin_AJAXDeepLinkPreservesReturnTo(t *testing.T) {
+	req := httptest.NewRequest("GET", "/guild/123", nil)
+	req.Header.Set("Accept", "application/json")
+	rec := httptest.NewRecorder()
+	redirectToLogin(rec, req)
+
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+	assert.Contains(t, rec.Body.String(), `"login_url":"/oauth/start?return_to=%2Fguild%2F123"`,
+		"AJAX 401 body must mirror the browser-redirect destination, not collapse to /login")
+}
+
 func TestRedirectToLogin_HTMXBeatsAJAX(t *testing.T) {
 	// HTMX requests can also be sent with X-Requested-With (some setups), but
 	// HX-Request is the more specific signal — HTMX needs HX-Redirect, not 401.
@@ -78,16 +110,29 @@ func TestRedirectToLogin_HTMXBeatsAJAX(t *testing.T) {
 	assert.Equal(t, "/login", rec.Header().Get("HX-Redirect"))
 }
 
+// testPublicPaths mirrors the set StartServer registers via its
+// handlePublic helper. The middleware tests exercise the matcher
+// semantics (exact entries plus trailing-slash prefixes); which routes
+// are public is decided at registration time in server.go.
+var testPublicPaths = publicPaths{
+	"/login":          true,
+	"/oauth/start":    true,
+	"/oauth/callback": true,
+	"/static/":        true,
+}
+
 func TestAuthMiddleware_SkipsPublicPaths(t *testing.T) {
 	called := false
 	handler := authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called = true
 		w.WriteHeader(http.StatusOK)
-	}))
+	}), testPublicPaths)
 
 	// `/` is intentionally not public — handleRoot relies on the session
 	// being injected by this middleware to decide /guilds vs /login.
-	for _, path := range []string{"/login", "/callback", "/static/css/custom.css"} {
+	// "/static/" itself must stay public: normalization preserves the
+	// trailing slash, so the prefix entry still matches its own root.
+	for _, path := range []string{"/login", "/oauth/start", "/oauth/callback", "/static/css/custom.css", "/static/"} {
 		called = false
 		req := httptest.NewRequest("GET", path, nil)
 		rec := httptest.NewRecorder()
@@ -104,7 +149,7 @@ func TestAuthMiddleware_SkipsPublicPaths(t *testing.T) {
 func TestAuthMiddleware_RootRequiresAuth(t *testing.T) {
 	handler := authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler should not be called without a session")
-	}))
+	}), testPublicPaths)
 
 	req := httptest.NewRequest("GET", "/", nil)
 	rec := httptest.NewRecorder()
@@ -113,10 +158,29 @@ func TestAuthMiddleware_RootRequiresAuth(t *testing.T) {
 	assert.Equal(t, "/login", rec.Header().Get("Location"))
 }
 
+// Traversal and double-slash variants of public prefixes must not skip
+// the session check: the middleware sees raw paths (it runs before the
+// mux), and "/static/../guilds" would otherwise prefix-match the public
+// "/static/" entry. ServeMux's own clean-and-redirect keeps protected
+// handlers from executing on such paths today, but the auth decision
+// must be correct without relying on that.
+func TestAuthMiddleware_UncleanPathsAreNotPublic(t *testing.T) {
+	handler := authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		t.Fatalf("handler should not be called without a session for %s", r.URL.Path)
+	}), testPublicPaths)
+
+	for _, p := range []string{"/static/../guilds", "/static/..", "/static/../../guild/123", "//static/../guilds"} {
+		req := httptest.NewRequest("GET", p, nil)
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		assert.Equal(t, http.StatusSeeOther, rec.Code, "path %s must require auth", p)
+	}
+}
+
 func TestAuthMiddleware_RedirectsWithoutCookie(t *testing.T) {
 	handler := authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler should not be called")
-	}))
+	}), testPublicPaths)
 
 	req := httptest.NewRequest("GET", "/guilds", nil)
 	rec := httptest.NewRecorder()
@@ -130,7 +194,7 @@ func TestAuthMiddleware_RedirectsWithoutCookie(t *testing.T) {
 func TestAuthMiddleware_HTMXRequest_UsesHXRedirect(t *testing.T) {
 	handler := authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Fatal("handler should not be called")
-	}))
+	}), testPublicPaths)
 
 	req := httptest.NewRequest("GET", "/guilds", nil)
 	req.Header.Set("HX-Request", "true")

@@ -2,6 +2,7 @@ package scheduled_tasks
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -154,4 +155,38 @@ func EffectiveRetentionDays(configKey string, guildOverride *uint) (uint, bool) 
 		return uint(ceiling), true
 	}
 	return override, true
+}
+
+// RetentionCeilingDays returns the bot-operator retention ceiling for a
+// config key. Negative config values collapse to 0 ("forever"), matching
+// EffectiveRetentionDays.
+func RetentionCeilingDays(configKey string) uint {
+	v := viper.GetInt(configKey)
+	if v < 0 {
+		return 0
+	}
+	return uint(v)
+}
+
+// ValidateRetentionOverride applies the override rules shared by the
+// dashboard settings handler and the /admin audit-log command: when the
+// bot ceiling is finite the override must be > 0 and <= ceiling; when
+// the ceiling is 0 ("forever") any value is allowed, and 0 collapses to
+// nil so a future finite ceiling cannot strand an invalid stored row.
+// Returned errors are user-facing.
+func ValidateRetentionOverride(configKey, label string, v uint) (*uint, error) {
+	ceiling := RetentionCeilingDays(configKey)
+	if ceiling == 0 {
+		if v == 0 {
+			return nil, nil
+		}
+		return &v, nil
+	}
+	if v == 0 {
+		return nil, fmt.Errorf("%s retention may not be 0 (forever) - the bot ceiling is %d days", label, ceiling)
+	}
+	if v > ceiling {
+		return nil, fmt.Errorf("%s retention may not exceed the bot ceiling of %d days", label, ceiling)
+	}
+	return &v, nil
 }

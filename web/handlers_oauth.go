@@ -1,0 +1,430 @@
+package web
+
+import (
+	"log/slog"
+	"net/http"
+	"net/url"
+	"path"
+	"slices"
+	"strings"
+	"time"
+
+	"github.com/disgoorg/disgo/bot"
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/snowflake/v2"
+	"golang.org/x/sync/singleflight"
+
+	"github.com/NLLCommunity/heimdallr/model"
+)
+
+// oauthScopes are the OAuth2 scopes we request from Discord:
+//   - identify: required to call GetCurrentUser and bind the session to a
+//     Discord user ID after the code exchange.
+//   - guilds: required to call GetCurrentUserGuilds — without this scope
+//     /guilds can't list a user's admin servers.
+var oauthScopes = []discord.OAuth2Scope{
+	discord.OAuth2ScopeIdentify,
+	discord.OAuth2ScopeGuilds,
+}
+
+// oauthStateCookieName is the short-lived cookie that pins OAuth states
+// to the user agent. /oauth/start appends to it; /oauth/callback
+// requires the state query parameter to be one of its values and
+// refuses any mismatch. Without this, an attacker could craft an
+// authorize URL and email it to a victim to log the victim into the
+// attacker's account (login-CSRF).
+//
+// The cookie holds up to oauthStateCookieMaxStates outstanding states
+// ("|"-joined) rather than a single value: a logged-out user opening
+// two dashboard deep-links starts two flows, and with one slot the
+// second /oauth/start would clobber the first tab's state, failing its
+// callback despite a valid DB state row.
+const oauthStateCookieName = "heimdallr_oauth_state"
+
+const oauthStateCookieMaxStates = 4
+
+// maxReturnToLength caps the return_to query parameter accepted by
+// safeReturnTo. The value is stored in dashboard_oauth_states and later
+// becomes a redirect Location header; without a cap an abusive client
+// could persist arbitrarily large rows and emit oversized redirects.
+const maxReturnToLength = 2048
+
+// makeOAuthStateCookie builds the oauth-state cookie carrying the given
+// outstanding states. An empty list produces an expiring cookie so the
+// browser deletes it. Set and clear must agree on Name and Path or the
+// browser never removes the cookie; routing both through this
+// constructor (the same pattern as makeSessionCookie) guarantees they
+// cannot drift.
+func makeOAuthStateCookie(states []string, secure bool) *http.Cookie {
+	c := &http.Cookie{
+		Name:     oauthStateCookieName,
+		Value:    strings.Join(states, "|"),
+		Path:     "/oauth/",
+		MaxAge:   600,
+		HttpOnly: true,
+		Secure:   secure,
+		SameSite: http.SameSiteLaxMode,
+	}
+	if len(states) == 0 {
+		c.MaxAge = -1
+	}
+	return c
+}
+
+// readOAuthStateCookie returns the outstanding state tokens from the
+// request's oauth-state cookie, or nil when absent.
+func readOAuthStateCookie(r *http.Request) []string {
+	c, err := r.Cookie(oauthStateCookieName)
+	if err != nil || c.Value == "" {
+		return nil
+	}
+	return strings.Split(c.Value, "|")
+}
+
+// oauthRedirectURI returns the absolute redirect URI Discord sends the
+// user back to after consent. Built from dashboard.base_url +
+// "/oauth/callback"; must match a redirect URI configured on the
+// application's Discord developer portal page.
+func oauthRedirectURI(base *url.URL) string {
+	u := *base
+	u.Path = "/oauth/callback"
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String()
+}
+
+// buildAuthorizeURL constructs the Discord OAuth2 authorize URL with the
+// given state. We use discord.AuthorizeURL rather than rolling our own
+// formatter so any future query-key change in disgo flows through without
+// a code change here.
+func buildAuthorizeURL(clientID snowflake.ID, redirectURI, state string) string {
+	return discord.AuthorizeURL(discord.QueryValues{
+		"client_id":     clientID,
+		"redirect_uri":  redirectURI,
+		"response_type": "code",
+		"scope":         discord.JoinScopes(oauthScopes),
+		"state":         state,
+	})
+}
+
+// hasRequiredScopes reports whether the scopes granted at the token
+// exchange cover everything in oauthScopes. Discord normally echoes the
+// requested scopes back, but the authorize URL's scope parameter is
+// user-editable mid-flow.
+func hasRequiredScopes(granted []discord.OAuth2Scope) bool {
+	for _, want := range oauthScopes {
+		if !slices.Contains(granted, want) {
+			return false
+		}
+	}
+	return true
+}
+
+// safeReturnTo validates and normalizes a return-to URL submitted via
+// query parameter. Returns the canonical relative path or "" if the
+// input is unsafe (absolute URL, scheme/host present, missing /guild/
+// prefix, or contains characters that the path-matcher in the auth
+// middleware can't sanitize).
+//
+// The allowlist is intentionally narrow: every deep-link we generate is
+// of the form "/guild/{snowflake}[/sub-path]". A wider allowlist would
+// expose an open-redirect for any path the dashboard serves, including
+// /static/, which can be arbitrary content.
+func safeReturnTo(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	// The accepted value is persisted into dashboard_oauth_states and
+	// later emitted as a redirect Location. Legitimate deep-links are a
+	// "/guild/{snowflake}" path plus a short sub-path and query, so cap
+	// the input well above anything we generate but well below what an
+	// abusive client could otherwise stuff into a DB row.
+	if len(raw) > maxReturnToLength {
+		return ""
+	}
+	// url.Parse with an absolute or scheme-bearing URL still parses but
+	// leaves Scheme/Host populated — both unsafe.
+	u, err := url.Parse(raw)
+	if err != nil {
+		return ""
+	}
+	if u.Scheme != "" || u.Host != "" {
+		return ""
+	}
+	// path.Clean collapses "..", ".", and double-slash segments so a
+	// crafted input like "/guild/../login" becomes "/login" and fails
+	// the prefix check below. Without this, the browser would resolve
+	// the traversal client-side and land the user on a path the
+	// allowlist was meant to exclude — still same-origin, but not what
+	// we promised the caller.
+	cleaned := path.Clean(u.Path)
+	if !strings.HasPrefix(cleaned, "/guild/") {
+		return ""
+	}
+	// Rebuild the output through url.URL so the stdlib percent-encodes
+	// every unsafe byte (EscapedPath keeps "/" literal, so legitimate
+	// paths come out unchanged, and fragments are dropped). This is one
+	// encoding guarantee instead of a hand-rolled denylist: url.Parse
+	// above already rejects raw control characters, but
+	// percent-encoded ones (%0d, %09, %7f, ...) decode into u.Path and
+	// a denylist has to enumerate them all - the previous \x00\r\n list
+	// emitted the rest raw.
+	out := url.URL{Path: cleaned}
+	if u.RawQuery != "" {
+		q, err := url.ParseQuery(u.RawQuery)
+		if err != nil {
+			return ""
+		}
+		out.RawQuery = q.Encode()
+	}
+	return out.String()
+}
+
+// handleOAuthStart kicks off the OAuth handshake. Public route — no
+// session required, since this is also the entry point for first-time
+// logins from /login. Stores a fresh state row and an oauth-state cookie
+// matching it, then redirects to Discord.
+func handleOAuthStart(clientID snowflake.ID, redirectURI string, secureCookie bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		returnTo := safeReturnTo(r.URL.Query().Get("return_to"))
+		state, err := model.CreateOAuthState(returnTo)
+		if err != nil {
+			slog.Error("oauth: failed to create state row", "err", err)
+			http.Error(w, "failed to start login", http.StatusInternalServerError)
+			return
+		}
+		// Append to any states already outstanding so a second tab's
+		// flow does not invalidate the first tab's. The cap keeps an
+		// abusive client from growing the cookie unboundedly; evicting
+		// the oldest state just fails that flow's callback, same as
+		// expiry would.
+		states := append(readOAuthStateCookie(r), state)
+		if len(states) > oauthStateCookieMaxStates {
+			states = states[len(states)-oauthStateCookieMaxStates:]
+		}
+		http.SetCookie(w, makeOAuthStateCookie(states, secureCookie))
+		http.Redirect(w, r, buildAuthorizeURL(clientID, redirectURI, state), http.StatusSeeOther)
+	}
+}
+
+// handleOAuthCallback finishes the Discord OAuth dance: validates the
+// state row AND the matching oauth-state cookie, exchanges the code for
+// an access/refresh token pair, fetches the user via /users/@me to bind
+// the session to a Discord user ID, then mints an admin session.
+//
+// The dual state check — DB row plus cookie — defends against login
+// CSRF. The DB row alone proves the state was issued by us; the cookie
+// proves it was issued to *this* browser.
+func handleOAuthCallback(
+	client *bot.Client,
+	clientID snowflake.ID,
+	clientSecret string,
+	redirectURI string,
+	crypto *model.TokenCrypto,
+	secureCookie bool,
+) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Every failure exits through one of these two helpers so the
+		// destination and shape stay uniform: bounceToLogin for "retry
+		// the login" conditions (logged at Warn unless the message is
+		// empty), failLogin for server-side faults that a retry will not
+		// fix. If the bounce destination ever needs to carry an error
+		// hint (e.g. /login?error=oauth), this is the single place to
+		// change.
+		bounceToLogin := func(msg string, args ...any) {
+			if msg != "" {
+				slog.Warn("oauth: "+msg, args...)
+			}
+			http.Redirect(w, r, "/login", http.StatusSeeOther)
+		}
+		failLogin := func(msg string, err error) {
+			slog.Error("oauth: "+msg, "err", err)
+			http.Error(w, "failed to finish login", http.StatusInternalServerError)
+		}
+
+		code := r.URL.Query().Get("code")
+		state := r.URL.Query().Get("state")
+
+		// Consume this flow's state from the cookie, success or failure
+		// - it must never survive its own callback, while states from
+		// other still-pending flows (e.g. a second tab) stay valid.
+		// This must happen before any http.Redirect or http.Error call:
+		// those flush the response headers, and net/http silently drops
+		// header mutations after WriteHeader, so a deferred SetCookie
+		// would never reach the browser.
+		cookieStates := readOAuthStateCookie(r)
+		stateIdx := slices.Index(cookieStates, state)
+		if state != "" && stateIdx >= 0 {
+			remaining := slices.Delete(slices.Clone(cookieStates), stateIdx, stateIdx+1)
+			http.SetCookie(w, makeOAuthStateCookie(remaining, secureCookie))
+		}
+
+		// Discord sends ?error=access_denied&error_description=... when
+		// the user clicks "Cancel" on consent. Treat as a normal bounce;
+		// Info because it is a user choice, not a fault.
+		if errParam := r.URL.Query().Get("error"); errParam != "" {
+			slog.Info("oauth: user cancelled consent",
+				"error", errParam,
+				"description", r.URL.Query().Get("error_description"),
+			)
+			bounceToLogin("")
+			return
+		}
+		if code == "" || state == "" {
+			bounceToLogin("")
+			return
+		}
+
+		if stateIdx < 0 {
+			bounceToLogin("state cookie mismatch on callback")
+			return
+		}
+
+		stateRow, err := model.ConsumeOAuthState(state)
+		if err != nil {
+			bounceToLogin("invalid state on callback", "err", err)
+			return
+		}
+
+		tok, err := client.Rest.GetAccessToken(clientID, clientSecret, code, redirectURI)
+		if err != nil {
+			bounceToLogin("token exchange failed", "err", err)
+			return
+		}
+
+		// The state binds the browser but not the scope parameter, so a
+		// user can edit scope=identify into the authorize URL mid-flow.
+		// A session minted from such a token lacks the guilds scope and
+		// every later /guilds load surfaces as an opaque failure instead
+		// of a clean re-consent prompt - reject it here. Only the
+		// tamperer is affected, so this is robustness, not privilege
+		// escalation.
+		if !hasRequiredScopes(tok.Scope) {
+			bounceToLogin("token exchange granted insufficient scopes", "scopes", tok.Scope)
+			return
+		}
+
+		me, err := client.Rest.GetCurrentUser(tok.AccessToken)
+		if err != nil {
+			bounceToLogin("GetCurrentUser failed after token exchange", "err", err)
+			return
+		}
+
+		sealedAccess, sealedRefresh, err := sealTokenPair(crypto, tok)
+		if err != nil {
+			failLogin("seal token pair failed", err)
+			return
+		}
+
+		avatar := ""
+		if me.Avatar != nil {
+			avatar = *me.Avatar
+		}
+		newSession, err := model.CreateAdminSession(
+			model.SessionIdentity{
+				UserID:   me.ID,
+				Username: me.Username,
+				Avatar:   avatar,
+			},
+			sealedAccess,
+			sealedRefresh,
+			time.Now().Add(tok.ExpiresIn),
+		)
+		if err != nil {
+			failLogin("failed to create admin session", err)
+			return
+		}
+
+		maxAge := int(time.Until(newSession.ExpiresAt).Seconds())
+		http.SetCookie(w, makeSessionCookie(newSession.Token, maxAge, secureCookie))
+
+		dest := stateRow.ReturnTo
+		if dest == "" {
+			dest = "/guilds"
+		}
+		http.Redirect(w, r, dest, http.StatusSeeOther)
+	}
+}
+
+// sealTokenPair encrypts the access/refresh pair from a token exchange
+// or refresh response. Both the callback and the refresh path must seal
+// tokens identically (e.g. if sealing ever binds extra context like the
+// session ID as AAD); keeping the pair in one place prevents the two
+// writers from diverging.
+func sealTokenPair(crypto *model.TokenCrypto, tok *discord.AccessTokenResponse) (sealedAccess, sealedRefresh string, err error) {
+	sealedAccess, err = crypto.Seal(tok.AccessToken)
+	if err != nil {
+		return "", "", err
+	}
+	sealedRefresh, err = crypto.Seal(tok.RefreshToken)
+	if err != nil {
+		return "", "", err
+	}
+	return sealedAccess, sealedRefresh, nil
+}
+
+// tokenRefreshGroup serializes token refreshes per session. Discord
+// rotates the refresh token on every use, so two concurrent refreshes
+// for the same session race: the loser exchanges an already-rotated
+// token, gets invalid_grant, and a slower UpdateSessionTokens write
+// could persist the revoked pair, forcing the user through a full
+// re-consent. Keys are session token hashes; entries exist only for
+// the duration of a flight, so the group cannot grow unboundedly.
+var tokenRefreshGroup singleflight.Group
+
+// tokenExpirySlack is how close to expiry a stored access token may be
+// before we refresh instead of handing it out, so a token cannot
+// expire mid-request.
+const tokenExpirySlack = 30 * time.Second
+
+// freshAccessToken returns a usable plaintext access token for the given
+// session, refreshing it via Discord if the stored token is expired.
+//
+// If refresh succeeds, the DB row is updated with the new tokens so
+// subsequent requests don't pay the refresh round-trip. If refresh
+// fails (revoked grant, network error), the caller is expected to
+// redirect the user back through OAuth — there's no fall-back path
+// because the entire point of the OAuth flow is user-scope access.
+//
+// Refreshes are single-flighted per session: concurrent requests share
+// one Discord round-trip, and a request that arrives just after a
+// completed flight re-reads the row inside its own flight and uses the
+// fresh tokens instead of burning the rotated refresh token.
+func freshAccessToken(client *bot.Client, clientID snowflake.ID, clientSecret string, crypto *model.TokenCrypto, session *model.DashboardSession) (string, error) {
+	if time.Until(session.TokenExpiresAt) > tokenExpirySlack {
+		return crypto.Open(session.AccessTokenEnc)
+	}
+	token, err, _ := tokenRefreshGroup.Do(session.Token, func() (any, error) {
+		// Re-read the row: our in-memory session was loaded before the
+		// lock, so a refresh that completed in the meantime is only
+		// visible in the DB.
+		row := session
+		if fresh, err := model.GetSessionByHash(session.Token); err == nil {
+			if time.Until(fresh.TokenExpiresAt) > tokenExpirySlack {
+				return crypto.Open(fresh.AccessTokenEnc)
+			}
+			row = fresh
+		}
+		refreshToken, err := crypto.Open(row.RefreshTokenEnc)
+		if err != nil {
+			return nil, err
+		}
+		tok, err := client.Rest.RefreshAccessToken(clientID, clientSecret, refreshToken)
+		if err != nil {
+			return nil, err
+		}
+		sealedAccess, sealedRefresh, err := sealTokenPair(crypto, tok)
+		if err != nil {
+			return nil, err
+		}
+		newExpiry := time.Now().Add(tok.ExpiresIn)
+		if err := model.UpdateSessionTokens(session.Token, sealedAccess, sealedRefresh, newExpiry); err != nil {
+			return nil, err
+		}
+		return tok.AccessToken, nil
+	})
+	if err != nil {
+		return "", err
+	}
+	return token.(string), nil
+}

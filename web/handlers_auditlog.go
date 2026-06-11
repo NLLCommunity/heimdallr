@@ -86,6 +86,7 @@ func handleAuditLog(client *bot.Client) http.HandlerFunc {
 			GuildID:   guildIDStr,
 			GuildName: guild.Name,
 			IsAdmin:   true,
+			IsPostMod: true,
 		}
 
 		renderSafe(w, r, pages.AuditLog(nav, pages.AuditLogData{

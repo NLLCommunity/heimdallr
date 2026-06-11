@@ -14,7 +14,6 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/NLLCommunity/heimdallr/audit"
-	"github.com/NLLCommunity/heimdallr/interactions/post_dashboard"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 	"github.com/NLLCommunity/heimdallr/web/posts"
@@ -43,13 +42,15 @@ func acquirePublishLock(postID uint) (*sync.Mutex, bool) {
 	return mu, mu.TryLock()
 }
 
-// modGate runs the post-mod permission check using the captured slash command ID.
-// Returns parsed guildID, whether the user is also a guild admin (for nav data),
-// and true on success; writes the error response and returns false otherwise.
-// Surfacing isAdmin lets handlers populate NavData without a second member fetch.
+// modGate runs the post-mod permission check via the per-guild
+// PostsModRoleID setting (or admin/owner short-circuit). Returns parsed
+// guildID, whether the user is also a guild admin (for nav data), and
+// true on success; writes the error response and returns false otherwise.
+// Surfacing isAdmin lets handlers populate NavData without a second
+// member fetch.
 func modGate(w http.ResponseWriter, r *http.Request, client *bot.Client) (guildID snowflake.ID, isAdmin, ok bool) {
 	guildIDStr := r.PathValue("id")
-	return checkGuildPostMod(w, r, client, guildIDStr, post_dashboard.CommandID(), post_dashboard.DefaultMemberPerm)
+	return checkGuildPostMod(w, r, client, guildIDStr)
 }
 
 // validatePostComponents runs the editor's components_json payload through

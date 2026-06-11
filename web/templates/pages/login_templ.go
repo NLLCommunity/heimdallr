@@ -43,7 +43,7 @@ func Login() templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<article><header><h2>Heimdallr Dashboard</h2></header><p>To log in, use the <code>/admin-dashboard</code> or <code>/post-dashboard</code> command in your Discord server. You will receive a one-time login link that expires in 5 minutes.</p></article>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<article><header><h2>Heimdallr Dashboard</h2></header><p>Sign in with your Discord account to manage servers you administer, or to manage posts in servers where you have been granted access.</p><p><a href=\"/oauth/start\" role=\"button\">Login with Discord</a></p><p><small>You can also run <code>/dashboard</code> in any server with Heimdallr to get a direct link to that server's dashboard.</small></p></article>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

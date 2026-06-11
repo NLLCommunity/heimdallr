@@ -1,14 +1,74 @@
 package config
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/url"
 	"strings"
 
+	"github.com/disgoorg/snowflake/v2"
 	"github.com/spf13/viper"
 )
+
+// DashboardTokenKeyBytes is the required length of the AES-256-GCM key used
+// to encrypt OAuth tokens at rest. Configured as a base64 string in
+// dashboard.token_encryption_key.
+const DashboardTokenKeyBytes = 32
+
+// DiscordClientID returns the Discord application's OAuth2 client ID parsed
+// as a snowflake. Returns 0 + error when the configured value is empty or
+// not a valid snowflake — callers (web server startup) should fail fast.
+func DiscordClientID() (snowflake.ID, error) {
+	raw := strings.TrimSpace(viper.GetString("discord.client_id"))
+	if raw == "" {
+		return 0, errors.New("discord.client_id is required for OAuth login (set HEIMDALLR_DISCORD_CLIENT_ID or discord.client_id)")
+	}
+	id, err := snowflake.Parse(raw)
+	if err != nil {
+		return 0, fmt.Errorf("discord.client_id %q is not a valid snowflake: %w", raw, err)
+	}
+	return id, nil
+}
+
+// DiscordClientSecret returns the Discord application's OAuth2 client secret.
+// Returns an error if unset — Heimdallr won't start without it because every
+// admin path requires the OAuth handshake.
+func DiscordClientSecret() (string, error) {
+	v := strings.TrimSpace(viper.GetString("discord.client_secret"))
+	if v == "" {
+		return "", errors.New("discord.client_secret is required for OAuth login (set HEIMDALLR_DISCORD_CLIENT_SECRET or discord.client_secret)")
+	}
+	return v, nil
+}
+
+// DashboardTokenEncryptionKey decodes the base64 AES-256-GCM key used to
+// encrypt user OAuth tokens at rest in the dashboard_sessions table. The
+// key must decode to exactly DashboardTokenKeyBytes; anything else is a
+// misconfiguration that would silently truncate or panic on use.
+//
+// Generate one with: `openssl rand -base64 32`.
+func DashboardTokenEncryptionKey() ([]byte, error) {
+	raw := strings.TrimSpace(viper.GetString("dashboard.token_encryption_key"))
+	if raw == "" {
+		return nil, errors.New("dashboard.token_encryption_key is required (generate with `openssl rand -base64 32` and set HEIMDALLR_DASHBOARD_TOKEN_ENCRYPTION_KEY)")
+	}
+	key, err := base64.StdEncoding.DecodeString(raw)
+	if err != nil {
+		// Accept URL-safe base64 too — operators copying from web UIs
+		// sometimes get the URL-safe variant without realizing.
+		if k2, err2 := base64.URLEncoding.DecodeString(raw); err2 == nil {
+			key = k2
+		} else {
+			return nil, fmt.Errorf("dashboard.token_encryption_key is not valid base64: %w", err)
+		}
+	}
+	if len(key) != DashboardTokenKeyBytes {
+		return nil, fmt.Errorf("dashboard.token_encryption_key must decode to %d bytes, got %d", DashboardTokenKeyBytes, len(key))
+	}
+	return key, nil
+}
 
 // ParsedDashboardBaseURL returns dashboard.base_url parsed and validated. The
 // scheme must be http or https and the host must be non-empty — url.Parse
@@ -71,6 +131,24 @@ func init() {
 	viper.SetDefault("web.trusted_proxies", []string{})
 
 	viper.SetDefault("dashboard.base_url", "http://localhost:8484")
+
+	// OAuth2 login uses Discord's authorization-code flow against the bot's
+	// own application credentials. client_id is public (it's in the
+	// authorize URL); client_secret is sensitive — keep it out of VCS by
+	// setting HEIMDALLR_DISCORD_CLIENT_SECRET in the environment. The
+	// redirect URI is derived from dashboard.base_url + "/oauth/callback"
+	// and must be registered on the application's Discord developer
+	// portal page.
+	viper.SetDefault("discord.client_id", "")
+	viper.SetDefault("discord.client_secret", "")
+
+	// AES-256-GCM key (base64) for encrypting OAuth tokens at rest in
+	// dashboard_sessions. The DB row already contains the session-token
+	// hash and user identifiers, so leaking the DB without this key still
+	// exposes user IDs; but encrypting the access/refresh tokens
+	// specifically keeps a DB compromise from handing out call-anything
+	// bearer tokens to Discord on behalf of every signed-in admin.
+	viper.SetDefault("dashboard.token_encryption_key", "")
 
 	// Audit log retention ceilings, in days. Per-guild settings may LOWER
 	// these (or set their own value) but never raise above them. 0 means

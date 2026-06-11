@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/disgoorg/disgo/bot"
@@ -30,6 +31,23 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	allowedOrigin := canonicalOrigin(parsedURL)
 	secureCookie := parsedURL.Scheme == "https"
 
+	// Fail fast on missing OAuth config: every admin path now requires the
+	// OAuth handshake to populate user-scoped tokens. A bot started
+	// without these would render a login page that leads nowhere.
+	oauthClientID, err := config.DiscordClientID()
+	if err != nil {
+		return err
+	}
+	oauthClientSecret, err := config.DiscordClientSecret()
+	if err != nil {
+		return err
+	}
+	tokenCrypto, err := model.NewTokenCrypto()
+	if err != nil {
+		return err
+	}
+	oauthRedirect := oauthRedirectURI(parsedURL)
+
 	trustedProxies, err := parseTrustedProxies(viper.GetStringSlice("web.trusted_proxies"))
 	if err != nil {
 		return fmt.Errorf("web.trusted_proxies: %w", err)
@@ -40,15 +58,32 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 
 	mux := http.NewServeMux()
 
-	// Auth routes.
+	// handlePublic mounts a route AND records it as auth-exempt in one
+	// step, so the public-path list the auth middleware consults cannot
+	// drift from what is actually registered. Patterns ending in "/"
+	// are prefix-matched by the middleware (e.g. /static/).
+	public := publicPaths{}
+	handlePublic := func(pattern string, h http.Handler) {
+		mux.Handle(pattern, h)
+		if _, path, ok := strings.Cut(pattern, " "); ok {
+			public[path] = true
+		} else {
+			public[pattern] = true
+		}
+	}
+
+	// Auth routes. /oauth/start is public (it's the entry point for
+	// first-time logins from /login as well as the post-login redirect
+	// target for deep-links). `/` is intentionally NOT public: it's the
+	// post-login landing handler and needs the session injected.
 	mux.HandleFunc("GET /", handleRoot)
-	mux.HandleFunc("GET /login", handleLogin)
-	mux.HandleFunc("GET /callback", handleCallbackGET)
-	mux.HandleFunc("POST /callback", handleCallbackPOST(allowedOrigin, secureCookie))
+	handlePublic("GET /login", http.HandlerFunc(handleLogin))
+	handlePublic("GET /oauth/start", handleOAuthStart(oauthClientID, oauthRedirect, secureCookie))
+	handlePublic("GET /oauth/callback", handleOAuthCallback(client, oauthClientID, oauthClientSecret, oauthRedirect, tokenCrypto, secureCookie))
 	mux.HandleFunc("GET /logout", handleLogout(secureCookie))
 
 	// Guild routes.
-	mux.HandleFunc("GET /guilds", handleGuilds(client))
+	mux.HandleFunc("GET /guilds", handleGuilds(client, oauthClientID, oauthClientSecret, tokenCrypto))
 	mux.HandleFunc("GET /guild/{id}", handleDashboard(client))
 
 	// Settings POST routes.
@@ -59,6 +94,7 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	mux.HandleFunc("POST /guild/{id}/settings/modmail", handleSaveModmail(client))
 	mux.HandleFunc("POST /guild/{id}/settings/gatekeep", handleSaveGatekeep(client))
 	mux.HandleFunc("POST /guild/{id}/settings/join-leave", handleSaveJoinLeave(client))
+	mux.HandleFunc("POST /guild/{id}/settings/posts", handleSavePosts(client))
 
 	mux.HandleFunc("GET /guild/{id}/auditlog", handleAuditLog(client))
 	mux.HandleFunc("POST /guild/{id}/settings/audit-log", handleSaveAuditLog(client))
@@ -95,19 +131,28 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	mux.HandleFunc("POST /guild/{id}/posts/{postID}/delete", handlePostDelete(client, postsLimiter))
 
 	// Static files.
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(getStaticFS())))
+	handlePublic("GET /static/", http.StripPrefix("/static/", http.FileServer(getStaticFS())))
 
-	exchangeCodeLimiter := newKeyedRateLimiter(
-		rate.Every(time.Minute/exchangeCodeRatePerMinute),
-		exchangeCodeBurst,
+	// /oauth/start creates a state row + cookie per call, so an
+	// unauthenticated attacker spraying it would otherwise grow the
+	// state table unboundedly until the 15-minute janitor catches up.
+	// /oauth/callback is just as unauthenticated and opens a
+	// write-capable ConsumeOAuthState transaction per request - the
+	// state-cookie equality check is attacker-satisfiable since the
+	// client controls both cookie and query param - so it shares the
+	// same per-IP budget.
+	oauthLimiter := newKeyedRateLimiter(
+		rate.Every(time.Minute/oauthRatePerMinute),
+		oauthBurst,
 	)
 
 	// Middleware chain: mux → auth → body limit → rate limit → CORS.
-	withAuth := authMiddleware(mux)
+	withAuth := authMiddleware(mux, public)
 	withBodyLimit := bodyLimitMiddleware(withAuth)
 	withRateLimit := rateLimitMiddleware(
-		exchangeCodeLimiter, trustedProxies,
-		rateLimitRule{Method: http.MethodPost, Path: "/callback"},
+		oauthLimiter, trustedProxies,
+		rateLimitRule{Method: http.MethodGet, Path: "/oauth/start"},
+		rateLimitRule{Method: http.MethodGet, Path: "/oauth/callback"},
 	)(withBodyLimit)
 	corsHandler := cors.New(cors.Options{
 		AllowedOrigins: []string{allowedOrigin},
@@ -145,7 +190,7 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 				if err := model.CleanExpiredSessions(); err != nil {
 					slog.Warn("session cleanup failed", "error", err)
 				}
-				exchangeCodeLimiter.cleanup(rateLimiterTTL)
+				oauthLimiter.cleanup(rateLimiterTTL)
 				sandboxLimiter.cleanup(rateLimiterTTL)
 				postsLimiter.cleanup(rateLimiterTTL)
 			}

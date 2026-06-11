@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"log/slog"
 	"time"
 
@@ -46,6 +47,13 @@ type GuildSettings struct {
 	BanFooter           string
 	AlwaysSendBanFooter bool
 
+	// PostsModRoleID grants a single role the ability to manage posts in
+	// the web dashboard. Zero means "admins only" — there is no implicit
+	// default, so post-mod access requires an admin to opt in by setting
+	// the role on the settings page. Replaces the prior reliance on
+	// Discord's per-command permission overrides for /post-dashboard.
+	PostsModRoleID snowflake.ID
+
 	// AuditLogEnabled is the master per-guild toggle for the bot's audit
 	// log. When false, no rows are written for the guild. Disabling it
 	// does not prune existing rows — those follow the retention schedule.
@@ -82,6 +90,44 @@ func SetGuildSettings(settings *GuildSettings) error {
 	res := DB.Save(settings)
 	if res.Error != nil {
 		return res.Error
+	}
+	return nil
+}
+
+// GetPostsModRoles returns the configured posts-mod role for each of
+// the given guilds that has one set. Read-only, single query: guilds
+// with no settings row or with PostsModRoleID == 0 are simply absent
+// from the result. Use this instead of per-guild GetGuildSettings
+// (which is a FirstOrCreate and inserts empty rows) on read paths that
+// span many guilds, such as the /guilds picker.
+func GetPostsModRoles(guildIDs []snowflake.ID) (map[snowflake.ID]snowflake.ID, error) {
+	roles := make(map[snowflake.ID]snowflake.ID, len(guildIDs))
+	if len(guildIDs) == 0 {
+		return roles, nil
+	}
+	var rows []GuildSettings
+	if err := DB.Select("guild_id", "posts_mod_role_id").
+		Where("guild_id IN ? AND posts_mod_role_id <> 0", guildIDs).
+		Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		roles[row.GuildID] = row.PostsModRoleID
+	}
+	return roles, nil
+}
+
+// ValidatePostsModRole rejects @everyone as the posts-mod role. The
+// @everyone role's ID equals the guild's ID, but @everyone is never
+// present in member.RoleIDs, so persisting it would silently grant
+// access to no one. Every writer of PostsModRoleID (dashboard save
+// handler and /admin posts command) must call this before
+// SetGuildSettings; the returned message is user-facing. It is not
+// enforced inside SetGuildSettings itself because that would also make
+// unrelated settings saves fail for a guild with a legacy bad row.
+func ValidatePostsModRole(guildID, roleID snowflake.ID) error {
+	if roleID != 0 && roleID == guildID {
+		return errors.New("@everyone cannot be used as the posts mod role. To grant access to everyone, pick a role that all members have")
 	}
 	return nil
 }

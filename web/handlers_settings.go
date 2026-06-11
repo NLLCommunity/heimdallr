@@ -17,7 +17,6 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/snowflake/v2"
 
-	"github.com/NLLCommunity/heimdallr/interactions/post_dashboard"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 	"github.com/NLLCommunity/heimdallr/web/templates/components"
@@ -129,6 +128,25 @@ func groupChannels(all []components.ChannelInfo) []components.ChannelGroup {
 	return groups
 }
 
+// rolesWithoutEveryone removes the @everyone role from the list. The
+// @everyone role's ID equals the guild's ID, but @everyone is never
+// present in member.RoleIDs — picking it as a permission role silently
+// grants access to no one. Used by settings panels where the chosen
+// role gates access via a RoleIDs lookup (notably posts).
+//
+// guildIDStr is taken as a string so callers can pass the route-bound
+// path value directly without parsing.
+func rolesWithoutEveryone(roles []components.RoleInfo, guildIDStr string) []components.RoleInfo {
+	out := make([]components.RoleInfo, 0, len(roles))
+	for _, r := range roles {
+		if r.ID == guildIDStr {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
 // guildRoles returns a list of roles for the guild from cache, sorted to
 // match Discord's display order: highest position first, then by name. The
 // cache iterator has non-deterministic order.
@@ -158,15 +176,13 @@ func handleDashboard(client *bot.Client) http.HandlerFunc {
 
 		// If the user is a post-mod but not an admin, send them to /posts
 		// rather than 403'ing — they have *some* access to this guild.
-		// Owner-shortcut + a single guildMember lookup feeds both
-		// isGuildAdminMember and canUsePostDashboardForMember, so we don't
-		// pay two REST round-trips on cache miss.
+		// Owner-shortcut + a single guildMember lookup feeds the shared
+		// access resolver.
 		if parsedID, err := snowflake.Parse(guildIDStr); err == nil {
 			if guild, ok := client.Caches.Guild(parsedID); ok && session != nil &&
 				guild.OwnerID != session.UserID {
-				if member := guildMember(client, parsedID, session.UserID); member != nil &&
-					!isGuildAdminMember(client, guild, member) &&
-					canUsePostDashboardForMember(client, guild, member, post_dashboard.CommandID(), post_dashboard.DefaultMemberPerm) {
+				member := guildMember(client, parsedID, session.UserID)
+				if guildAccessLevel(client, guild, member) == guildAccessPosts {
 					http.Redirect(w, r, "/guild/"+parsedID.String()+"/posts", http.StatusSeeOther)
 					return
 				}
@@ -280,6 +296,16 @@ func allSettingsSections(guildID string, settings *model.GuildSettings, ms *mode
 		}).Render(ctx, w); err != nil {
 			return err
 		}
+		if err := partials.SettingsPosts(partials.PostsData{
+			GuildID: guildID,
+			ModRole: idStr(settings.PostsModRoleID),
+			// @everyone (whose role ID equals the guild ID) is filtered out:
+			// it's never present in member.RoleIDs, so picking it would
+			// silently grant access to no one. See hasPostsModRole.
+			Roles: rolesWithoutEveryone(roles, guildID),
+		}).Render(ctx, w); err != nil {
+			return err
+		}
 		if err := partials.SettingsAuditLog(buildAuditLogSettingsData(guildID, settings)).Render(ctx, w); err != nil {
 			return err
 		}
@@ -288,6 +314,70 @@ func allSettingsSections(guildID string, settings *model.GuildSettings, ms *mode
 }
 
 // --- POST handlers ---
+
+// handleSavePosts persists the per-guild PostsModRoleID. Admin-gated:
+// only admins can choose who gets non-admin posts access, otherwise a
+// post-mod could escalate themselves by changing the role to one of
+// their own.
+func handleSavePosts(client *bot.Client) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		guildIDStr := r.PathValue("id")
+		guildID, ok := checkGuildAdmin(w, r, client, guildIDStr)
+		if !ok {
+			return
+		}
+
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form data", http.StatusBadRequest)
+			return
+		}
+		settings, err := model.GetGuildSettings(guildID)
+		if err != nil {
+			renderSafe(w, r, partials.SettingsPosts(partials.PostsData{
+				GuildID: guildIDStr, SaveError: "Failed to load settings.",
+			}))
+			return
+		}
+
+		renderPostsError := func(message string) {
+			renderSafe(w, r, partials.SettingsPosts(partials.PostsData{
+				GuildID:   guildIDStr,
+				ModRole:   idStr(settings.PostsModRoleID),
+				Roles:     rolesWithoutEveryone(guildRoles(client, guildID), guildIDStr),
+				SaveError: message,
+			}))
+		}
+
+		modRole, err := parseSnowflakeOrZero(r.FormValue("mod_role"))
+		if err != nil {
+			renderPostsError("Invalid role ID.")
+			return
+		}
+		// The UI filters @everyone out, but defend-in-depth at the save
+		// layer too in case a hand-crafted POST sneaks it past. The
+		// shared model check keeps this rule and its message in lockstep
+		// with the /admin posts command.
+		if err := model.ValidatePostsModRole(guildID, modRole); err != nil {
+			renderPostsError(err.Error())
+			return
+		}
+		settings.PostsModRoleID = modRole
+		if err := model.SetGuildSettings(settings); err != nil {
+			slog.Error("failed to save posts settings", "error", err)
+			renderPostsError("Failed to save settings.")
+			return
+		}
+		logSettingsUpdate(sessionFromContext(r.Context()), guildID, "posts",
+			map[string]any{"mod_role": idStr(settings.PostsModRoleID)})
+
+		renderSafe(w, r, partials.SettingsPosts(partials.PostsData{
+			GuildID:     guildIDStr,
+			ModRole:     idStr(settings.PostsModRoleID),
+			Roles:       rolesWithoutEveryone(guildRoles(client, guildID), guildIDStr),
+			SaveSuccess: true,
+		}))
+	}
+}
 
 func handleSaveModChannel(client *bot.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

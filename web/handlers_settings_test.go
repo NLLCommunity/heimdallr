@@ -342,6 +342,39 @@ func TestGroupChannels(t *testing.T) {
 	}
 }
 
+func TestRolesWithoutEveryone(t *testing.T) {
+	const guildID = "99"
+
+	// @everyone's role ID equals the guild ID. It must be filtered out
+	// of role-pickers used to gate access by member.RoleIDs — picking
+	// it would silently grant access to no one.
+	roles := []components.RoleInfo{
+		{ID: "100", Name: "Moderator"},
+		{ID: guildID, Name: "@everyone"},
+		{ID: "200", Name: "Helper"},
+	}
+
+	got := rolesWithoutEveryone(roles, guildID)
+
+	assert.Len(t, got, 2)
+	for _, r := range got {
+		assert.NotEqual(t, guildID, r.ID, "@everyone role must not appear in the result")
+	}
+}
+
+func TestRolesWithoutEveryone_NoEveryonePresent(t *testing.T) {
+	// Inputs that don't contain the @everyone marker round-trip through
+	// the filter unchanged.
+	roles := []components.RoleInfo{
+		{ID: "100", Name: "Moderator"},
+	}
+	got := rolesWithoutEveryone(roles, "99")
+	assert.Equal(t, roles, got)
+
+	got = rolesWithoutEveryone(nil, "99")
+	assert.Empty(t, got)
+}
+
 // The whole point of grouping is to be deterministic across page loads:
 // shuffling the input (simulating a different cache iteration order) must
 // not change the output.

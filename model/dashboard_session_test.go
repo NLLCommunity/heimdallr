@@ -8,67 +8,87 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func (suite *ModelTestSuite) TestExchangeLoginCode_Success() {
-	userID := snowflake.ID(111222333)
-	code, err := CreateLoginCode(userID, "alice", "avatar-hash", "admin", 0)
+func (suite *ModelTestSuite) TestOAuthState_RoundTrip() {
+	state, err := CreateOAuthState("/guild/12345")
 	require.NoError(suite.T(), err)
-	require.NotEmpty(suite.T(), code)
+	require.NotEmpty(suite.T(), state)
 
-	session, _, _, err := ExchangeLoginCode(code)
+	got, err := ConsumeOAuthState(state)
 	require.NoError(suite.T(), err)
-	require.NotNil(suite.T(), session)
-	assert.Equal(suite.T(), userID, session.UserID)
-	assert.Equal(suite.T(), "alice", session.Username)
-	assert.Equal(suite.T(), "avatar-hash", session.Avatar)
-	assert.NotEmpty(suite.T(), session.Token)
-	assert.True(suite.T(), session.ExpiresAt.After(time.Now()))
+	require.NotNil(suite.T(), got)
+	assert.Equal(suite.T(), "/guild/12345", got.ReturnTo)
+
+	// Single-use: second consume must fail.
+	_, err = ConsumeOAuthState(state)
+	assert.Error(suite.T(), err, "oauth state must be single-use")
 }
 
-func (suite *ModelTestSuite) TestExchangeLoginCode_IsOneTime() {
-	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "", "admin", 0)
+func (suite *ModelTestSuite) TestOAuthState_EmptyReturnToRoundTrip() {
+	// A bare /oauth/start without return_to stores "" — must still be
+	// usable on the callback (the handler defaults to /guilds).
+	state, err := CreateOAuthState("")
 	require.NoError(suite.T(), err)
-
-	_, _, _, err = ExchangeLoginCode(code)
+	got, err := ConsumeOAuthState(state)
 	require.NoError(suite.T(), err)
-
-	// A login code must be single-use: the second exchange must fail and not
-	// produce a session, even if the original session is still valid.
-	_, _, _, err = ExchangeLoginCode(code)
-	assert.Error(suite.T(), err, "login code must be single-use")
-
-	var sessionCount int64
-	require.NoError(suite.T(), DB.Model(&DashboardSession{}).Count(&sessionCount).Error)
-	assert.Equal(suite.T(), int64(1), sessionCount, "second exchange must not create a second session")
+	assert.Equal(suite.T(), "", got.ReturnTo)
 }
 
-func (suite *ModelTestSuite) TestExchangeLoginCode_ExpiredCodeRejected() {
-	// Insert a code that's already past its expiry. ExchangeLoginCode's
-	// query filters on expires_at > now, so this should not match.
-	expired := DashboardLoginCode{
-		Code:      "expired-code-fixture",
-		UserID:    snowflake.ID(111222333),
-		Username:  "alice",
-		Target:    "admin",
+func (suite *ModelTestSuite) TestOAuthState_ExpiredRejected() {
+	expired := DashboardOAuthState{
+		State:     "expired-state-fixture",
 		ExpiresAt: time.Now().Add(-time.Minute),
 	}
 	require.NoError(suite.T(), DB.Create(&expired).Error)
 
-	_, _, _, err := ExchangeLoginCode(expired.Code)
-	assert.Error(suite.T(), err, "expired login code must be rejected")
+	_, err := ConsumeOAuthState(expired.State)
+	assert.Error(suite.T(), err, "expired oauth state must be rejected")
 }
 
-func (suite *ModelTestSuite) TestExchangeLoginCode_UnknownCodeRejected() {
-	_, _, _, err := ExchangeLoginCode("does-not-exist")
+func (suite *ModelTestSuite) TestOAuthState_UnknownRejected() {
+	_, err := ConsumeOAuthState("does-not-exist")
 	assert.Error(suite.T(), err)
 }
 
-func (suite *ModelTestSuite) TestGetSession_RequiresRawToken() {
-	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "", "admin", 0)
+func (suite *ModelTestSuite) TestCreateAdminSession() {
+	identity := SessionIdentity{
+		UserID:   snowflake.ID(111222333),
+		Username: "alice",
+		Avatar:   "avatar-hash",
+	}
+	expires := time.Now().Add(time.Hour)
+	session, err := CreateAdminSession(identity, "sealed-access", "sealed-refresh", expires)
 	require.NoError(suite.T(), err)
-	session, _, _, err := ExchangeLoginCode(code)
+	require.NotNil(suite.T(), session)
+	assert.Equal(suite.T(), identity.UserID, session.UserID)
+	assert.NotEmpty(suite.T(), session.Token, "raw cookie token must be returned")
+	assert.Equal(suite.T(), "sealed-access", session.AccessTokenEnc)
+	assert.Equal(suite.T(), "sealed-refresh", session.RefreshTokenEnc)
+}
+
+func (suite *ModelTestSuite) TestUpdateSessionTokens() {
+	identity := SessionIdentity{UserID: snowflake.ID(111222333), Username: "alice"}
+	session, err := CreateAdminSession(identity, "old-access", "old-refresh", time.Now().Add(time.Minute))
 	require.NoError(suite.T(), err)
 
-	// The raw token (as it would arrive in the cookie) succeeds.
+	newExpiry := time.Now().Add(2 * time.Hour).Truncate(time.Second)
+	require.NoError(suite.T(),
+		UpdateSessionTokens(tokenHash(session.Token), "new-access", "new-refresh", newExpiry))
+
+	var stored DashboardSession
+	require.NoError(suite.T(),
+		DB.Where("token = ?", tokenHash(session.Token)).First(&stored).Error)
+	assert.Equal(suite.T(), "new-access", stored.AccessTokenEnc)
+	assert.Equal(suite.T(), "new-refresh", stored.RefreshTokenEnc)
+	assert.True(suite.T(),
+		stored.TokenExpiresAt.Truncate(time.Second).Equal(newExpiry),
+		"TokenExpiresAt must round-trip through Update")
+}
+
+func (suite *ModelTestSuite) TestGetSession_RequiresRawToken() {
+	identity := SessionIdentity{UserID: snowflake.ID(111222333), Username: "alice"}
+	session, err := CreateAdminSession(identity, "", "", time.Time{})
+	require.NoError(suite.T(), err)
+
 	got, err := GetSession(session.Token)
 	require.NoError(suite.T(), err)
 	assert.Equal(suite.T(), session.UserID, got.UserID)
@@ -80,9 +100,8 @@ func (suite *ModelTestSuite) TestGetSession_RequiresRawToken() {
 }
 
 func (suite *ModelTestSuite) TestGetSession_DBStoresHashOnly() {
-	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "", "admin", 0)
-	require.NoError(suite.T(), err)
-	session, _, _, err := ExchangeLoginCode(code)
+	identity := SessionIdentity{UserID: snowflake.ID(111222333), Username: "alice"}
+	session, err := CreateAdminSession(identity, "", "", time.Time{})
 	require.NoError(suite.T(), err)
 
 	var stored DashboardSession
@@ -110,9 +129,8 @@ func (suite *ModelTestSuite) TestGetSession_ExpiredSessionRejected() {
 }
 
 func (suite *ModelTestSuite) TestDeleteSession_RemovesByRawToken() {
-	code, err := CreateLoginCode(snowflake.ID(111222333), "alice", "", "admin", 0)
-	require.NoError(suite.T(), err)
-	session, _, _, err := ExchangeLoginCode(code)
+	identity := SessionIdentity{UserID: snowflake.ID(111222333), Username: "alice"}
+	session, err := CreateAdminSession(identity, "", "", time.Time{})
 	require.NoError(suite.T(), err)
 
 	require.NoError(suite.T(), DeleteSession(session.Token))
@@ -122,12 +140,11 @@ func (suite *ModelTestSuite) TestDeleteSession_RemovesByRawToken() {
 }
 
 func (suite *ModelTestSuite) TestCleanExpiredSessions() {
-	// Two expired records and one fresh one across both tables.
-	require.NoError(suite.T(), DB.Create(&DashboardLoginCode{
-		Code: "expired-code", Target: "admin", ExpiresAt: time.Now().Add(-time.Minute),
+	require.NoError(suite.T(), DB.Create(&DashboardOAuthState{
+		State: "expired-state", ExpiresAt: time.Now().Add(-time.Minute),
 	}).Error)
-	require.NoError(suite.T(), DB.Create(&DashboardLoginCode{
-		Code: "fresh-code", Target: "admin", ExpiresAt: time.Now().Add(time.Minute),
+	require.NoError(suite.T(), DB.Create(&DashboardOAuthState{
+		State: "fresh-state", ExpiresAt: time.Now().Add(time.Minute),
 	}).Error)
 	require.NoError(suite.T(), DB.Create(&DashboardSession{
 		Token: tokenHash("expired"), ExpiresAt: time.Now().Add(-time.Minute),
@@ -138,9 +155,9 @@ func (suite *ModelTestSuite) TestCleanExpiredSessions() {
 
 	require.NoError(suite.T(), CleanExpiredSessions())
 
-	var codeCount, sessionCount int64
-	require.NoError(suite.T(), DB.Model(&DashboardLoginCode{}).Count(&codeCount).Error)
+	var stateCount, sessionCount int64
+	require.NoError(suite.T(), DB.Model(&DashboardOAuthState{}).Count(&stateCount).Error)
 	require.NoError(suite.T(), DB.Model(&DashboardSession{}).Count(&sessionCount).Error)
-	assert.Equal(suite.T(), int64(1), codeCount, "expired login code must be deleted")
+	assert.Equal(suite.T(), int64(1), stateCount, "expired oauth state must be deleted")
 	assert.Equal(suite.T(), int64(1), sessionCount, "expired session must be deleted")
 }
