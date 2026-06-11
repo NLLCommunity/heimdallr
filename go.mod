@@ -3,7 +3,7 @@ module github.com/NLLCommunity/heimdallr
 go 1.26.0
 
 require (
-	github.com/a-h/templ v0.3.1001
+	github.com/a-h/templ v0.3.1020
 	github.com/agnivade/levenshtein v1.2.1
 	github.com/cbroglie/mustache v1.4.0
 	github.com/disgoorg/disgo v0.19.2
