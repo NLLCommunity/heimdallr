@@ -43,6 +43,12 @@ const oauthStateCookieName = "heimdallr_oauth_state"
 
 const oauthStateCookieMaxStates = 4
 
+// maxReturnToLength caps the return_to query parameter accepted by
+// safeReturnTo. The value is stored in dashboard_oauth_states and later
+// becomes a redirect Location header; without a cap an abusive client
+// could persist arbitrarily large rows and emit oversized redirects.
+const maxReturnToLength = 2048
+
 // makeOAuthStateCookie builds the oauth-state cookie carrying the given
 // outstanding states. An empty list produces an expiring cookie so the
 // browser deletes it. Set and clear must agree on Name and Path or the
@@ -126,6 +132,14 @@ func hasRequiredScopes(granted []discord.OAuth2Scope) bool {
 // /static/, which can be arbitrary content.
 func safeReturnTo(raw string) string {
 	if raw == "" {
+		return ""
+	}
+	// The accepted value is persisted into dashboard_oauth_states and
+	// later emitted as a redirect Location. Legitimate deep-links are a
+	// "/guild/{snowflake}" path plus a short sub-path and query, so cap
+	// the input well above anything we generate but well below what an
+	// abusive client could otherwise stuff into a DB row.
+	if len(raw) > maxReturnToLength {
 		return ""
 	}
 	// url.Parse with an absolute or scheme-bearing URL still parses but

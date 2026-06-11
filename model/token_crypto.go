@@ -36,11 +36,11 @@ func NewTokenCrypto() (*TokenCrypto, error) {
 	}
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, fmt.Errorf("token_encryption_key: %w", err)
+		return nil, fmt.Errorf("dashboard.token_encryption_key: %w", err)
 	}
 	aead, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, fmt.Errorf("token_encryption_key: %w", err)
+		return nil, fmt.Errorf("dashboard.token_encryption_key: %w", err)
 	}
 	return &TokenCrypto{aead: aead}, nil
 }

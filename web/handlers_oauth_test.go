@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/disgoorg/disgo/discord"
@@ -92,6 +93,12 @@ func TestSafeReturnTo(t *testing.T) {
 		// cleaned through, the result must still start with /guild/.
 		{"/guild/./12345", "/guild/12345"},
 		{"/guild//12345", "/guild/12345"},
+		// Refused: oversized input. The value is persisted into
+		// dashboard_oauth_states, so inputs past the cap are rejected
+		// even when otherwise well-formed.
+		{"/guild/12345/" + strings.Repeat("a", maxReturnToLength), ""},
+		// Boundary: exactly at the cap is still accepted.
+		{"/guild/" + strings.Repeat("a", maxReturnToLength-7), "/guild/" + strings.Repeat("a", maxReturnToLength-7)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.in, func(t *testing.T) {
