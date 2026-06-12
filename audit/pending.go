@@ -38,6 +38,7 @@
 package audit
 
 import (
+	"log/slog"
 	"sync"
 	"time"
 
@@ -148,6 +149,20 @@ type pendingEnrichment struct {
 	timer           *time.Timer
 	expired         bool
 	mu              sync.Mutex
+	// fallback, if non-nil, is committed verbatim when the enrichment
+	// expires without consuming a pending entry. Used for events the
+	// native side can fully reconstruct on its own — moderator-driven
+	// member nick/role/timeout changes specifically, where the gateway
+	// listener bails on cold cache (no old state to diff against) and
+	// no pending entry ever arrives. On warm cache the gateway entry
+	// matches first and the fallback is discarded.
+	fallback *Entry
+	// fallbackCommitted is set under en.mu by whichever path (TTL expiry
+	// or FlushPending) succeeds in committing the fallback. Both paths
+	// do check-and-set under the same lock so they can't double-commit
+	// if a shutdown coincides with TTL: one wins the claim and calls
+	// Log, the other observes fallbackCommitted == true and skips.
+	fallbackCommitted bool
 }
 
 // pendingBuffer holds entries waiting for native-audit enrichment and
@@ -181,6 +196,12 @@ func LogPending(entry Entry, enrichable []EnrichField) {
 	if !shouldLog(entry.GuildID) {
 		return
 	}
+
+	// Decouple from the caller's storage. The entry sits in the buffer
+	// until commit; without cloning, a caller that recycles its Details
+	// map (or mutates the snowflake pointers' targets) would race with
+	// the TTL goroutine reading the stored copy.
+	entry = cloneEntry(entry)
 
 	allowed := make(map[EnrichField]bool, len(enrichable))
 	for _, f := range enrichable {
@@ -316,6 +337,105 @@ func TryEnrich(
 	match MatchMode,
 	maxMatches int,
 ) int {
+	return tryEnrich(guildID, eventType, targetID, requiredDetails, actorID, actorKind, actorUsername, reason, match, maxMatches, nil)
+}
+
+// TryEnrichWithFallback is TryEnrich plus a fallback Entry that is
+// committed if the enrichment is buffered and its TTL elapses without
+// consuming a pending entry. Use this for events the native audit log
+// fully describes on its own — moderator-driven member changes (nick,
+// role, timeout) where a cold gateway cache makes our own listener bail
+// and no pending entry will arrive.
+//
+// On warm cache the gateway pending entry matches first; the enrichment
+// is consumed inline and the fallback is dropped without being written.
+// On cold cache the buffered enrichment times out, expireEnrichment
+// commits the fallback, and the event is preserved with full attribution
+// from Discord's native side.
+//
+// The fallback path is only well-defined for MatchFirst — MatchAll can
+// serve N inline matches AND then commit the fallback at TTL, producing
+// a duplicate. If a non-MatchFirst match mode is passed with a non-nil
+// fallback, the fallback is dropped with a warning and the call falls
+// back to plain TryEnrich semantics.
+//
+// The fallback commit is routed through Log (not the package-internal
+// commit) so it inherits Category derivation, the empty-Category warning
+// + drop, and the shouldLog re-check — meaning a guild that disables
+// audit logging between TryEnrich and TTL expiry won't get backdoor rows
+// and a caller that forgets to set Category won't silently produce a
+// broken row.
+//
+// Ownership: the fallback Entry is deep-cloned on entry, so the caller
+// may mutate (or recycle) the Details map and the snowflake-pointer
+// targets after this returns without affecting the buffered copy or
+// racing the TTL goroutine.
+//
+// Identity normalization: the fallback's GuildID / EventType / TargetID
+// are overwritten with the explicit guildID / eventType / targetID args
+// before buffering. Mismatch is logged at warn level so caller bugs are
+// visible, but the row that eventually gets written is internally
+// consistent with how it would have been keyed.
+func TryEnrichWithFallback(
+	guildID snowflake.ID,
+	eventType EventType,
+	targetID *snowflake.ID,
+	requiredDetails map[string]string,
+	actorID *snowflake.ID,
+	actorKind ActorKind,
+	actorUsername string,
+	reason string,
+	match MatchMode,
+	maxMatches int,
+	fallback Entry,
+) int {
+	return tryEnrich(guildID, eventType, targetID, requiredDetails, actorID, actorKind, actorUsername, reason, match, maxMatches, &fallback)
+}
+
+func tryEnrich(
+	guildID snowflake.ID,
+	eventType EventType,
+	targetID *snowflake.ID,
+	requiredDetails map[string]string,
+	actorID *snowflake.ID,
+	actorKind ActorKind,
+	actorUsername string,
+	reason string,
+	match MatchMode,
+	maxMatches int,
+	fallback *Entry,
+) int {
+	// MatchAll + fallback is unsupported: the enrichment can serve N
+	// inline matches AND then commit the fallback at TTL, producing a
+	// duplicate. Drop the fallback rather than introduce a quietly-wrong
+	// row. Only MatchFirst guarantees "inline match OR fallback, not both".
+	if fallback != nil && match != MatchFirst {
+		slog.Warn("audit: dropping fallback paired with non-MatchFirst — unsupported combination",
+			"guild_id", guildID, "event_type", eventType)
+		fallback = nil
+	}
+	if fallback != nil {
+		// Defend against caller misuse: the fallback's identity fields
+		// must match the explicit match-key args, otherwise we'd commit
+		// a row keyed differently than the buffered enrichment we're
+		// supposedly replacing. Warn loudly so the bug is visible, then
+		// normalize so the row that gets written is at least internally
+		// consistent. The clone also decouples the stored fallback from
+		// the caller's storage — TTL expiry can fire on another goroutine
+		// 1.5s later, and we don't want to race the caller's Details map.
+		if fallback.GuildID != guildID ||
+			fallback.EventType != eventType ||
+			!snowflakePtrEqual(fallback.TargetID, targetID) {
+			slog.Warn("audit: fallback identity fields don't match explicit args — normalizing",
+				"explicit_guild", guildID, "fallback_guild", fallback.GuildID,
+				"explicit_event", eventType, "fallback_event", fallback.EventType)
+		}
+		cloned := cloneEntry(*fallback)
+		cloned.GuildID = guildID
+		cloned.EventType = eventType
+		cloned.TargetID = copySnowflake(targetID)
+		fallback = &cloned
+	}
 	// Clamp negative caps to "unlimited" so misbehaving callers can't
 	// accidentally disable the buffered-enrichment path with -1.
 	if maxMatches < 0 {
@@ -388,6 +508,7 @@ func TryEnrich(
 			reason:          reason,
 			match:           match,
 			remaining:       bufferRemaining,
+			fallback:        fallback,
 		}
 		en.timer = time.AfterFunc(pendingTTL, func() {
 			expireEnrichment(key, en)
@@ -457,10 +578,23 @@ func FlushPending() {
 	}
 	for _, list := range allEnrichments {
 		for _, en := range list {
+			// Check-and-set fallbackCommitted under en.mu — see the
+			// comment on expireEnrichment for the race we're defending
+			// against. en.expired is set unconditionally so any in-flight
+			// timer callback bails on entry rather than doing redundant
+			// buffer work.
 			en.mu.Lock()
 			en.expired = true
 			en.timer.Stop()
+			fallback := en.fallback
+			won := fallback != nil && !en.fallbackCommitted
+			if won {
+				en.fallbackCommitted = true
+			}
 			en.mu.Unlock()
+			if won {
+				Log(*fallback)
+			}
 		}
 	}
 }
@@ -507,10 +641,22 @@ func flushOne(pe *pendingEntry) {
 }
 
 // expireEnrichment removes an unconsumed enrichment from the buffer when
-// its TTL fires. No commit happens — an unmatched enrichment is just an
-// audit log entry Discord told us about that we never saw via gateway,
-// which we deliberately do not record (we only persist gateway-witnessed
-// events to keep one row per real-world action).
+// its TTL fires. By default no commit happens — an unmatched enrichment
+// is just a native audit log entry we never saw via gateway, which we
+// deliberately do not record (one row per real-world action).
+//
+// The exception is when the enrichment carries a fallback Entry (set by
+// TryEnrichWithFallback). That's the cold-cache moderator-action case:
+// the native side has full details and the gateway will never file a
+// pending entry, so we commit the fallback to preserve the event.
+//
+// Race with FlushPending: if a shutdown swaps the buffer between us
+// releasing en.mu and re-acquiring buffer.mu, our stillInBuffer check
+// returns false (FlushPending emptied the map) and FlushPending sees the
+// enrichment in its swapped-out list. Both paths could be tempted to
+// commit — or worse, both could skip. The check-and-set on
+// en.fallbackCommitted under en.mu resolves it: whichever path claims
+// the flag first commits, the other observes the flag and skips.
 func expireEnrichment(key pendingKey, en *pendingEnrichment) {
 	en.mu.Lock()
 	if en.expired {
@@ -518,12 +664,15 @@ func expireEnrichment(key pendingKey, en *pendingEnrichment) {
 		return
 	}
 	en.expired = true
+	fallback := en.fallback
 	en.mu.Unlock()
 
+	var stillInBuffer bool
 	pendingBuffer.mu.Lock()
 	list := pendingBuffer.enrichments[key]
 	for i, e := range list {
 		if e == en {
+			stillInBuffer = true
 			pendingBuffer.enrichments[key] = append(list[:i], list[i+1:]...)
 			if len(pendingBuffer.enrichments[key]) == 0 {
 				delete(pendingBuffer.enrichments, key)
@@ -532,6 +681,28 @@ func expireEnrichment(key pendingKey, en *pendingEnrichment) {
 		}
 	}
 	pendingBuffer.mu.Unlock()
+
+	// stillInBuffer false means either LogPending consumed (gateway took
+	// the row) or FlushPending swapped the buffer mid-flight (FlushPending
+	// will commit the fallback). Either way, leave the commit to the
+	// other path.
+	if !stillInBuffer || fallback == nil {
+		return
+	}
+
+	// Claim the right to commit. Route through Log so the fallback
+	// inherits Category derivation, the empty-Category drop-with-warning,
+	// and a re-check of shouldLog (the toggle could flip between
+	// TryEnrich and TTL expiry).
+	en.mu.Lock()
+	won := !en.fallbackCommitted
+	if won {
+		en.fallbackCommitted = true
+	}
+	en.mu.Unlock()
+	if won {
+		Log(*fallback)
+	}
 }
 
 // matchesTarget returns true when filterTarget matches entryTarget. nil
@@ -589,6 +760,15 @@ func copySnowflake(id *snowflake.ID) *snowflake.ID {
 	return &v
 }
 
+// snowflakePtrEqual treats nil pointers as equal to other nils and
+// dereferences non-nil pointers to compare the underlying IDs.
+func snowflakePtrEqual(a, b *snowflake.ID) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
+}
+
 func copyStringMap(m map[string]string) map[string]string {
 	if len(m) == 0 {
 		return nil
@@ -598,4 +778,60 @@ func copyStringMap(m map[string]string) map[string]string {
 		out[k] = v
 	}
 	return out
+}
+
+// cloneEntry returns an Entry safe to retain across goroutine boundaries.
+// The caller's Details map and the snowflake pointers are not aliased by
+// the returned value, so the caller can mutate (or recycle) the original
+// after the call without affecting what eventually gets committed — and
+// without racing the TTL goroutine that reads the stored copy.
+func cloneEntry(e Entry) Entry {
+	e.ActorID = copySnowflake(e.ActorID)
+	e.TargetID = copySnowflake(e.TargetID)
+	e.Details = cloneDetails(e.Details)
+	return e
+}
+
+// cloneDetails deep-copies a Details map. Scalar values (strings, numbers,
+// booleans) are immutable from Go's perspective and copied via assignment;
+// nested maps and slices are recursively cloned so the result shares no
+// mutable storage with the input. Unrecognised composite types fall through
+// to a shallow assignment — callers using exotic mutable value shapes must
+// clone them themselves. Current audit listeners also emit shallow-copied
+// pointer values such as *time.Time (for example timeout_until), in addition
+// to string / float / map / slice combinations.
+func cloneDetails(d map[string]any) map[string]any {
+	if d == nil {
+		return nil
+	}
+	out := make(map[string]any, len(d))
+	for k, v := range d {
+		out[k] = cloneDetailValue(v)
+	}
+	return out
+}
+
+func cloneDetailValue(v any) any {
+	switch x := v.(type) {
+	case map[string]any:
+		return cloneDetails(x)
+	case []any:
+		out := make([]any, len(x))
+		for i, item := range x {
+			out[i] = cloneDetailValue(item)
+		}
+		return out
+	case []map[string]any:
+		out := make([]map[string]any, len(x))
+		for i, m := range x {
+			out[i] = cloneDetails(m)
+		}
+		return out
+	case []string:
+		out := make([]string, len(x))
+		copy(out, x)
+		return out
+	}
+	// Scalars and unknown types: shallow assignment.
+	return v
 }

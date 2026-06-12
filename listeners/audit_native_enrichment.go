@@ -1,6 +1,7 @@
 package listeners
 
 import (
+	"encoding/json"
 	"strconv"
 
 	"github.com/disgoorg/disgo/discord"
@@ -136,13 +137,26 @@ func OnAuditNativeEnrichment(e *events.GuildAuditLogEntryCreate) {
 		// We split by the change key so the right pending event type
 		// gets enriched: timeout / nick / role changes are separate
 		// audit log event types since this last refactor.
+		//
+		// Each TryEnrich call carries a fallback Entry built from the
+		// native Changes payload. On warm cache the gateway pending entry
+		// is consumed inline and the fallback is dropped; on cold cache
+		// (gateway listener bails because it can't diff against zero
+		// state), the buffered enrichment times out and the fallback
+		// commits — preserving moderator-driven nick/role/timeout events
+		// that would otherwise be silently lost post-restart.
 		var target *snowflake.ID
 		if entry.TargetID != nil {
 			id := *entry.TargetID
 			target = &id
 		}
+		var targetUsername string
+		if target != nil {
+			targetUsername = audit.ResolveMemberUsernameOrFetch(e.Client(), guildID, *target)
+		}
 		for _, ev := range memberUpdateEnrichmentTargets(entry.Changes) {
-			audit.TryEnrich(guildID, ev, target, nil, actorPtr, audit.ActorUser, actorUsername, reason, audit.MatchFirst, 0)
+			fallback := buildMemberUpdateFallback(guildID, ev, target, actorPtr, actorUsername, targetUsername, reason, entry.Changes)
+			audit.TryEnrichWithFallback(guildID, ev, target, nil, actorPtr, audit.ActorUser, actorUsername, reason, audit.MatchFirst, 0, fallback)
 		}
 
 	case discord.AuditLogEventMemberKick:
@@ -271,6 +285,100 @@ func isNullJSON(raw []byte) bool {
 // is missing so the buffered enrichment can't latch onto unlimited
 // late-arriving pendings.
 const bulkDeleteCeiling = 100
+
+// buildMemberUpdateFallback constructs an Entry suitable for direct
+// commit when the gateway listener bails (cold cache) and no pending
+// entry will ever arrive to be enriched. Mirrors what the gateway side
+// would have produced from an old/new diff, but built from Discord's
+// native Changes payload — which carries before/after values for every
+// audited field regardless of our member cache state.
+//
+// targetUsername is resolved once at the call site (via ResolveMemberUsernameOrFetch)
+// rather than per-event so a single MemberUpdate with multiple change
+// kinds doesn't pay 2-3× the REST cost.
+func buildMemberUpdateFallback(
+	guildID snowflake.ID,
+	ev audit.EventType,
+	target, actorPtr *snowflake.ID,
+	actorUsername, targetUsername, reason string,
+	changes []discord.AuditLogChange,
+) audit.Entry {
+	details := changesToMemberDetails(changes, ev)
+	if actorUsername != "" {
+		details["actor_username"] = actorUsername
+	}
+	if targetUsername != "" {
+		details["target_username"] = targetUsername
+	}
+	return audit.Entry{
+		GuildID:    guildID,
+		Category:   audit.EventCategory(ev),
+		EventType:  ev,
+		ActorID:    actorPtr,
+		ActorKind:  audit.ActorUser,
+		TargetID:   target,
+		TargetKind: audit.TargetUser,
+		// The native side produced this row; Log / LogPending normally
+		// fill in the Source, but the fallback path goes through commit
+		// directly. Mark as Gateway since the event is conceptually a
+		// gateway-witnessed change (we just couldn't observe it via
+		// disgo's GuildMemberUpdate due to cold cache) — keeps the row
+		// indistinguishable from a warm-cache emit in viewer filters.
+		Source:  audit.SourceGateway,
+		Reason:  reason,
+		Details: details,
+	}
+}
+
+// changesToMemberDetails extracts the Details payload for a specific
+// member-event type from a native audit log Changes array. Mirrors the
+// keys the gateway listener writes (nick_before / nick_after,
+// roles_added / roles_removed, timeout_until) so the viewer renders
+// fallback rows identically to gateway-witnessed rows.
+//
+// Returns an empty map (not nil) so callers can unconditionally set
+// actor_username / target_username on top.
+func changesToMemberDetails(changes []discord.AuditLogChange, ev audit.EventType) map[string]any {
+	details := map[string]any{}
+	for _, c := range changes {
+		switch c.Key {
+		case discord.AuditLogChangeKeyNick:
+			if ev != audit.EventMemberNickChange {
+				continue
+			}
+			var before, after string
+			_ = json.Unmarshal(c.OldValue, &before)
+			_ = json.Unmarshal(c.NewValue, &after)
+			details["nick_before"] = before
+			details["nick_after"] = after
+		case discord.AuditLogChangeKeyRoleAdd:
+			if ev != audit.EventMemberRoleChange {
+				continue
+			}
+			var added []map[string]any
+			if err := json.Unmarshal(c.NewValue, &added); err == nil && len(added) > 0 {
+				details["roles_added"] = added
+			}
+		case discord.AuditLogChangeKeyRoleRemove:
+			if ev != audit.EventMemberRoleChange {
+				continue
+			}
+			var removed []map[string]any
+			if err := json.Unmarshal(c.NewValue, &removed); err == nil && len(removed) > 0 {
+				details["roles_removed"] = removed
+			}
+		case discord.AuditLogChangeKeyCommunicationDisabledUntil:
+			if ev != audit.EventMemberTimeoutAdd {
+				continue
+			}
+			var until string
+			if err := json.Unmarshal(c.NewValue, &until); err == nil && until != "" {
+				details["timeout_until"] = until
+			}
+		}
+	}
+	return details
+}
 
 // isHandledAuditAction reports whether the listener has a case for this
 // native audit log action type. Used as an early bail-out so we don't

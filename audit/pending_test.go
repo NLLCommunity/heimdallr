@@ -65,6 +65,32 @@ func countRows(t *testing.T, guildID snowflake.ID) int64 {
 	return count
 }
 
+// waitForRows polls until countRows(guildID) == want or a timeout
+// elapses. Replaces fixed-duration "sleep past TTL + padding" patterns:
+// on success the test continues as soon as the commit lands (typically a
+// few ms after pendingTTL fires) instead of always paying the full
+// padding. Failure path still has a generous upper bound so a slow CI
+// runner doesn't flake.
+func waitForRows(t *testing.T, guildID snowflake.ID, want int64) {
+	t.Helper()
+	require.Eventually(t, func() bool {
+		return countRows(t, guildID) == want
+	}, pendingTTL*8, pendingTTL/5,
+		"expected %d row(s) for guild %d", want, guildID)
+}
+
+// assertRowsStayAt asserts countRows(guildID) stays at want for at least
+// pendingTTL*2 — long enough to be confident no late commit will arrive.
+// Use for "must NOT commit" scenarios (disabled guild, dropped fallback)
+// or to verify no duplicate after an inline commit.
+func assertRowsStayAt(t *testing.T, guildID snowflake.ID, want int64) {
+	t.Helper()
+	require.Never(t, func() bool {
+		return countRows(t, guildID) != want
+	}, pendingTTL*2, pendingTTL/2,
+		"row count for guild %d must stay at %d", guildID, want)
+}
+
 func TestLogPending_FlushesAfterTTL(t *testing.T) {
 	setupTestDB(t)
 	guildID := snowflake.ID(1001)
@@ -84,8 +110,7 @@ func TestLogPending_FlushesAfterTTL(t *testing.T) {
 	// Pre-TTL: the row hasn't been written yet.
 	assert.EqualValues(t, 0, countRows(t, guildID))
 
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-	assert.EqualValues(t, 1, countRows(t, guildID), "row should have been committed after TTL")
+	waitForRows(t, guildID, 1)
 }
 
 func TestTryEnrich_AttachesActorAndCommits(t *testing.T) {
@@ -233,6 +258,448 @@ func TestTryEnrich_NativeBeforeGateway(t *testing.T) {
 	assert.Equal(t, "timeout", row.Reason)
 }
 
+// TryEnrichWithFallback's cold-cache path: native enrichment arrives,
+// no pending entry is ever filed (the gateway listener bailed because
+// the member wasn't cached), TTL expires — the fallback Entry must be
+// committed so the moderator-driven event isn't silently lost.
+func TestTryEnrichWithFallback_CommitsOnTTLExpiry(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1300)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(13001)
+	moderator := snowflake.ID(13002)
+
+	fallback := Entry{
+		GuildID:    guildID,
+		EventType:  EventMemberNickChange,
+		Category:   CategoryMember,
+		ActorID:    &moderator,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+		Reason:     "policy",
+		Details: map[string]any{
+			"nick_before":     "old",
+			"nick_after":      "new",
+			"actor_username":  "modUser",
+			"target_username": "targetUser",
+		},
+	}
+
+	enriched := TryEnrichWithFallback(guildID, EventMemberNickChange, &target, nil,
+		&moderator, ActorUser, "modUser", "policy", MatchFirst, 0, fallback)
+	assert.Equal(t, 0, enriched, "no pending entries — buffered with fallback")
+
+	// Pre-TTL: nothing committed yet.
+	assert.EqualValues(t, 0, countRows(t, guildID))
+
+	waitForRows(t, guildID, 1)
+
+	var row model.AuditLogEntry
+	require.NoError(t, model.DB.Where("guild_id = ?", guildID).First(&row).Error)
+	require.NotNil(t, row.ActorID)
+	assert.Equal(t, moderator, *row.ActorID)
+	assert.Equal(t, "policy", row.Reason)
+	assert.Contains(t, row.Details, "nick_after")
+}
+
+// TryEnrichWithFallback's warm-cache path: the gateway pending entry
+// arrives within the TTL window, the buffered enrichment is consumed
+// inline, the fallback must NOT also commit (would produce a duplicate).
+func TestTryEnrichWithFallback_GatewayWinsNoDuplicate(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1301)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(13011)
+	moderator := snowflake.ID(13012)
+
+	fallback := Entry{
+		GuildID:    guildID,
+		EventType:  EventMemberNickChange,
+		Category:   CategoryMember,
+		ActorID:    &moderator,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+		Reason:     "policy",
+		Details:    map[string]any{"nick_before": "old", "nick_after": "new"},
+	}
+
+	// Native arrives first, buffered with fallback.
+	TryEnrichWithFallback(guildID, EventMemberNickChange, &target, nil,
+		&moderator, ActorUser, "modUser", "policy", MatchFirst, 0, fallback)
+
+	// Gateway arrives within TTL → consumes the buffered enrichment.
+	LogPending(Entry{
+		GuildID:    guildID,
+		EventType:  EventMemberNickChange,
+		Category:   CategoryMember,
+		ActorKind:  ActorUnknown,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+		Details:    map[string]any{"nick_before": "old", "nick_after": "new"},
+	}, []EnrichField{EnrichActor, EnrichReason})
+
+	// Gateway entry committed immediately on enrichment.
+	assert.EqualValues(t, 1, countRows(t, guildID))
+
+	// Past TTL: the enrichment's timer fires, but since the buffer entry
+	// was already consumed by LogPending the fallback path must skip.
+	assertRowsStayAt(t, guildID, 1)
+}
+
+// Disabled guilds must not receive backdoor rows via the fallback path.
+// The native enrichment listener calls TryEnrichWithFallback for every
+// moderator member-action regardless of the per-guild toggle; the
+// shouldLog re-check inside expireEnrichment must drop the fallback
+// when the guild has audit logging off.
+func TestTryEnrichWithFallback_DisabledGuildDropsFallback(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1302)
+	// Deliberately do NOT call guildEnabled — the guild_settings row
+	// stays at AuditLogEnabled=false (default).
+
+	target := snowflake.ID(13021)
+	moderator := snowflake.ID(13022)
+
+	fallback := Entry{
+		GuildID:    guildID,
+		Category:   CategoryMember,
+		EventType:  EventMemberNickChange,
+		ActorID:    &moderator,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+		Details:    map[string]any{"nick_before": "old", "nick_after": "new"},
+	}
+
+	TryEnrichWithFallback(guildID, EventMemberNickChange, &target, nil,
+		&moderator, ActorUser, "modUser", "", MatchFirst, 0, fallback)
+
+	assertRowsStayAt(t, guildID, 0)
+}
+
+// The fallback's Category must persist to the row — without it, retention
+// pruning (which filters on exact category match) silently leaks
+// fallback rows forever, and the viewer's category filter misses them.
+func TestTryEnrichWithFallback_PersistsCategory(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1303)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(13031)
+	moderator := snowflake.ID(13032)
+
+	fallback := Entry{
+		GuildID:    guildID,
+		Category:   CategoryMember,
+		EventType:  EventMemberNickChange,
+		ActorID:    &moderator,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+		Details:    map[string]any{"nick_before": "old", "nick_after": "new"},
+	}
+
+	TryEnrichWithFallback(guildID, EventMemberNickChange, &target, nil,
+		&moderator, ActorUser, "modUser", "", MatchFirst, 0, fallback)
+	waitForRows(t, guildID, 1)
+
+	var row model.AuditLogEntry
+	require.NoError(t, model.DB.Where("guild_id = ?", guildID).First(&row).Error)
+	assert.Equal(t, string(CategoryMember), row.Category,
+		"fallback row must carry its Category — retention pruning and viewer filters depend on it")
+}
+
+// FlushPending must commit unconsumed fallback rows on shutdown — the
+// cold-cache event would otherwise be silently dropped if the bot exits
+// before pendingTTL fires.
+func TestTryEnrichWithFallback_FlushCommitsFallback(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1305)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(13051)
+	moderator := snowflake.ID(13052)
+
+	fallback := Entry{
+		GuildID:    guildID,
+		Category:   CategoryMember,
+		EventType:  EventMemberNickChange,
+		ActorID:    &moderator,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+		Details:    map[string]any{"nick_before": "old", "nick_after": "new"},
+	}
+
+	TryEnrichWithFallback(guildID, EventMemberNickChange, &target, nil,
+		&moderator, ActorUser, "modUser", "", MatchFirst, 0, fallback)
+
+	// Pre-TTL: nothing committed yet — the enrichment is sitting in the
+	// buffer waiting for a gateway entry that will never come.
+	assert.EqualValues(t, 0, countRows(t, guildID))
+
+	// Bot shutdown mid-window.
+	FlushPending()
+
+	assert.EqualValues(t, 1, countRows(t, guildID),
+		"FlushPending must commit unconsumed fallback so cold-cache event isn't lost on shutdown")
+}
+
+// FlushPending must NOT commit a fallback whose enrichment was already
+// consumed by an inline gateway entry — that row was committed by the
+// gateway path and committing the fallback too would duplicate.
+func TestTryEnrichWithFallback_FlushSkipsConsumedFallback(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1306)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(13061)
+	moderator := snowflake.ID(13062)
+
+	fallback := Entry{
+		GuildID:    guildID,
+		Category:   CategoryMember,
+		EventType:  EventMemberNickChange,
+		ActorID:    &moderator,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+		Details:    map[string]any{"nick_before": "old", "nick_after": "new"},
+	}
+
+	// Native arrives first → buffered with fallback.
+	TryEnrichWithFallback(guildID, EventMemberNickChange, &target, nil,
+		&moderator, ActorUser, "modUser", "", MatchFirst, 0, fallback)
+	// Gateway arrives → consumes the enrichment, commits the row.
+	LogPending(Entry{
+		GuildID:    guildID,
+		EventType:  EventMemberNickChange,
+		Category:   CategoryMember,
+		ActorKind:  ActorUnknown,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+		Details:    map[string]any{"nick_before": "old", "nick_after": "new"},
+	}, []EnrichField{EnrichActor, EnrichReason})
+
+	assert.EqualValues(t, 1, countRows(t, guildID))
+
+	// Now shutdown. The buffered enrichment was already removed by
+	// LogPending, but the timer may still be alive — FlushPending must
+	// not double-commit.
+	FlushPending()
+
+	assert.EqualValues(t, 1, countRows(t, guildID),
+		"FlushPending must not duplicate a fallback whose enrichment was already consumed")
+}
+
+// Exercises the race between expireEnrichment and FlushPending: if
+// expireEnrichment has set en.expired = true but FlushPending swaps the
+// buffer before expireEnrichment can re-acquire buffer.mu, expireEnrichment
+// sees stillInBuffer = false and skips. Without the fallbackCommitted
+// check-and-set, FlushPending would also see expired = true and skip,
+// silently dropping the row. The check-and-set guarantees exactly one
+// path commits.
+//
+// Reproduces the race deterministically by setting en.expired manually
+// before calling FlushPending (simulating expireEnrichment having
+// claimed but not yet committed). pendingTTL is bumped to a value
+// large enough that the buffered timer cannot fire during the manual
+// setup phase even on a slow CI runner — without this the timer's
+// real expireEnrichment could fire between the TryEnrichWithFallback
+// call and the manual lookup, making the test pass for the wrong
+// reason (or fail intermittently).
+func TestTryEnrichWithFallback_ExpireFlushRace(t *testing.T) {
+	setupTestDB(t)
+	prevTTL := pendingTTL
+	pendingTTL = 30 * time.Second
+	t.Cleanup(func() { pendingTTL = prevTTL })
+
+	guildID := snowflake.ID(1307)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(13071)
+	moderator := snowflake.ID(13072)
+
+	fallback := Entry{
+		GuildID:    guildID,
+		Category:   CategoryMember,
+		EventType:  EventMemberNickChange,
+		ActorID:    &moderator,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+		Details:    map[string]any{"nick_before": "old", "nick_after": "new"},
+	}
+
+	TryEnrichWithFallback(guildID, EventMemberNickChange, &target, nil,
+		&moderator, ActorUser, "modUser", "", MatchFirst, 0, fallback)
+
+	// Locate the buffered enrichment and simulate expireEnrichment's
+	// partial progress: en.expired set, but the buffer still contains
+	// the entry. (Real expireEnrichment would release en.mu here and
+	// race for buffer.mu against FlushPending.)
+	pendingBuffer.mu.Lock()
+	var en *pendingEnrichment
+	for _, list := range pendingBuffer.enrichments {
+		if len(list) > 0 {
+			en = list[0]
+			break
+		}
+	}
+	pendingBuffer.mu.Unlock()
+	require.NotNil(t, en, "enrichment should have been buffered")
+
+	en.mu.Lock()
+	en.expired = true
+	en.mu.Unlock()
+
+	// Now run FlushPending. With the buggy "skip if expired" check it
+	// would observe en.expired == true and skip; with the fallbackCommitted
+	// check-and-set it commits the fallback because nobody else has yet.
+	FlushPending()
+
+	assert.EqualValues(t, 1, countRows(t, guildID),
+		"FlushPending must commit fallback even when expireEnrichment claimed it but didn't get to commit")
+}
+
+// The fallback Entry must be decoupled from the caller's storage:
+// mutating Details or the snowflake pointers' targets after the call
+// must not affect what eventually gets committed. Without the deep
+// clone in TryEnrichWithFallback this would both (a) corrupt the
+// stored row and (b) race the TTL goroutine reading Details for the
+// commit's JSON marshal.
+func TestTryEnrichWithFallback_ClonesCallerStorage(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1308)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(13081)
+	moderator := snowflake.ID(13082)
+
+	details := map[string]any{
+		"nick_before": "original-old",
+		"nick_after":  "original-new",
+	}
+	fallback := Entry{
+		GuildID:    guildID,
+		Category:   CategoryMember,
+		EventType:  EventMemberNickChange,
+		ActorID:    &moderator,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+		Details:    details,
+	}
+
+	TryEnrichWithFallback(guildID, EventMemberNickChange, &target, nil,
+		&moderator, ActorUser, "modUser", "", MatchFirst, 0, fallback)
+
+	// Mutate everything the caller still holds references to.
+	details["nick_before"] = "MUTATED"
+	details["nick_after"] = "MUTATED"
+	delete(details, "nick_before")
+	moderator = snowflake.ID(99999)
+	target = snowflake.ID(99998)
+
+	waitForRows(t, guildID, 1)
+
+	var row model.AuditLogEntry
+	require.NoError(t, model.DB.Where("guild_id = ?", guildID).First(&row).Error)
+	assert.Contains(t, row.Details, "original-old",
+		"stored Details must reflect pre-mutation state — buffered fallback shouldn't alias caller's map")
+	assert.NotContains(t, row.Details, "MUTATED",
+		"caller's post-call mutation must not be visible in the stored row")
+	require.NotNil(t, row.ActorID)
+	assert.Equal(t, snowflake.ID(13082), *row.ActorID,
+		"stored ActorID must reflect pre-mutation value — buffered fallback shouldn't alias caller's pointer target")
+	require.NotNil(t, row.TargetID)
+	assert.Equal(t, snowflake.ID(13081), *row.TargetID)
+}
+
+// The fallback's identity fields (GuildID/EventType/TargetID) are
+// normalized to match the explicit args at the call boundary. A
+// caller that passes mismatched values shouldn't be able to write a
+// row keyed differently than the buffered enrichment claims.
+func TestTryEnrichWithFallback_NormalizesIdentity(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1309)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(13091)
+	moderator := snowflake.ID(13092)
+	wrongGuild := snowflake.ID(99999)
+	wrongTarget := snowflake.ID(99998)
+
+	fallback := Entry{
+		// Wrong identity fields — should be overwritten by explicit args.
+		GuildID:    wrongGuild,
+		EventType:  EventMessageDelete,
+		TargetID:   &wrongTarget,
+		Category:   CategoryMember,
+		ActorID:    &moderator,
+		ActorKind:  ActorUser,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+		Details:    map[string]any{"nick_after": "new"},
+	}
+
+	TryEnrichWithFallback(guildID, EventMemberNickChange, &target, nil,
+		&moderator, ActorUser, "modUser", "", MatchFirst, 0, fallback)
+
+	// Row should land under the explicit guild, not the fallback's wrong one.
+	waitForRows(t, guildID, 1)
+	assert.EqualValues(t, 0, countRows(t, wrongGuild))
+
+	var row model.AuditLogEntry
+	require.NoError(t, model.DB.Where("guild_id = ?", guildID).First(&row).Error)
+	assert.Equal(t, string(EventMemberNickChange), row.EventType,
+		"EventType must be the explicit arg, not the fallback's stale value")
+	require.NotNil(t, row.TargetID)
+	assert.Equal(t, snowflake.ID(13091), *row.TargetID,
+		"TargetID must be the explicit arg, not the fallback's stale value")
+}
+
+// MatchAll + fallback is unsupported (would duplicate). The pairing must
+// drop the fallback rather than silently emit two rows.
+func TestTryEnrichWithFallback_MatchAllDropsFallback(t *testing.T) {
+	setupTestDB(t)
+	guildID := snowflake.ID(1304)
+	guildEnabled(t, guildID)
+
+	target := snowflake.ID(13041)
+	moderator := snowflake.ID(13042)
+
+	fallback := Entry{
+		GuildID:    guildID,
+		Category:   CategoryMessage,
+		EventType:  EventMessageDelete,
+		ActorID:    &moderator,
+		ActorKind:  ActorUser,
+		TargetID:   &target,
+		TargetKind: TargetUser,
+		Source:     SourceGateway,
+	}
+
+	TryEnrichWithFallback(guildID, EventMessageDelete, &target, nil,
+		&moderator, ActorUser, "modUser", "", MatchAll, 0, fallback)
+
+	assertRowsStayAt(t, guildID, 0)
+}
+
 // MatchFirst enrichments are one-shot: once a matching gateway entry has
 // been enriched, the enrichment must NOT linger in the buffer to latch
 // onto the next unrelated gateway event for the same (guild, event,
@@ -275,9 +742,7 @@ func TestTryEnrich_MatchFirstDoesNotBleedIntoNextEntry(t *testing.T) {
 	}, []EnrichField{EnrichActor, EnrichReason})
 
 	// Wait past TTL so the second pending entry flushes.
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-
-	assert.EqualValues(t, 2, countRows(t, guildID))
+	waitForRows(t, guildID, 2)
 
 	var rows []model.AuditLogEntry
 	require.NoError(t, model.DB.Where("guild_id = ?", guildID).Order("created_at ASC").Find(&rows).Error)
@@ -357,8 +822,7 @@ func TestTryEnrich_MessageDelete_DetailsScope(t *testing.T) {
 	assert.Equal(t, 1, enriched, "only the mod-deleted message should be enriched")
 
 	// Let the unrelated self-delete flush unenriched.
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-	assert.EqualValues(t, 2, countRows(t, guildID))
+	waitForRows(t, guildID, 2)
 
 	var rows []model.AuditLogEntry
 	require.NoError(t, model.DB.Where("guild_id = ?", guildID).Order("target_id ASC").Find(&rows).Error)
@@ -435,8 +899,7 @@ func TestTryEnrich_MessageDelete_NativeFirst_DetailsScope(t *testing.T) {
 	}, []EnrichField{EnrichActor, EnrichReason})
 
 	// Let the bystander entry flush unenriched.
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-	assert.EqualValues(t, 2, countRows(t, guildID))
+	waitForRows(t, guildID, 2)
 
 	var rows []model.AuditLogEntry
 	require.NoError(t, model.DB.Where("guild_id = ?", guildID).Order("target_id ASC").Find(&rows).Error)
@@ -501,8 +964,7 @@ func TestTryEnrich_MatchAll_CountCap(t *testing.T) {
 	makePending(8402)
 	makePending(8403)
 
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-	assert.EqualValues(t, 3, countRows(t, guildID))
+	waitForRows(t, guildID, 3)
 
 	var rows []model.AuditLogEntry
 	require.NoError(t, model.DB.Where("guild_id = ?", guildID).Order("target_id ASC").Find(&rows).Error)
@@ -566,8 +1028,7 @@ func TestTryEnrich_MatchAll_CountCap_InlinePlusBuffered(t *testing.T) {
 	makePending(8803)
 	makePending(8804)
 
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-	assert.EqualValues(t, 4, countRows(t, guildID))
+	waitForRows(t, guildID, 4)
 
 	var rows []model.AuditLogEntry
 	require.NoError(t, model.DB.Where("guild_id = ?", guildID).Order("target_id ASC").Find(&rows).Error)
@@ -622,8 +1083,7 @@ func TestTryEnrich_DetailsMatch_RequiresAllKeys(t *testing.T) {
 		&moderator, ActorUser, "modUser", "spam", MatchFirst, 0)
 	assert.Equal(t, 0, enriched, "missing author_id must not match")
 
-	time.Sleep(pendingTTL + 200*time.Millisecond)
-	assert.EqualValues(t, 1, countRows(t, guildID))
+	waitForRows(t, guildID, 1)
 
 	var row model.AuditLogEntry
 	require.NoError(t, model.DB.Where("guild_id = ?", guildID).First(&row).Error)
