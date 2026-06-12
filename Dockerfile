@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1.23.0
+# syntax=docker/dockerfile:1.24.0
 FROM golang:1.26 AS builder
 
 WORKDIR /usr/src/app
