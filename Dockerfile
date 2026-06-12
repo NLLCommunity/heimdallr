@@ -15,7 +15,7 @@ RUN CGO_ENABLED=0 GOOS=linux \
   -o heimdallrbot \
   github.com/NLLCommunity/heimdallr
 
-FROM alpine:3.23
+FROM alpine:3.24
 
 WORKDIR /usr/src/app
 
