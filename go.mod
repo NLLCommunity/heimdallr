@@ -6,7 +6,7 @@ require (
 	github.com/a-h/templ v0.3.1020
 	github.com/agnivade/levenshtein v1.2.1
 	github.com/cbroglie/mustache v1.4.0
-	github.com/disgoorg/disgo v0.19.2
+	github.com/disgoorg/disgo v0.19.6
 	github.com/disgoorg/omit v1.0.0
 	github.com/disgoorg/snowflake/v2 v2.0.3
 	github.com/glebarez/sqlite v1.11.0
@@ -24,7 +24,7 @@ require golang.org/x/sync v0.21.0
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/disgoorg/godave v0.0.0-20260211223842-18cd5c306076 // indirect
+	github.com/disgoorg/godave v0.1.0 // indirect
 	github.com/disgoorg/json/v2 v2.0.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
