@@ -11,7 +11,7 @@ require (
 	github.com/disgoorg/snowflake/v2 v2.0.3
 	github.com/glebarez/sqlite v1.11.0
 	github.com/google/uuid v1.6.0
-	github.com/jellydator/ttlcache/v3 v3.4.0
+	github.com/jellydator/ttlcache/v3 v3.4.1
 	github.com/rs/cors v1.11.1
 	github.com/spf13/viper v1.21.0
 	github.com/sqids/sqids-go v0.4.1
