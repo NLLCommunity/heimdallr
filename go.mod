@@ -17,7 +17,7 @@ require (
 	github.com/sqids/sqids-go v0.4.1
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/time v0.15.0
-	gorm.io/gorm v1.31.1
+	gorm.io/gorm v1.31.2
 )
 
 require golang.org/x/sync v0.21.0
