@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/disgoorg/disgo/bot"
+	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/rest"
 
 	"github.com/NLLCommunity/heimdallr/model"
@@ -36,19 +37,41 @@ func removeTempBans(ctx context.Context) {
 	}
 
 	for _, ban := range tb {
-		err = client.Rest.DeleteBan(ban.GuildID, ban.UserID, rest.WithReason("Ban expired."))
+		err := removeTempBan(ban, client.Rest)
 		if err != nil {
 			slog.Error(
-				"Failed to delete temp ban from Discord.",
+				"Failed to remove temp ban.",
 				"guild_id", ban.GuildID,
 				"user_id", ban.UserID,
 				"error", err,
 			)
 		}
-
-		err = ban.Delete()
-		if err != nil {
-			slog.Error("Failed to remove temp ban from database.")
-		}
 	}
+}
+
+func removeTempBan(ban model.TempBan, r rest.Rest) error {
+	err := r.DeleteBan(ban.GuildID, ban.UserID, rest.WithReason("Ban expired."))
+	if err == nil {
+		err = ban.Delete()
+		return err
+	}
+
+
+	guildSettings, err := model.GetGuildSettings(ban.GuildID)
+	if err != nil {
+		return err
+	}
+
+	if guildSettings.ModeratorChannel == 0 {
+		return nil
+	}
+
+	user, err := r.GetUser(ban.UserID)
+	if err != nil {
+		return err
+	}
+	_, err = r.CreateMessage(guildSettings.ModeratorChannel,
+		discord.NewMessageCreate().
+			WithContentf("Failed to unban temporarily banned user %s (`%d`)", user.Username, user.ID))
+	return err
 }
