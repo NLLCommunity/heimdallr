@@ -51,17 +51,6 @@ var InfractionsCommand = discord.SlashCommandCreate{
 					},
 					Required: false,
 				},
-				discord.ApplicationCommandOptionString{
-					Name: "user-id",
-					NameLocalizations: map[discord.Locale]string{
-						discord.LocaleNorwegian: "bruker-id",
-					},
-					Description: "The ID of the user user to view warnings for.",
-					DescriptionLocalizations: map[discord.Locale]string{
-						discord.LocaleNorwegian: "ID-en til brukeren du vil se advarsler for.",
-					},
-					Required: false,
-				},
 			},
 		},
 
@@ -98,45 +87,15 @@ func InfractionsListHandler(e *handler.CommandEvent) error {
 	slog.Info("interaction `/infractions list` called.")
 	data := e.SlashCommandInteractionData()
 	user, hasUser := data.OptUser("user")
-	userIDString, hasUserID := data.OptString("user-id")
-
-	if !hasUser && !hasUserID {
-		return e.CreateMessage(
-			interactions.EphemeralMessageContent(
-				"You must specify either a user or a user ID.",
-			),
-		)
-	}
-
-	if hasUser && hasUserID {
-		return e.CreateMessage(
-			interactions.EphemeralMessageContent(
-				"You can only specify either a user or a user ID.",
-			),
-		)
-	}
 
 	if !hasUser {
-		userID, err := snowflake.Parse(userIDString)
-		if err != nil {
-			_ = e.CreateMessage(
-				interactions.EphemeralMessageContent(
-					"Failed to parse user id.",
-				),
-			)
-			return fmt.Errorf("failed to parse user id: %w", err)
-		}
-
-		userRef, err := e.Client().Rest.GetUser(userID)
-		if err != nil || userRef == nil {
-			user = discord.User{
-				ID:       userID,
-				Username: "unknown_user",
-			}
-		} else {
-			user = *userRef
-		}
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"You must specify either a user.",
+			),
+		)
 	}
+
 	guild, ok := e.Guild()
 	if !ok {
 		slog.Warn("No guild id found in event.", "guild", guild)
