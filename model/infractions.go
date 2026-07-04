@@ -50,6 +50,12 @@ func CreateInfraction(guildID, userID, moderator snowflake.ID, reason string, we
 func GetUserTotalInfractionWeight(guildID, userID snowflake.ID, halfLifeDays float64) (float64, error) {
 	var totalWeight float64
 
+	if halfLifeDays == 0 {
+		err := gorm.G[Infraction](DB).Select("IFNULL(SUM(IFNULL(weight, 0)), 0)").
+			Where("guild_id = ? AND user_id = ?", guildID, userID).Scan(context.Background(), &totalWeight)
+		return totalWeight, err
+	}
+
 	err := gorm.G[Infraction](DB).Select("IFNULL(SUM(IFNULL(weight, 0) * POW(0.5, (unixepoch('now') - unixepoch(timestamp)) / 3600.0 / (? * 24.0))), 0)", halfLifeDays).
 		Where("guild_id = ? AND user_id = ?", guildID, userID).Scan(context.Background(), &totalWeight)
 
