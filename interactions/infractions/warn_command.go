@@ -158,13 +158,15 @@ func WarnHandler(e *handler.CommandEvent) error {
 		channel, err := e.Client().Rest.CreateDMChannel(user.ID)
 		if err != nil || channel == nil {
 			failedToSend = true
-		}
-		_, err = e.Client().Rest.CreateMessage(
-			channel.ID(), discord.NewMessageCreate().
-				WithEmbeds(embed.Build()),
-		)
-		if err != nil {
-			failedToSend = true
+		} else {
+
+			_, err = e.Client().Rest.CreateMessage(
+				channel.ID(), discord.NewMessageCreate().
+					WithEmbeds(embed.Build()),
+			)
+			if err != nil {
+				failedToSend = true
+			}
 		}
 	}
 
