@@ -204,9 +204,28 @@ func userCanReadChannelMessages(userID, channelID snowflake.ID, client *bot.Clie
 	var permissionOverwrites discord.PermissionOverwrites
 
 	switch c := channel.(type) {
-	case discord.GuildMessageChannel:
+	case discord.GuildTextChannel:
 		guildID = c.GuildID()
 		permissionOverwrites = c.PermissionOverwrites()
+	case discord.GuildNewsChannel:
+		guildID = c.GuildID()
+		permissionOverwrites = c.PermissionOverwrites()
+	case discord.GuildVoiceChannel:
+		guildID = c.GuildID()
+		permissionOverwrites = c.PermissionOverwrites()
+	case discord.GuildStageVoiceChannel:
+		guildID = c.GuildID()
+		permissionOverwrites = c.PermissionOverwrites()
+	case discord.GuildForumChannel:
+		guildID = c.GuildID()
+		permissionOverwrites = c.PermissionOverwrites()
+	case discord.GuildThread:
+		parent := c.ParentID()
+		if parent == nil {
+			return false, errors.New("thread has no parent channel")
+		}
+		return userCanReadChannelMessages(userID, *parent, client)
+
 	default:
 		return false, nil
 	}
