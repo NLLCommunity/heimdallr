@@ -6,7 +6,9 @@ import (
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
+	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/omit"
+	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/utils"
@@ -83,14 +85,22 @@ func CreateRoleButtonHandler(e *handler.CommandEvent) error {
 
 	role := e.SlashCommandInteractionData().Role("role")
 
-	instructions := e.SlashCommandInteractionData().String("instructions")
-	if instructions == "" {
-		instructions = fmt.Sprintf("Click the button below to get the **%s** role.", role.Name)
+	hasSufficientRole, err := memberHasRolesAboveTargetRole(e.Client().Rest, *e.GuildID(), e.Member().Member, role)
+	if err != nil {
+		slog.Error("Failed to check if member has roles above target role", "err", err)
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"An error occurred.",
+			),
+		)
 	}
 
-	text := e.SlashCommandInteractionData().String("text")
-	if text == "" {
-		text = "Get role"
+	if !hasSufficientRole {
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"You cannot assign a role that is higher than or equal to your highest role.",
+			),
+		)
 	}
 
 	// Check if the user has permission to assign roles
@@ -111,6 +121,16 @@ func CreateRoleButtonHandler(e *handler.CommandEvent) error {
 		)
 	}
 
+	instructions := e.SlashCommandInteractionData().String("instructions")
+	if instructions == "" {
+		instructions = fmt.Sprintf("Click the button below to get the **%s** role.", role.Name)
+	}
+
+	text := e.SlashCommandInteractionData().String("text")
+	if text == "" {
+		text = "Get role"
+	}
+
 	// Create the button
 
 	return e.CreateMessage(
@@ -119,4 +139,38 @@ func CreateRoleButtonHandler(e *handler.CommandEvent) error {
 			AddActionRow(discord.NewPrimaryButton(text, fmt.Sprintf("/role/assign/%s", role.ID.String()))).
 			WithAllowedMentions(&discord.AllowedMentions{}),
 	)
+}
+
+func memberHasRolesAboveTargetRole(r rest.Rest, guildID snowflake.ID, member discord.Member, targetRole discord.Role) (bool, error) {
+	guildRolesPositions, err := getRolesPositionMap(r, guildID)
+	if err != nil {
+		return false, err
+	}
+
+	highestRoleNum := 0
+	for _, roleID := range member.RoleIDs {
+		if pos, ok := guildRolesPositions[roleID]; ok && pos > highestRoleNum {
+			highestRoleNum = pos
+		}
+	}
+
+	if highestRoleNum <= targetRole.Position {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func getRolesPositionMap(r rest.Rest, guildID snowflake.ID) (map[snowflake.ID]int, error) {
+
+	guildRoles, err := r.GetRoles(guildID)
+	if err != nil {
+		return nil, err
+	}
+	guildToPositionMap := make(map[snowflake.ID]int)
+	for _, r := range guildRoles {
+		guildToPositionMap[r.ID] = r.Position
+	}
+
+	return guildToPositionMap, nil
 }
