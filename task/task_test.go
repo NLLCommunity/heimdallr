@@ -18,7 +18,7 @@ func TestNew(t *testing.T) {
 	}
 	interval := time.Second
 
-	task := New("test-task", execFunc, contextValues, interval)
+	task := New("test-task", execFunc, contextValues, interval, false)
 
 	assert.NotNil(t, task)
 	assert.Equal(t, TaskStatusNotStarted, task.Status())
@@ -34,7 +34,7 @@ func TestTaskExecution(t *testing.T) {
 		mu.Unlock()
 	}
 
-	task := New("test-task", execFunc, nil, 50*time.Millisecond)
+	task := New("test-task", execFunc, nil, 50*time.Millisecond, false)
 
 	// Test that task starts.
 	task.Start()
@@ -76,7 +76,7 @@ func TestTaskStartNoWait(t *testing.T) {
 		mu.Unlock()
 	}
 
-	task := New("test-task", execFunc, nil, time.Second)
+	task := New("test-task", execFunc, nil, time.Second, false)
 
 	// StartNoWait should execute immediately and then start the timer.
 	task.StartNoWait()
@@ -115,7 +115,7 @@ func TestTaskContextValues(t *testing.T) {
 		testKey: expectedValue,
 	}
 
-	task := New("test-task", execFunc, contextValues, 100*time.Millisecond)
+	task := New("test-task", execFunc, contextValues, 100*time.Millisecond, false)
 	task.Start()
 
 	// Wait for execution.
@@ -134,7 +134,7 @@ func TestTaskCancellation(t *testing.T) {
 		// Just a simple execution function for this test.
 	}
 
-	task := New("test-task", execFunc, nil, 50*time.Millisecond)
+	task := New("test-task", execFunc, nil, 50*time.Millisecond, false)
 	task.Start()
 
 	// Let it run briefly.
@@ -164,8 +164,8 @@ func TestMultipleTaskInstances(t *testing.T) {
 		mu2.Unlock()
 	}
 
-	task1 := New("task-1", exec1, nil, 50*time.Millisecond)
-	task2 := New("task-2", exec2, nil, 75*time.Millisecond)
+	task1 := New("task-1", exec1, nil, 50*time.Millisecond, false)
+	task2 := New("task-2", exec2, nil, 75*time.Millisecond, false)
 
 	task1.Start()
 	task2.Start()
@@ -194,7 +194,7 @@ func TestMultipleTaskInstances(t *testing.T) {
 func TestTaskStatusTransitions(t *testing.T) {
 	execFunc := func(ctx context.Context) {}
 
-	task := New("test-task", execFunc, nil, time.Second)
+	task := New("test-task", execFunc, nil, time.Second, false)
 
 	// Initial status.
 	assert.Equal(t, TaskStatusNotStarted, task.Status())

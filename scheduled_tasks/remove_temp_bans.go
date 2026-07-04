@@ -18,7 +18,7 @@ func RemoveTempBansScheduledTask(client *bot.Client) task.Task {
 		task.ContextKeyBotClientRef: client,
 	}
 
-	t := task.New("remove-temp-bans", removeTempBans, values, 15*time.Minute)
+	t := task.New("remove-temp-bans", removeTempBans, values, 15*time.Minute, true)
 	t.StartNoWait()
 
 	return t
@@ -55,7 +55,6 @@ func removeTempBan(ban model.TempBan, r rest.Rest) error {
 		err = ban.Delete()
 		return err
 	}
-
 
 	guildSettings, err := model.GetGuildSettings(ban.GuildID)
 	if err != nil {

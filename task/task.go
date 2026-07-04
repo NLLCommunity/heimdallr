@@ -36,11 +36,11 @@ type taskImpl struct {
 	context    context.Context
 	cancelFunc context.CancelFunc
 	interval   time.Duration
-	counter    uint64
 	taskStatus TaskStatus
+	silent     bool
 }
 
-func New(name string, exec func(ctx context.Context), contextValues map[ContextKey]any, interval time.Duration) Task {
+func New(name string, exec func(ctx context.Context), contextValues map[ContextKey]any, interval time.Duration, silent bool) Task {
 	ctx := context.Background()
 	for k, v := range contextValues {
 		//nolint:staticcheck
@@ -54,8 +54,8 @@ func New(name string, exec func(ctx context.Context), contextValues map[ContextK
 		context:    ctx,
 		cancelFunc: cancelFunc,
 		interval:   interval,
-		counter:    0,
 		taskStatus: TaskStatusNotStarted,
+		silent:     silent,
 	}
 }
 
@@ -71,8 +71,9 @@ func (t *taskImpl) Start() {
 				ticker.Stop()
 				return
 			case <-ticker.C:
-				slog.Info("task running", "task", t.name, "counter", t.counter)
-				t.counter++
+				if !t.silent {
+					slog.Info("task running", "task", t.name)
+				}
 				t.exec(t.context)
 			}
 		}
@@ -80,8 +81,7 @@ func (t *taskImpl) Start() {
 }
 
 func (t *taskImpl) StartNoWait() {
-	slog.Info("task running early", "task", t.name, "counter", t.counter)
-	t.counter++
+	slog.Info("task running early", "task", t.name)
 	t.exec(t.context)
 	t.Start()
 }
