@@ -93,12 +93,12 @@ func OnAntispamMessageCreate(e *events.GuildMessageCreate) {
 
 	info.Messages = append(info.Messages, messageDetails)
 
-	userMessages.Set(uHash, info, cooldown)
-
 	if info.Score >= guildSettings.AntiSpamCount {
 		timeoutUser(e, guildSettings, info)
+		info.Score = 0
 	}
 
+	userMessages.Set(uHash, info, cooldown)
 }
 
 func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSettings, info userMessagesInfo) {
