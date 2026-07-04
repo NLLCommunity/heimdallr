@@ -35,6 +35,10 @@ var userMessages = ttlcache.New[string, userMessagesInfo](
 	ttlcache.WithTTL[string, userMessagesInfo](60 * time.Second),
 )
 
+func RemoveExpiredMessagesInTTLCache() {
+	userMessages.DeleteExpired()
+}
+
 type userMessagesInfo struct {
 	Score    int
 	Messages []*messageDetails
