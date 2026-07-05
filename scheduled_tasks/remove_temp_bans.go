@@ -33,6 +33,7 @@ func removeTempBans(ctx context.Context) {
 
 	tb, err := model.GetExpiredTempBans()
 	if err != nil {
+		slog.Error("Failed to get expired temp bans.", "error", err)
 		return
 	}
 
@@ -51,9 +52,11 @@ func removeTempBans(ctx context.Context) {
 
 func removeTempBan(ban model.TempBan, r rest.Rest) error {
 	err := r.DeleteBan(ban.GuildID, ban.UserID, rest.WithReason("Ban expired."))
-	if err == nil {
-		err = ban.Delete()
-		return err
+	// A missing ban (e.g. a moderator already unbanned the user) means there is
+	// nothing left to undo, so treat it the same as a successful unban and drop
+	// the row. Any other error is left to be retried on the next run.
+	if err == nil || rest.IsJSONErrorCode(err, rest.JSONErrorCodeUnknownBan) {
+		return ban.Delete()
 	}
 
 	guildSettings, err := model.GetGuildSettings(ban.GuildID)
