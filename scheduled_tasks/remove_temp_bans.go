@@ -74,6 +74,7 @@ func removeTempBan(ban model.TempBan, r rest.Rest) error {
 	}
 	_, err = r.CreateMessage(guildSettings.ModeratorChannel,
 		discord.NewMessageCreate().
-			WithContentf("Failed to unban temporarily banned user %s (`%d`)", user.Username, user.ID))
+			WithContentf("Failed to unban temporarily banned user %s (`%d`)", user.Username, user.ID).
+			WithAllowedMentions(&discord.AllowedMentions{}))
 	return err
 }

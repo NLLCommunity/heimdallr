@@ -82,7 +82,9 @@ func (t *taskImpl) Start() {
 }
 
 func (t *taskImpl) StartNoWait() {
-	slog.Info("task running early", "task", t.name)
+	if !t.silent {
+		slog.Info("task running early", "task", t.name)
+	}
 	t.runExec()
 	t.Start()
 }

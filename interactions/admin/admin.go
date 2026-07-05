@@ -140,7 +140,8 @@ func AdminShowAllButtonHandler(e *handler.ComponentEvent) error {
 	return e.CreateMessage(
 		discord.NewMessageCreate().
 			WithContent(e.Message.Content).
-			WithEmbeds(e.Message.Embeds...),
+			WithEmbeds(e.Message.Embeds...).
+			WithAllowedMentions(&discord.AllowedMentions{}),
 	)
 }
 

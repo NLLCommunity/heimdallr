@@ -91,7 +91,7 @@ func InfractionsListHandler(e *handler.CommandEvent) error {
 	if !hasUser {
 		return e.CreateMessage(
 			interactions.EphemeralMessageContent(
-				"You must specify either a user.",
+				"You must specify a user.",
 			),
 		)
 	}
