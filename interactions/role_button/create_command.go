@@ -85,23 +85,9 @@ func CreateRoleButtonHandler(e *handler.CommandEvent) error {
 
 	role := e.SlashCommandInteractionData().Role("role")
 
-	hasSufficientRole, err := memberHasRolesAboveTargetRole(e.Client().Rest, *e.GuildID(), e.Member().Member, role)
-	if err != nil {
-		slog.Error("Failed to check if member has roles above target role", "err", err)
-		return e.CreateMessage(
-			interactions.EphemeralMessageContent(
-				"An error occurred.",
-			),
-		)
-	}
-
-	if !hasSufficientRole {
-		return e.CreateMessage(
-			interactions.EphemeralMessageContent(
-				"You cannot assign a role that is higher than or equal to your highest role.",
-			),
-		)
-	}
+	// Local permission checks first, before the hierarchy check below, which
+	// costs a GetRoles REST call - an unauthorized caller should be rejected
+	// without paying for that round-trip.
 
 	// Check if the user has permission to assign roles
 	if !permissions.Has(discord.PermissionManageRoles) {
@@ -117,6 +103,24 @@ func CreateRoleButtonHandler(e *handler.CommandEvent) error {
 		return e.CreateMessage(
 			interactions.EphemeralMessageContent(
 				"You cannot assign a role with permissions you do not have.",
+			),
+		)
+	}
+
+	hasSufficientRole, err := memberHasRolesAboveTargetRole(e.Client().Rest, *e.GuildID(), e.Member().Member, role)
+	if err != nil {
+		slog.Error("Failed to check if member has roles above target role", "err", err)
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"An error occurred.",
+			),
+		)
+	}
+
+	if !hasSufficientRole {
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"You cannot assign a role that is higher than or equal to your highest role.",
 			),
 		)
 	}

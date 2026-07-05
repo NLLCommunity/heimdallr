@@ -372,6 +372,12 @@ func addQuoteToMessage(text string) string {
 func hasPrivateThreadAccess(userID snowflake.ID, channel discord.GuildThread, r rest.Rest) (bool, error) {
 	tm, err := r.GetThreadMember(channel.ID(), userID, false)
 	if err != nil {
+		// A non-member lookup returns 404 Unknown Member. That is a definitive
+		// "no access", not a failure to determine access, so report it as such
+		// rather than bubbling an error that would fail the whole quote.
+		if rest.IsJSONErrorCode(err, rest.JSONErrorCodeUnknownMember) {
+			return false, nil
+		}
 		return false, err
 	}
 
