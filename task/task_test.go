@@ -207,3 +207,35 @@ func TestTaskStatusTransitions(t *testing.T) {
 	task.Stop()
 	assert.Equal(t, TaskStatusStopped, task.Status())
 }
+
+// A panic in the exec function must be recovered so it neither crashes the
+// process nor stops the ticker. Without the recover in runExec, StartNoWait's
+// synchronous first call alone would take down the test process.
+func TestTaskRecoversFromPanic(t *testing.T) {
+	var calls int
+	var mu sync.Mutex
+
+	execFunc := func(ctx context.Context) {
+		mu.Lock()
+		calls++
+		mu.Unlock()
+		panic("boom")
+	}
+
+	task := New("panic-task", execFunc, nil, 25*time.Millisecond, false)
+
+	// StartNoWait runs exec synchronously first; if the panic escaped, this
+	// line would crash the test binary rather than return.
+	task.StartNoWait()
+	assert.Equal(t, TaskStatusRunning, task.Status())
+
+	// The ticker keeps firing despite each run panicking.
+	time.Sleep(90 * time.Millisecond)
+	task.Stop()
+
+	mu.Lock()
+	got := calls
+	mu.Unlock()
+
+	assert.GreaterOrEqual(t, got, 2, "task should keep running after a panic")
+}

@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"log/slog"
+	"runtime/debug"
 	"time"
 )
 
@@ -74,7 +75,7 @@ func (t *taskImpl) Start() {
 				if !t.silent {
 					slog.Info("task running", "task", t.name)
 				}
-				t.exec(t.context)
+				t.runExec()
 			}
 		}
 	}()
@@ -82,8 +83,24 @@ func (t *taskImpl) Start() {
 
 func (t *taskImpl) StartNoWait() {
 	slog.Info("task running early", "task", t.name)
-	t.exec(t.context)
+	t.runExec()
 	t.Start()
+}
+
+// runExec runs the task's exec function, recovering any panic so that a bug in a
+// periodic task logs and skips the run instead of crashing the whole process.
+func (t *taskImpl) runExec() {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error(
+				"recovered from panic in scheduled task",
+				"task", t.name,
+				"panic", r,
+				"stack", string(debug.Stack()),
+			)
+		}
+	}()
+	t.exec(t.context)
 }
 
 func (t *taskImpl) Stop() {

@@ -17,7 +17,6 @@ import (
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/disgo/gateway"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/disgo/handler/middleware"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/spf13/viper"
 
@@ -104,7 +103,7 @@ func main() {
 	}
 
 	r := handler.New()
-	r.Use(middleware.Go)
+	r.Use(interactions.RecoverGo)
 
 	commandInteractions := []interactions.ApplicationCommandRegisterFunc{
 		admin.Register,
