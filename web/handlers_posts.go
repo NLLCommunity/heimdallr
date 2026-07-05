@@ -10,6 +10,7 @@ import (
 	"sync"
 
 	"github.com/disgoorg/disgo/bot"
+	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/snowflake/v2"
 	"gorm.io/gorm"
 
@@ -530,19 +531,33 @@ func handlePostUnpublish(client *bot.Client, limiter *keyedRateLimiter) http.Han
 			return
 		}
 		dc := posts.NewLiveDiscord(client, guildID)
+		// Only drop a row once its Discord message is actually gone. A message
+		// that failed to delete for a real reason (permissions, rate limit,
+		// transient 5xx) is still live, so we keep tracking it: forgetting it
+		// would orphan the message and make a later republish create a duplicate
+		// instead of editing it. A 404 (message/channel already gone) counts as
+		// success so an externally-deleted message doesn't wedge unpublish
+		// forever.
+		var remaining []model.PostMessage
 		for _, e := range existing {
-			if derr := dc.Delete(e.ChannelID, e.MessageID); derr != nil {
+			derr := dc.Delete(e.ChannelID, e.MessageID)
+			if derr != nil && !rest.IsJSONErrorCode(derr, rest.JSONErrorCodeUnknownMessage, rest.JSONErrorCodeUnknownChannel) {
 				slog.Warn("unpublish: failed to delete Discord message",
 					"error", derr,
 					"post_id", post.ID,
 					"channel_id", e.ChannelID,
 					"message_id", e.MessageID,
 				)
+				remaining = append(remaining, model.PostMessage{ChannelID: e.ChannelID, MessageID: e.MessageID})
 			}
 		}
-		if err := model.ReplacePostMessages(post.ID, nil); err != nil {
-			slog.Error("ReplacePostMessages(nil) failed", "error", err, "post_id", post.ID)
+		if err := model.ReplacePostMessages(post.ID, remaining); err != nil {
+			slog.Error("ReplacePostMessages failed during unpublish", "error", err, "post_id", post.ID)
 			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		if len(remaining) > 0 {
+			http.Error(w, fmt.Sprintf("unpublish incomplete: %d message(s) could not be removed from Discord; reload and retry", len(remaining)), http.StatusBadGateway)
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)

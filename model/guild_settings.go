@@ -94,6 +94,25 @@ func SetGuildSettings(settings *GuildSettings) error {
 	return nil
 }
 
+// UpdateGuildSettingsColumns writes only the named columns of the guild's
+// settings row, leaving every other column untouched.
+//
+// The dashboard saves each settings section independently. Using a whole-row
+// Save (SetGuildSettings) there lets two concurrent section saves clobber each
+// other: each reads the full row, mutates its own fields, and writes the whole
+// snapshot back, so the later writer reverts the earlier writer's unrelated
+// columns. Restricting the write to the columns a section actually owns makes
+// disjoint sections safe to save concurrently. The row must already exist
+// (GetGuildSettings is a FirstOrCreate, so callers that loaded settings first
+// are fine). columns are GORM field names, e.g. "AntiSpamCount"; Select forces
+// them to be written even when their value is the zero value.
+func UpdateGuildSettingsColumns(settings *GuildSettings, columns ...string) error {
+	if len(columns) == 0 {
+		return nil
+	}
+	return DB.Model(settings).Select(columns).Updates(settings).Error
+}
+
 // GetPostsModRoles returns the configured posts-mod role for each of
 // the given guilds that has one set. Read-only, single query: guilds
 // with no settings row or with PostsModRoleID == 0 are simply absent

@@ -362,7 +362,7 @@ func handleSavePosts(client *bot.Client) http.HandlerFunc {
 			return
 		}
 		settings.PostsModRoleID = modRole
-		if err := model.SetGuildSettings(settings); err != nil {
+		if err := model.UpdateGuildSettingsColumns(settings, "PostsModRoleID"); err != nil {
 			slog.Error("failed to save posts settings", "error", err)
 			renderPostsError("Failed to save settings.")
 			return
@@ -414,7 +414,7 @@ func handleSaveModChannel(client *bot.Client) http.HandlerFunc {
 			return
 		}
 		settings.ModeratorChannel = modChannel
-		if err := model.SetGuildSettings(settings); err != nil {
+		if err := model.UpdateGuildSettingsColumns(settings, "ModeratorChannel"); err != nil {
 			slog.Error("failed to save mod channel settings", "error", err)
 			renderModChannelError("Failed to save settings.")
 			return
@@ -475,7 +475,9 @@ func handleSaveInfractions(client *bot.Client) http.HandlerFunc {
 		settings.NotifyOnWarnedUserJoin = r.FormValue("notify_on_warned_user_join") == "true"
 		settings.NotifyWarnSeverityThreshold = threshold
 
-		if err := model.SetGuildSettings(settings); err != nil {
+		if err := model.UpdateGuildSettingsColumns(settings,
+			"InfractionHalfLifeDays", "NotifyOnWarnedUserJoin", "NotifyWarnSeverityThreshold",
+		); err != nil {
 			slog.Error("failed to save infraction settings", "error", err)
 			renderInfractionsError("Failed to save settings.")
 			return
@@ -540,7 +542,9 @@ func handleSaveAntiSpam(client *bot.Client) http.HandlerFunc {
 		settings.AntiSpamCount = count
 		settings.AntiSpamCooldownSeconds = cooldown
 
-		if err := model.SetGuildSettings(settings); err != nil {
+		if err := model.UpdateGuildSettingsColumns(settings,
+			"AntiSpamEnabled", "AntiSpamCount", "AntiSpamCooldownSeconds",
+		); err != nil {
 			slog.Error("failed to save anti-spam settings", "error", err)
 			renderAntiSpamError("Failed to save settings.")
 			return
@@ -584,7 +588,9 @@ func handleSaveBanFooter(client *bot.Client) http.HandlerFunc {
 		settings.BanFooter = r.FormValue("footer")
 		settings.AlwaysSendBanFooter = r.FormValue("always_send") == "true"
 
-		if err := model.SetGuildSettings(settings); err != nil {
+		if err := model.UpdateGuildSettingsColumns(settings,
+			"BanFooter", "AlwaysSendBanFooter",
+		); err != nil {
 			slog.Error("failed to save ban footer settings", "error", err)
 			renderSafe(w, r, partials.SettingsBanFooter(partials.BanFooterData{
 				GuildID:    guildIDStr,
@@ -751,7 +757,11 @@ func handleSaveGatekeep(client *bot.Client) http.HandlerFunc {
 			settings.GatekeepApprovedMessageV2Json = preserveV2Json(approvedV2Raw)
 		}
 
-		if err := model.SetGuildSettings(settings); err != nil {
+		if err := model.UpdateGuildSettingsColumns(settings,
+			"GatekeepEnabled", "GatekeepPendingRole", "GatekeepApprovedRole",
+			"GatekeepAddPendingRoleOnJoin", "GatekeepApprovedMessage",
+			"GatekeepApprovedMessageV2", "GatekeepApprovedMessageV2Json",
+		); err != nil {
 			slog.Error("failed to save gatekeep settings", "error", err)
 			renderGatekeepError("Failed to save settings.")
 			return
@@ -856,7 +866,11 @@ func handleSaveJoinLeave(client *bot.Client) http.HandlerFunc {
 			settings.LeaveMessageV2Json = preserveV2Json(leaveV2Raw)
 		}
 
-		if err := model.SetGuildSettings(settings); err != nil {
+		if err := model.UpdateGuildSettingsColumns(settings,
+			"JoinMessageEnabled", "JoinMessage", "JoinMessageV2", "JoinMessageV2Json",
+			"LeaveMessageEnabled", "LeaveMessage", "LeaveMessageV2", "LeaveMessageV2Json",
+			"JoinLeaveChannel",
+		); err != nil {
 			slog.Error("failed to save join/leave settings", "error", err)
 			renderJoinLeaveError("Failed to save settings.")
 			return
