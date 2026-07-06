@@ -35,6 +35,10 @@ var userMessages = ttlcache.New[string, userMessagesInfo](
 	ttlcache.WithTTL[string, userMessagesInfo](60 * time.Second),
 )
 
+func RemoveExpiredMessagesInTTLCache() {
+	userMessages.DeleteExpired()
+}
+
 type userMessagesInfo struct {
 	Score    int
 	Messages []*messageDetails
@@ -89,12 +93,12 @@ func OnAntispamMessageCreate(e *events.GuildMessageCreate) {
 
 	info.Messages = append(info.Messages, messageDetails)
 
-	userMessages.Set(uHash, info, cooldown)
-
 	if info.Score >= guildSettings.AntiSpamCount {
 		timeoutUser(e, guildSettings, info)
+		info.Score = 0
 	}
 
+	userMessages.Set(uHash, info, cooldown)
 }
 
 func timeoutUser(e *events.GuildMessageCreate, guildSettings *model.GuildSettings, info userMessagesInfo) {

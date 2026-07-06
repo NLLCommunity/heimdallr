@@ -7,7 +7,6 @@ import (
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/omit"
 
-	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
@@ -139,8 +138,10 @@ func AdminShowAllButtonHandler(e *handler.ComponentEvent) error {
 	utils.LogInteraction("admin", e)
 
 	return e.CreateMessage(
-		interactions.EphemeralMessageContent(e.Message.Content).
-			WithEmbeds(e.Message.Embeds...),
+		discord.NewMessageCreate().
+			WithContent(e.Message.Content).
+			WithEmbeds(e.Message.Embeds...).
+			WithAllowedMentions(&discord.AllowedMentions{}),
 	)
 }
 

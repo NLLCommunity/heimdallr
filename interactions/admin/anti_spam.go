@@ -150,7 +150,7 @@ func AdminAntiSpamHandler(e *handler.CommandEvent) error {
 		message += fmt.Sprintf("Anti-spam timeout (minutes) set to %d\n", timeout)
 	}
 
-	if !utils.Any(hasEnabled, hasCount, hasCooldown, hasReset) {
+	if !utils.Any(hasEnabled, hasCount, hasCooldown, hasReset, hasTimeout) {
 		return e.CreateMessage(interactions.EphemeralMessageContent(antiSpamInfo(settings)))
 	}
 

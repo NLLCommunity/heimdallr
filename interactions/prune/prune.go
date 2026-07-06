@@ -197,11 +197,6 @@ func removeKickedMembersAndNotify(e *handler.ComponentEvent, guildID snowflake.I
 
 	// Cleanup
 
-	err = model.RemovePrunedMembers(guildID)
-	if err != nil {
-		slog.Error("failed to remove pruned members from prune table", "err", err)
-	}
-
 	err = model.RemoveMembersByPruneID(pruneID, guildID)
 	if err != nil {
 		slog.Error("failed to remove members from prune table", "err", err)
@@ -227,7 +222,7 @@ func kickMembers(client *bot.Client, guildID snowflake.ID, pruneID uuid.UUID) (m
 	}
 
 	for _, member := range members {
-		err := model.SetMemberPruned(guildID, member.UserID, true)
+		err := model.SetMemberPruned(guildID, pruneID, member.UserID, true)
 		if err != nil {
 			messages += fmt.Sprintf("Failed to kick %s", getUsernameOrID(client, guildID, member.UserID))
 			slog.Warn(
@@ -240,13 +235,13 @@ func kickMembers(client *bot.Client, guildID snowflake.ID, pruneID uuid.UUID) (m
 
 		discordMember, err := client.Rest.GetMember(guildID, member.UserID)
 		if err == nil && !slices.Contains(discordMember.RoleIDs, guildSettings.GatekeepPendingRole) {
-			_ = model.SetMemberPruned(guildID, member.UserID, false)
+			_ = model.SetMemberPruned(guildID, pruneID, member.UserID, false)
 			continue // member no longer has the pending role, skip to next.
 		}
 
 		err = client.Rest.RemoveMember(guildID, member.UserID)
 		if err != nil {
-			_ = model.SetMemberPruned(guildID, member.UserID, false)
+			_ = model.SetMemberPruned(guildID, pruneID, member.UserID, false)
 			slog.Warn(
 				"failed to prune/kick member",
 				"guild_id", guildID,

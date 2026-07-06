@@ -26,7 +26,7 @@ func PruneAuditLogScheduledTask() task.Task {
 	if interval <= 0 {
 		interval = 6 * time.Hour
 	}
-	t := task.New("prune-audit-log", pruneAuditLog, nil, interval)
+	t := task.New("prune-audit-log", pruneAuditLog, nil, interval, false)
 	t.StartNoWait()
 	return t
 }

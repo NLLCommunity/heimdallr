@@ -283,10 +283,17 @@ func isTrusted(addr netip.Addr, trusted []netip.Prefix) bool {
 	return false
 }
 
-// clientIP extracts the client IP. Forwarded-IP headers (X-Real-IP and
-// X-Forwarded-For) are honored only when the immediate connection comes from a
-// proxy in the trusted list; otherwise they're ignored to prevent spoofing of
-// the per-IP rate limiter.
+// clientIP extracts the client IP. Forwarded-IP headers (X-Forwarded-For and
+// X-Real-IP) are honored only when the immediate connection comes from a proxy
+// in the trusted list; otherwise they're ignored to prevent spoofing of the
+// per-IP rate limiter.
+//
+// X-Forwarded-For is preferred because it is append-based: walking it
+// right-to-left while skipping trusted hops yields the address the trusted edge
+// appended, so any leading client-spoofed entries are ignored. X-Real-IP is a
+// single value with no chain to verify — an append-only proxy (e.g. Heroku's
+// router) passes a client-supplied X-Real-IP through untouched — so it is used
+// only as a fallback when X-Forwarded-For carries no usable entry.
 func clientIP(r *http.Request, trusted []netip.Prefix) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -299,11 +306,6 @@ func clientIP(r *http.Request, trusted []netip.Prefix) string {
 	remote = remote.Unmap()
 	if !isTrusted(remote, trusted) {
 		return remote.String()
-	}
-	if h := strings.TrimSpace(r.Header.Get("X-Real-IP")); h != "" {
-		if a, err := netip.ParseAddr(h); err == nil {
-			return a.Unmap().String()
-		}
 	}
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		// Walk right-to-left, skipping known-trusted hops; the rightmost
@@ -331,6 +333,11 @@ func clientIP(r *http.Request, trusted []netip.Prefix) string {
 		}
 		if rightmost != "" {
 			return rightmost
+		}
+	}
+	if h := strings.TrimSpace(r.Header.Get("X-Real-IP")); h != "" {
+		if a, err := netip.ParseAddr(h); err == nil {
+			return a.Unmap().String()
 		}
 	}
 	return remote.String()

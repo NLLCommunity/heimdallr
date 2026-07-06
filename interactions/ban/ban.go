@@ -157,6 +157,7 @@ func BanHandler(e *handler.CommandEvent) error {
 	)
 	if err != nil {
 		_ = e.CreateMessage(interactions.EphemeralMessageContent("Failed to ban User"))
+		return err
 	} else if failedToMessage {
 		_ = e.CreateMessage(interactions.EphemeralMessageContent("User was banned but message failed to send."))
 	} else {

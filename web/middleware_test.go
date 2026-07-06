@@ -440,6 +440,48 @@ func TestClientIP_MalformedXRealIPIgnored(t *testing.T) {
 	assert.Equal(t, "127.0.0.1", clientIP(req, trusted))
 }
 
+// Behind an append-only proxy (e.g. Heroku), X-Real-IP is client-controlled: the
+// router appends the real client to X-Forwarded-For but passes a spoofed
+// X-Real-IP through untouched. X-Forwarded-For must win so the rate-limit key
+// can't be forged.
+func TestClientIP_XForwardedForBeatsSpoofedXRealIP(t *testing.T) {
+	trusted, err := parseTrustedProxies([]string{"0.0.0.0/0", "::/0"})
+	require.NoError(t, err)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.RemoteAddr = "10.1.2.3:1234"
+	req.Header.Set("X-Real-IP", "9.9.9.9") // attacker-supplied
+	req.Header.Set("X-Forwarded-For", "203.0.113.9")
+
+	assert.Equal(t, "203.0.113.9", clientIP(req, trusted))
+}
+
+// Rotating a spoofed X-Real-IP while the trusted edge keeps appending the same
+// real client to X-Forwarded-For must not mint fresh rate-limit buckets.
+func TestRateLimiter_SpoofedXRealIPCannotBypassBucket(t *testing.T) {
+	rl := newKeyedRateLimiter(rate.Every(time.Minute), 1)
+	trusted, err := parseTrustedProxies([]string{"0.0.0.0/0", "::/0"})
+	require.NoError(t, err)
+
+	handler := rateLimitMiddleware(rl, trusted, rateLimitRule{Method: "GET", Path: "/callback"})(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	do := func(realIP string) int {
+		req := httptest.NewRequest("GET", "/callback", nil)
+		req.RemoteAddr = "10.1.2.3:1234"
+		req.Header.Set("X-Real-IP", realIP)
+		req.Header.Set("X-Forwarded-For", "203.0.113.9")
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec.Code
+	}
+
+	assert.Equal(t, http.StatusOK, do("9.9.9.1"))
+	// Same real client via XFF; rotating X-Real-IP must not dodge the bucket.
+	assert.Equal(t, http.StatusTooManyRequests, do("9.9.9.2"))
+}
+
 // Sanity check that prefix-membership works for both v4 and v6.
 func TestIsTrusted(t *testing.T) {
 	trusted, err := parseTrustedProxies([]string{"10.0.0.0/8", "::1"})

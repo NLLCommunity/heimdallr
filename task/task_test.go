@@ -18,7 +18,7 @@ func TestNew(t *testing.T) {
 	}
 	interval := time.Second
 
-	task := New("test-task", execFunc, contextValues, interval)
+	task := New("test-task", execFunc, contextValues, interval, false)
 
 	assert.NotNil(t, task)
 	assert.Equal(t, TaskStatusNotStarted, task.Status())
@@ -34,7 +34,7 @@ func TestTaskExecution(t *testing.T) {
 		mu.Unlock()
 	}
 
-	task := New("test-task", execFunc, nil, 50*time.Millisecond)
+	task := New("test-task", execFunc, nil, 50*time.Millisecond, false)
 
 	// Test that task starts.
 	task.Start()
@@ -76,7 +76,7 @@ func TestTaskStartNoWait(t *testing.T) {
 		mu.Unlock()
 	}
 
-	task := New("test-task", execFunc, nil, time.Second)
+	task := New("test-task", execFunc, nil, time.Second, false)
 
 	// StartNoWait should execute immediately and then start the timer.
 	task.StartNoWait()
@@ -115,7 +115,7 @@ func TestTaskContextValues(t *testing.T) {
 		testKey: expectedValue,
 	}
 
-	task := New("test-task", execFunc, contextValues, 100*time.Millisecond)
+	task := New("test-task", execFunc, contextValues, 100*time.Millisecond, false)
 	task.Start()
 
 	// Wait for execution.
@@ -134,7 +134,7 @@ func TestTaskCancellation(t *testing.T) {
 		// Just a simple execution function for this test.
 	}
 
-	task := New("test-task", execFunc, nil, 50*time.Millisecond)
+	task := New("test-task", execFunc, nil, 50*time.Millisecond, false)
 	task.Start()
 
 	// Let it run briefly.
@@ -164,8 +164,8 @@ func TestMultipleTaskInstances(t *testing.T) {
 		mu2.Unlock()
 	}
 
-	task1 := New("task-1", exec1, nil, 50*time.Millisecond)
-	task2 := New("task-2", exec2, nil, 75*time.Millisecond)
+	task1 := New("task-1", exec1, nil, 50*time.Millisecond, false)
+	task2 := New("task-2", exec2, nil, 75*time.Millisecond, false)
 
 	task1.Start()
 	task2.Start()
@@ -194,7 +194,7 @@ func TestMultipleTaskInstances(t *testing.T) {
 func TestTaskStatusTransitions(t *testing.T) {
 	execFunc := func(ctx context.Context) {}
 
-	task := New("test-task", execFunc, nil, time.Second)
+	task := New("test-task", execFunc, nil, time.Second, false)
 
 	// Initial status.
 	assert.Equal(t, TaskStatusNotStarted, task.Status())
@@ -206,4 +206,36 @@ func TestTaskStatusTransitions(t *testing.T) {
 	// After stopping.
 	task.Stop()
 	assert.Equal(t, TaskStatusStopped, task.Status())
+}
+
+// A panic in the exec function must be recovered so it neither crashes the
+// process nor stops the ticker. Without the recover in runExec, StartNoWait's
+// synchronous first call alone would take down the test process.
+func TestTaskRecoversFromPanic(t *testing.T) {
+	var calls int
+	var mu sync.Mutex
+
+	execFunc := func(ctx context.Context) {
+		mu.Lock()
+		calls++
+		mu.Unlock()
+		panic("boom")
+	}
+
+	task := New("panic-task", execFunc, nil, 25*time.Millisecond, false)
+
+	// StartNoWait runs exec synchronously first; if the panic escaped, this
+	// line would crash the test binary rather than return.
+	task.StartNoWait()
+	assert.Equal(t, TaskStatusRunning, task.Status())
+
+	// The ticker keeps firing despite each run panicking.
+	time.Sleep(90 * time.Millisecond)
+	task.Stop()
+
+	mu.Lock()
+	got := calls
+	mu.Unlock()
+
+	assert.GreaterOrEqual(t, got, 2, "task should keep running after a panic")
 }

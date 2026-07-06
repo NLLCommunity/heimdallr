@@ -172,7 +172,7 @@ func severityToDots(severity float64) string {
 	dots += strings.Repeat("●", severityInt)
 
 	remaining := severity - severityFloor
-	if remaining >= 0.0 && remaining < 0.125 {
+	if remaining >= 0.01 && remaining < 0.125 {
 		dots += "○"
 	} else if remaining >= 0.125 && remaining < 0.375 {
 		dots += "◔"

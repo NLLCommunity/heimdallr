@@ -26,8 +26,10 @@ func OnMemberBan(e *events.GuildBan) {
 	if err != nil || ban == nil {
 		_, _ = e.Client().Rest.CreateMessage(
 			guildSettings.ModeratorChannel, discord.NewMessageCreate().
-				WithContentf("User %s (`%d`) was banned", e.User.Username, e.User.ID),
+				WithContentf("User %s (`%d`) was banned", e.User.Username, e.User.ID).
+				WithAllowedMentions(&discord.AllowedMentions{}),
 		)
+		return
 	}
 
 	reason := utils.RefDefault(ban.Reason, "")

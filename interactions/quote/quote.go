@@ -12,6 +12,7 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
+	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 
@@ -204,9 +205,36 @@ func userCanReadChannelMessages(userID, channelID snowflake.ID, client *bot.Clie
 	var permissionOverwrites discord.PermissionOverwrites
 
 	switch c := channel.(type) {
-	case discord.GuildMessageChannel:
+	case discord.GuildTextChannel:
 		guildID = c.GuildID()
 		permissionOverwrites = c.PermissionOverwrites()
+	case discord.GuildNewsChannel:
+		guildID = c.GuildID()
+		permissionOverwrites = c.PermissionOverwrites()
+	case discord.GuildVoiceChannel:
+		guildID = c.GuildID()
+		permissionOverwrites = c.PermissionOverwrites()
+	case discord.GuildStageVoiceChannel:
+		guildID = c.GuildID()
+		permissionOverwrites = c.PermissionOverwrites()
+	case discord.GuildForumChannel:
+		guildID = c.GuildID()
+		permissionOverwrites = c.PermissionOverwrites()
+	case discord.GuildThread:
+		// there is an edge case where a user does have the manage threads permission, but is not a thread member.
+		// a workaround for the user is to join the thread.
+		// TODO: check if the user has manage threads permission, and if so, allow them to read the thread.
+		if c.Type() == discord.ChannelTypeGuildPrivateThread {
+			if hasAccess, err := hasPrivateThreadAccess(userID, c, client.Rest); err != nil || !hasAccess {
+				return false, err
+			}
+		}
+		parent := c.ParentID()
+		if parent == nil {
+			return false, errors.New("thread has no parent channel")
+		}
+		return userCanReadChannelMessages(userID, *parent, client)
+
 	default:
 		return false, nil
 	}
@@ -339,4 +367,23 @@ func addQuoteToMessage(text string) string {
 		temp[i] = fmt.Sprintf("> %s", s)
 	}
 	return strings.Join(temp, "\n")
+}
+
+func hasPrivateThreadAccess(userID snowflake.ID, channel discord.GuildThread, r rest.Rest) (bool, error) {
+	tm, err := r.GetThreadMember(channel.ID(), userID, false)
+	if err != nil {
+		// A non-member lookup returns 404 Unknown Member. That is a definitive
+		// "no access", not a failure to determine access, so report it as such
+		// rather than bubbling an error that would fail the whole quote.
+		if rest.IsJSONErrorCode(err, rest.JSONErrorCodeUnknownMember) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	if tm == nil {
+		return false, nil
+	}
+
+	return true, nil
 }

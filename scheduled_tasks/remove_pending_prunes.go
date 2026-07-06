@@ -9,7 +9,7 @@ import (
 )
 
 func RemoveStalePendingPrunes() task.Task {
-	t := task.New("remove-stale-prunes", removeStalePrunes, nil, 1*time.Hour)
+	t := task.New("remove-stale-prunes", removeStalePrunes, nil, 1*time.Hour, false)
 	t.StartNoWait()
 
 	return t

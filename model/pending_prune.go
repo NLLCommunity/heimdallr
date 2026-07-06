@@ -73,13 +73,6 @@ func GetPrunedMembers(pruneID uuid.UUID, guildID snowflake.ID) ([]MemberPendingP
 	return prunedMembers, err
 }
 
-func RemovePrunedMembers(guildID snowflake.ID) error {
-	ctx := context.Background()
-	session := DB.Session(&gorm.Session{SkipDefaultTransaction: true})
-	_, err := gorm.G[MemberPendingPrune](session).Where("guild_id = ? AND pruned = 1", guildID).Delete(ctx)
-	return err
-}
-
 func RemoveMembersByPruneID(pruneID uuid.UUID, guildID snowflake.ID) error {
 	ctx := context.Background()
 	session := DB.Session(&gorm.Session{SkipDefaultTransaction: true})
@@ -87,32 +80,35 @@ func RemoveMembersByPruneID(pruneID uuid.UUID, guildID snowflake.ID) error {
 	return err
 }
 
-func SetMemberPruned(guildID snowflake.ID, userID snowflake.ID, pruned bool) error {
+// SetMemberPruned flips the pruned flag on a single member's row within one
+// prune batch. It is scoped by prune_id because a user can appear in more than
+// one pending batch at once (the primary key is guild+prune+user); scoping only
+// by guild+user would mutate that user's rows in every other batch too.
+func SetMemberPruned(guildID snowflake.ID, pruneID uuid.UUID, userID snowflake.ID, pruned bool) error {
 	ctx := context.Background()
 	session := DB.Session(&gorm.Session{SkipDefaultTransaction: true})
 	_, err := gorm.G[MemberPendingPrune](session).
-		Where("guild_id = ? AND user_id = ?", guildID, userID).
+		Where("guild_id = ? AND prune_id = ? AND user_id = ?", guildID, pruneID, userID).
 		Select("pruned").
 		Updates(ctx, MemberPendingPrune{Pruned: pruned})
 	return err
 }
 
+// IsMemberPruned reports whether the user is marked pruned in ANY pending batch
+// for the guild. Callers (the leave and kick-audit listeners) only know the
+// user, not which batch, so this deliberately spans batches. It checks for the
+// existence of a pruned row rather than inspecting an arbitrary row, since a
+// user may have several rows with mixed pruned states across batches.
 func IsMemberPruned(guildID, userID snowflake.ID) (bool, error) {
 	ctx := context.Background()
 	session := DB.Session(&gorm.Session{SkipDefaultTransaction: true})
 	members, err := gorm.G[MemberPendingPrune](session).
-		Where("guild_id = ? AND user_id = ?", guildID, userID).
+		Where("guild_id = ? AND user_id = ? AND pruned = 1", guildID, userID).
 		Find(ctx)
-
 	if err != nil {
 		return false, err
 	}
-
-	if len(members) < 1 {
-		return false, nil
-	}
-
-	return members[0].Pruned, err
+	return len(members) > 0, nil
 }
 
 func DeletePrunesBeforeTime(t time.Time) error {

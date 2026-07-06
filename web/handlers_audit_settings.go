@@ -144,7 +144,10 @@ func handleSaveAuditLog(client *bot.Client) http.HandlerFunc {
 		settings.AuditMemberRetentionDays = memberDays
 		settings.AuditGuildRetentionDays = guildDays
 
-		if err := model.SetGuildSettings(settings); err != nil {
+		if err := model.UpdateGuildSettingsColumns(settings,
+			"AuditLogEnabled", "AuditMessageRetentionDays",
+			"AuditMemberRetentionDays", "AuditGuildRetentionDays",
+		); err != nil {
 			slog.Error("failed to save audit log settings", "error", err)
 			renderErr("Failed to save settings.")
 			return
