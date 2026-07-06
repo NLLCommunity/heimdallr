@@ -4,25 +4,42 @@ version: "3"
 
 env:
   GOTOOLCHAIN: auto
+vars:
+  binary: heimdallrBot{{exeExt}}
+  extraBuildFlags: '-a -installsuffix cgo -ldflags "-s -w"'
 
 tasks:
   default:
     desc: Build and run heimdallr
     cmds:
+      - task: debug
+  debug:
+    desc: Build and run heimdallr with debug flags
+    cmds:
       - task: build
+        vars:
+          extraBuildFlags: '-gcflags "all=-N -l"'
       - task: run
   run:
     desc: Run heimdallr
     preconditions:
-      - sh: test -f ./heimdallrbot{{exeExt}}
+      - sh: test -f ./{{.binary}}
         msg: "heimdallr binary not found, please run 'task build' first"
     cmds:
-      - ./heimdallrbot{{exeExt}}
+      - ./{{.binary}}
   build:
     desc: Build heimdallr binary
     cmds:
-      - templ generate
+      - task: generate
       - >
-        go build -a -installsuffix cgo -ldflags "-s -w"
-        -o heimdallrbot{{exeExt}}
+        go build {{.extraBuildFlags}}
+        -o {{.binary}}
         github.com/NLLCommunity/heimdallr
+  generate:
+    desc: Generate code
+    preconditions:
+      - sh: command -v templ
+        msg: "templ not found, please install templ first. https://www.github.com/a-h/templ"
+    cmds:
+      - templ generate
+      - go generate ./...
