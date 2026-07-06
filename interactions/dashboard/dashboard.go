@@ -1,7 +1,6 @@
 package dashboard
 
 import (
-	"fmt"
 	"log/slog"
 
 	"github.com/disgoorg/disgo/discord"
@@ -48,12 +47,10 @@ func Handler(e *handler.CommandEvent) error {
 		u = u.JoinPath("guild", gid.String())
 	}
 
-	message := fmt.Sprintf(
-		"**Dashboard**\n\n"+
-			"[Open the dashboard](%s)\n\n"+
-			"You'll be asked to authorize with Discord on first visit.",
-		u.String(),
-	)
-
-	return e.CreateMessage(interactions.EphemeralMessageContent(message))
+	return e.CreateMessage(
+		interactions.EphemeralMessageContent("Click tke below button to open the dashboard").
+			AddActionRow(
+				discord.NewLinkButton("Open Dashboard", u.String()).
+					WithEmoji(discord.NewComponentEmoji("⚙️")),
+			))
 }
