@@ -49,9 +49,22 @@ templ Base(title string, nav NavData) {
 }
 
 templ Navbar(nav NavData) {
-	<nav class="container">
-		<ul>
+	<nav class="site-nav container" x-data="{ navOpen: false }">
+		<ul class="nav-brand">
 			<li><strong>Heimdallr</strong></li>
+			if nav.GuildID != "" || nav.User != nil {
+				<li class="nav-toggle-item">
+					<button
+						type="button"
+						class="nav-toggle"
+						aria-label="Toggle navigation menu"
+						x-bind:aria-expanded="navOpen ? 'true' : 'false'"
+						@click="navOpen = !navOpen"
+					>☰</button>
+				</li>
+			}
+		</ul>
+		<ul class="nav-links" x-bind:class="navOpen ? 'nav-open' : ''">
 			if nav.GuildID != "" {
 				<li><a href="/guilds">← All guilds</a></li>
 				if nav.IsAdmin {
@@ -64,7 +77,7 @@ templ Navbar(nav NavData) {
 				}
 			}
 		</ul>
-		<ul>
+		<ul class="nav-links nav-user" x-bind:class="navOpen ? 'nav-open' : ''">
 			if nav.GuildName != "" {
 				<li>{ nav.GuildName }</li>
 			}
