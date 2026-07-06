@@ -1,8 +1,8 @@
 package pages
 
 import (
-	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
 	"github.com/NLLCommunity/heimdallr/web/templates/components"
+	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
 )
 
 type SandboxData struct {
@@ -13,7 +13,6 @@ type SandboxData struct {
 templ Sandbox(nav layouts.NavData, data SandboxData) {
 	@layouts.Base("Message Sandbox", nav) {
 		<h2>Message Sandbox</h2>
-		<p><a href={ templ.SafeURL("/guild/" + data.GuildID) }>← Back to settings</a></p>
 		<div
 			x-data="messageBuilder()"
 			data-initial="[]"
