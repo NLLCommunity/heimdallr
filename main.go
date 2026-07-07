@@ -4,11 +4,13 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
@@ -37,6 +39,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/listeners"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/scheduled_tasks"
+	"github.com/NLLCommunity/heimdallr/telemetry"
 	"github.com/NLLCommunity/heimdallr/web"
 )
 
@@ -69,6 +72,27 @@ func main() {
 		panic("No bot token found in config file. Please set 'bot.token'.")
 	}
 
+	baseHandler := buildBaseLogHandler(os.Stderr, getLogLevel(viper.GetString("loglevel")))
+	telemetryRuntime, err := telemetry.Start(
+		context.Background(),
+		telemetry.ConfigFromViper(),
+		baseHandler,
+	)
+	if err != nil {
+		panic(fmt.Errorf("failed to initialize telemetry: %w", err))
+	}
+	slog.SetDefault(telemetryRuntime.Logger())
+	defer func() {
+		if telemetryRuntime == nil {
+			return
+		}
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := telemetryRuntime.Shutdown(shutdownCtx); err != nil {
+			slog.Warn("telemetry shutdown failed", "error", err)
+		}
+	}()
+
 	if *rmGlobalCommands || *rmGuildCommands != 0 {
 		slog.Info("Removing commands.")
 		rmCommands(token, *rmGlobalCommands, *rmGuildCommands)
@@ -90,7 +114,7 @@ func main() {
 	if strings.Contains(dbPath, "?") {
 		sep = "&"
 	}
-	_, err := model.InitDB(dbPath + sep + "_pragma=journal_mode(WAL)&_pragma=analysis_limit(400)")
+	_, err = model.InitDB(dbPath + sep + "_pragma=journal_mode(WAL)&_pragma=analysis_limit(400)")
 	if err != nil {
 		panic(fmt.Errorf("failed to initialize database: %w", err))
 	}
@@ -127,20 +151,12 @@ func main() {
 
 	client, err := disgo.New(
 		token,
-		bot.WithLogger(
-			slog.New(
-				slog.NewTextHandler(
-					os.Stderr, &slog.HandlerOptions{
-						Level: getLogLevel(viper.GetString("loglevel")),
-					},
-				),
-			),
-		),
+		bot.WithLogger(telemetryRuntime.Logger()),
 		bot.WithDefaultGateway(),
 		bot.WithEventListeners(r),
 		bot.WithEventListenerFunc(
 			func(e *events.Ready) {
-				fmt.Println("Bot is ready!")
+				slog.Info("bot is ready")
 			},
 		),
 		bot.WithEventListenerFunc(listeners.OnWarnedUserJoin),
@@ -196,7 +212,7 @@ func main() {
 	webDone := make(chan struct{})
 	go func() {
 		defer close(webDone)
-		if err := web.StartServer(webCtx, viper.GetString("web.address"), client); err != nil {
+		if err := web.StartServer(webCtx, viper.GetString("web.address"), client, telemetryRuntime); err != nil {
 			slog.Error("Web server stopped with error", "error", err)
 		}
 	}()
@@ -244,9 +260,21 @@ func main() {
 	// Now that the web server has drained, the REST client can go.
 	// client.Close also calls Gateway.Close, which is idempotent.
 	client.Close(context.Background())
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	if err := telemetryRuntime.Shutdown(shutdownCtx); err != nil {
+		slog.Warn("telemetry shutdown failed", "error", err)
+	}
+	cancel()
+	telemetryRuntime = nil
 	if webFailed {
 		os.Exit(1)
 	}
+}
+
+func buildBaseLogHandler(w io.Writer, level slog.Level) slog.Handler {
+	return slog.NewTextHandler(w, &slog.HandlerOptions{
+		Level: level,
+	})
 }
 
 func getLogLevel(level string) slog.Level {

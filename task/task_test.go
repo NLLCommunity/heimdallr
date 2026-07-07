@@ -1,12 +1,21 @@
 package task
 
 import (
+	"bytes"
 	"context"
+	"log/slog"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
+	"unsafe"
 
+	"github.com/NLLCommunity/heimdallr/telemetry"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func TestNew(t *testing.T) {
@@ -238,4 +247,203 @@ func TestTaskRecoversFromPanic(t *testing.T) {
 	mu.Unlock()
 
 	assert.GreaterOrEqual(t, got, 2, "task should keep running after a panic")
+}
+
+func TestRunExecLogsCompletionDuration(t *testing.T) {
+	var buf bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() {
+		slog.SetDefault(previous)
+	})
+
+	task := &taskImpl{
+		name:    "Prune Audit Log",
+		exec:    func(context.Context) {},
+		context: context.Background(),
+	}
+
+	task.runExec()
+
+	output := buf.String()
+	assert.Contains(t, output, "task completed")
+	assert.Contains(t, output, "task=prune_audit_log")
+	assert.NotContains(t, output, "task=\"Prune Audit Log\"")
+	assert.Contains(t, output, "duration=")
+}
+
+func TestRunExecCancelledLogsOutcomeAndSetsSpanAttribute(t *testing.T) {
+	var buf bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() {
+		slog.SetDefault(previous)
+	})
+
+	recorder := tracetest.NewSpanRecorder()
+	traceProvider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(recorder))
+	t.Cleanup(func() {
+		require.NoError(t, traceProvider.Shutdown(context.Background()))
+	})
+	restoreRuntime := installDefaultTelemetryRuntime(t, traceProvider.Tracer("github.com/NLLCommunity/heimdallr"))
+	t.Cleanup(restoreRuntime)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	started := make(chan struct{})
+	done := make(chan struct{})
+
+	task := &taskImpl{
+		name: "Cancelable Task",
+		exec: func(ctx context.Context) {
+			close(started)
+			<-ctx.Done()
+		},
+		context: ctx,
+	}
+
+	go func() {
+		defer close(done)
+		task.runExec()
+	}()
+
+	<-started
+	cancel()
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for cancelled task run")
+	}
+
+	output := buf.String()
+	assert.Contains(t, output, "task completed")
+	assert.Contains(t, output, "task=cancelable_task")
+	assert.Contains(t, output, "outcome=cancelled")
+	assert.NotContains(t, output, "outcome=success")
+
+	spans := recorder.Ended()
+	require.Len(t, spans, 1)
+	attrs := map[string]string{}
+	for _, attr := range spans[0].Attributes() {
+		attrs[string(attr.Key)] = attr.Value.AsString()
+	}
+	assert.Equal(t, "cancelable_task", attrs["task.name"])
+	assert.Equal(t, "cancelled", attrs["task.outcome"])
+}
+
+func TestRunExecPanicLogIncludesDuration(t *testing.T) {
+	var buf bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() {
+		slog.SetDefault(previous)
+	})
+
+	task := &taskImpl{
+		name: "Panic Task",
+		exec: func(context.Context) {
+			panic("boom")
+		},
+		context: context.Background(),
+	}
+
+	require.NotPanics(t, task.runExec)
+
+	output := buf.String()
+	assert.Contains(t, output, "recovered from panic in scheduled task")
+	assert.Contains(t, output, "task=panic_task")
+	assert.NotContains(t, output, "task=\"Panic Task\"")
+	assert.Contains(t, output, "duration=")
+	assert.Contains(t, output, "panic_recovered=true")
+	assert.Contains(t, output, "outcome=panic")
+	assert.NotContains(t, output, "boom")
+	assert.NotContains(t, output, "goroutine")
+}
+
+func TestTaskLifecycleLogsUseNormalizedTaskToken(t *testing.T) {
+	var buf lockedBuffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() {
+		slog.SetDefault(previous)
+	})
+
+	task := New("Nightly Member Sync", func(context.Context) {}, nil, 15*time.Millisecond, false)
+
+	task.Start()
+	time.Sleep(35 * time.Millisecond)
+	task.Stop()
+	time.Sleep(20 * time.Millisecond)
+
+	output := buf.String()
+	assert.Contains(t, output, "task running")
+	assert.Contains(t, output, "task stopped")
+	assert.Contains(t, output, "task=nightly_member_sync")
+	assert.NotContains(t, output, "task=\"Nightly Member Sync\"")
+}
+
+type lockedBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *lockedBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *lockedBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+func TestRunExecPassesSpanContextToExec(t *testing.T) {
+	recorder := tracetest.NewSpanRecorder()
+	traceProvider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(recorder))
+	t.Cleanup(func() {
+		require.NoError(t, traceProvider.Shutdown(context.Background()))
+	})
+	restoreRuntime := installDefaultTelemetryRuntime(t, traceProvider.Tracer("github.com/NLLCommunity/heimdallr"))
+	t.Cleanup(restoreRuntime)
+
+	parentCtx, parentSpan := traceProvider.Tracer("task-test").Start(context.Background(), "parent")
+	defer parentSpan.End()
+
+	var spanContext trace.SpanContext
+	task := &taskImpl{
+		name: "Nightly Member Sync",
+		exec: func(ctx context.Context) {
+			spanContext = trace.SpanContextFromContext(ctx)
+		},
+		context: parentCtx,
+	}
+
+	task.runExec()
+
+	require.True(t, spanContext.IsValid(), "expected exec context to carry a valid span")
+	assert.Equal(t, trace.SpanContextFromContext(parentCtx).TraceID(), spanContext.TraceID())
+	assert.NotEqual(t, trace.SpanContextFromContext(parentCtx).SpanID(), spanContext.SpanID())
+
+	spans := recorder.Ended()
+	require.Len(t, spans, 1)
+	assert.Equal(t, "scheduled_task.run", spans[0].Name())
+	assert.Equal(t, trace.SpanContextFromContext(parentCtx).SpanID(), spans[0].Parent().SpanID())
+	assert.Equal(t, spanContext.SpanID(), spans[0].SpanContext().SpanID())
+}
+
+func installDefaultTelemetryRuntime(t *testing.T, tracer trace.Tracer) func() {
+	t.Helper()
+
+	runtime := &telemetry.Runtime{}
+	runtimeValue := reflect.ValueOf(runtime).Elem()
+	otelField := runtimeValue.FieldByName("otel")
+	otelValue := reflect.New(otelField.Type().Elem())
+	tracerField := otelValue.Elem().FieldByName("tracer")
+
+	reflect.NewAt(tracerField.Type(), unsafe.Pointer(tracerField.UnsafeAddr())).Elem().Set(reflect.ValueOf(tracer))
+	reflect.NewAt(otelField.Type(), unsafe.Pointer(otelField.UnsafeAddr())).Elem().Set(otelValue)
+
+	return telemetry.SetDefaultRuntime(runtime)
 }

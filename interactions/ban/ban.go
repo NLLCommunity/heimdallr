@@ -145,7 +145,7 @@ func BanHandler(e *handler.CommandEvent) error {
 		if err != nil {
 			slog.Info(
 				"Could not DM user with ban information",
-				"user", user, "err", err,
+				banDMFailureLogFields(user, err)...,
 			)
 			failedToMessage = true
 		}
@@ -274,6 +274,13 @@ func createBanDMMessage(data BanHandlerData) discord.MessageCreate {
 			utils.Iif(data.Message != "", messageText, ""),
 			footer,
 		)
+}
+
+func banDMFailureLogFields(user discord.User, err error) []any {
+	return []any{
+		"user_id", user.ID,
+		"err", err,
+	}
 }
 
 func durationToRelTimestamp(duration string) string {

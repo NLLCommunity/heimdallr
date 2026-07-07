@@ -6,6 +6,8 @@ import (
 	"net/http"
 
 	"github.com/a-h/templ"
+
+	"github.com/NLLCommunity/heimdallr/telemetry"
 )
 
 // renderSafe renders a templ component into a buffer first so that a render
@@ -25,15 +27,16 @@ func renderSafe(w http.ResponseWriter, r *http.Request, c templ.Component) {
 // error as a successful response. Status must be set before WriteHeader, so
 // this helper buffers, sets headers, then commits — the order matters.
 func renderSafeStatus(w http.ResponseWriter, r *http.Request, status int, c templ.Component) {
+	route := telemetry.SanitizedHTTPRequestRoute(r)
 	var buf bytes.Buffer
 	if err := c.Render(r.Context(), &buf); err != nil {
-		slog.Error("failed to render template", "error", err, "path", r.URL.Path)
+		slog.Error("failed to render template", "error", err, "path", route)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(status)
 	if _, err := buf.WriteTo(w); err != nil {
-		slog.Error("failed to write response", "error", err, "path", r.URL.Path)
+		slog.Error("failed to write response", "error", err, "path", route)
 	}
 }
