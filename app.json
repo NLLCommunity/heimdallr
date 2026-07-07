@@ -47,6 +47,62 @@
       "value": "info",
       "required": false
     },
+    "HEIMDALLR_TELEMETRY_OTEL_ENABLED": {
+      "description": "Enable OpenTelemetry log and trace export. Disabled by default.",
+      "value": "false",
+      "required": false
+    },
+    "HEIMDALLR_TELEMETRY_OTEL_ENDPOINT": {
+      "description": "OTLP/HTTP collector endpoint, for example collector.example.com:4318. Required only when OpenTelemetry is enabled.",
+      "required": false
+    },
+    "HEIMDALLR_TELEMETRY_OTEL_INSECURE": {
+      "description": "Set to true when the OTLP/HTTP endpoint does not use TLS.",
+      "value": "false",
+      "required": false
+    },
+    "HEIMDALLR_TELEMETRY_OTEL_SERVICE_NAME": {
+      "description": "OpenTelemetry service.name resource attribute. Defaults to heimdallr.",
+      "value": "heimdallr",
+      "required": false
+    },
+    "HEIMDALLR_TELEMETRY_OTEL_SERVICE_NAMESPACE": {
+      "description": "Optional OpenTelemetry service.namespace resource attribute.",
+      "required": false
+    },
+    "HEIMDALLR_TELEMETRY_OTEL_ENVIRONMENT": {
+      "description": "Deployment environment resource attribute, for example production or staging.",
+      "required": false
+    },
+    "HEIMDALLR_TELEMETRY_POSTHOG_ENABLED": {
+      "description": "Enable explicit privacy-preserving PostHog product events. Disabled by default.",
+      "value": "false",
+      "required": false
+    },
+    "HEIMDALLR_TELEMETRY_POSTHOG_API_KEY": {
+      "description": "PostHog project API key. Required only when PostHog is enabled.",
+      "required": false
+    },
+    "HEIMDALLR_TELEMETRY_POSTHOG_ENDPOINT": {
+      "description": "PostHog ingestion endpoint.",
+      "value": "https://us.i.posthog.com",
+      "required": false
+    },
+    "HEIMDALLR_TELEMETRY_POSTHOG_FLUSH_INTERVAL_SECONDS": {
+      "description": "Seconds between PostHog background flushes.",
+      "value": "30",
+      "required": false
+    },
+    "HEIMDALLR_TELEMETRY_POSTHOG_FLUSH_AT": {
+      "description": "Batch size threshold that triggers an earlier PostHog flush.",
+      "value": "20",
+      "required": false
+    },
+    "HEIMDALLR_TELEMETRY_POSTHOG_GROUP_ANALYTICS_ENABLED": {
+      "description": "Attach PostHog group analytics metadata using Discord guild IDs. Requires a PostHog plan that supports group analytics.",
+      "value": "false",
+      "required": false
+    },
     "DB_REPLICA_URL": {
       "description": "Litestream replica URL (e.g. s3://bucket/path). Required for SQLite persistence across dyno restarts.",
       "required": false

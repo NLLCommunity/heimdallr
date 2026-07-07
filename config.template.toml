@@ -53,3 +53,24 @@ guild_retention_days = 0 # guild.* and bot/web actions — kept forever by defau
 # How often the pruner runs. The pruner also runs once at boot to catch
 # up after downtime.
 prune_interval_hours = 6
+
+[telemetry.otel]
+# OpenTelemetry is disabled by default. When enabled, logs and traces are sent
+# to an OTLP/HTTP collector endpoint such as "collector.example.com:4318".
+# Full signal URLs ending in "/v1/logs" or "/v1/traces" are also accepted.
+enabled = false
+endpoint = ""
+headers = {}
+insecure = false
+service_name = "heimdallr"
+service_namespace = ""
+environment = ""
+
+[telemetry.posthog]
+# PostHog is disabled by default and independent from OpenTelemetry.
+enabled = false
+api_key = ""
+endpoint = "https://us.i.posthog.com"
+flush_interval_seconds = 30
+flush_at = 20
+group_analytics_enabled = false

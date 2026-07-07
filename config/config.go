@@ -104,6 +104,44 @@ func ParsedDashboardBaseURL() (*url.URL, error) {
 	return u, nil
 }
 
+func setDefaults() {
+	viper.SetDefault("bot.token", "")
+	viper.SetDefault("bot.db", "heimdallr.db")
+
+	viper.SetDefault("loglevel", "info")
+
+	viper.SetDefault("dev_mode.enabled", false)
+	viper.SetDefault("dev_mode.guild_id", 0)
+
+	viper.SetDefault("web.address", ":8484")
+	viper.SetDefault("web.trusted_proxies", []string{})
+
+	viper.SetDefault("dashboard.base_url", "http://localhost:8484")
+	viper.SetDefault("discord.client_id", "")
+	viper.SetDefault("discord.client_secret", "")
+	viper.SetDefault("dashboard.token_encryption_key", "")
+
+	viper.SetDefault("audit_log.message_retention_days", 14)
+	viper.SetDefault("audit_log.member_retention_days", 90)
+	viper.SetDefault("audit_log.guild_retention_days", 0)
+	viper.SetDefault("audit_log.prune_interval_hours", 6)
+
+	viper.SetDefault("telemetry.otel.enabled", false)
+	viper.SetDefault("telemetry.otel.endpoint", "")
+	viper.SetDefault("telemetry.otel.headers", map[string]string{})
+	viper.SetDefault("telemetry.otel.insecure", false)
+	viper.SetDefault("telemetry.otel.service_name", "heimdallr")
+	viper.SetDefault("telemetry.otel.service_namespace", "")
+	viper.SetDefault("telemetry.otel.environment", "")
+
+	viper.SetDefault("telemetry.posthog.enabled", false)
+	viper.SetDefault("telemetry.posthog.api_key", "")
+	viper.SetDefault("telemetry.posthog.endpoint", "https://us.i.posthog.com")
+	viper.SetDefault("telemetry.posthog.flush_interval_seconds", 30)
+	viper.SetDefault("telemetry.posthog.flush_at", 20)
+	viper.SetDefault("telemetry.posthog.group_analytics_enabled", false)
+}
+
 func init() {
 	viper.SetConfigName("config")
 	viper.SetConfigType("toml")
@@ -119,19 +157,6 @@ func init() {
 	viper.AddConfigPath("./")
 
 	// SET DEFAULTS
-	viper.SetDefault("bot.token", "")
-	viper.SetDefault("bot.db", "heimdallr.db")
-
-	viper.SetDefault("loglevel", "info")
-
-	viper.SetDefault("dev_mode.enabled", false)
-	viper.SetDefault("dev_mode.guild_id", 0)
-
-	viper.SetDefault("web.address", ":8484")
-	viper.SetDefault("web.trusted_proxies", []string{})
-
-	viper.SetDefault("dashboard.base_url", "http://localhost:8484")
-
 	// OAuth2 login uses Discord's authorization-code flow against the bot's
 	// own application credentials. client_id is public (it's in the
 	// authorize URL); client_secret is sensitive — keep it out of VCS by
@@ -139,8 +164,6 @@ func init() {
 	// redirect URI is derived from dashboard.base_url + "/oauth/callback"
 	// and must be registered on the application's Discord developer
 	// portal page.
-	viper.SetDefault("discord.client_id", "")
-	viper.SetDefault("discord.client_secret", "")
 
 	// AES-256-GCM key (base64) for encrypting OAuth tokens at rest in
 	// dashboard_sessions. The DB row already contains the session-token
@@ -148,16 +171,12 @@ func init() {
 	// exposes user IDs; but encrypting the access/refresh tokens
 	// specifically keeps a DB compromise from handing out call-anything
 	// bearer tokens to Discord on behalf of every signed-in admin.
-	viper.SetDefault("dashboard.token_encryption_key", "")
 
 	// Audit log retention ceilings, in days. Per-guild settings may LOWER
 	// these (or set their own value) but never raise above them. 0 means
 	// "no limit / forever" — guilds may set 0 only when the bot ceiling
 	// is also 0. The pruner runs at audit_log.prune_interval_hours.
-	viper.SetDefault("audit_log.message_retention_days", 14)
-	viper.SetDefault("audit_log.member_retention_days", 90)
-	viper.SetDefault("audit_log.guild_retention_days", 0)
-	viper.SetDefault("audit_log.prune_interval_hours", 6)
+	setDefaults()
 
 	viper.AutomaticEnv()
 
