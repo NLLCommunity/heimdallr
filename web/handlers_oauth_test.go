@@ -1,13 +1,29 @@
 package web
 
 import (
+	"bytes"
+	"context"
+	"log/slog"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/snowflake/v2"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/telemetry"
 )
+
+type recordingEvents struct {
+	events []telemetry.Event
+}
+
+func (r *recordingEvents) Capture(_ context.Context, event telemetry.Event) {
+	r.events = append(r.events, event)
+}
 
 // A token exchange must grant every scope the dashboard needs - a
 // mid-flow scope=identify edit would otherwise mint a session whose
@@ -108,4 +124,71 @@ func TestSafeReturnTo(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCaptureDashboardEventRequiresSession(t *testing.T) {
+	recorder := &recordingEvents{}
+	restore := telemetry.SetDefaultEvents(recorder)
+	t.Cleanup(restore)
+
+	req := httptest.NewRequest("GET", "/guild/123", nil)
+	captureDashboardEvent(req, "guild_selected", "123", map[string]any{"guild_id": "123"})
+
+	assert.Empty(t, recorder.events)
+}
+
+func TestCaptureDashboardEventUsesSessionUserAndGuild(t *testing.T) {
+	recorder := &recordingEvents{}
+	restore := telemetry.SetDefaultEvents(recorder)
+	t.Cleanup(restore)
+
+	req := httptest.NewRequest("GET", "/guild/123", nil)
+	req = req.WithContext(setSession(req.Context(), &model.DashboardSession{
+		UserID: snowflake.ID(123456789012345678),
+	}))
+
+	captureDashboardEvent(req, "guild_selected", "987654321098765432", map[string]any{
+		"guild_id":     "987654321098765432",
+		"access_level": "admin",
+		"guild_name":   "secret",
+	})
+
+	if assert.Len(t, recorder.events, 1) {
+		assert.Equal(t, "guild_selected", recorder.events[0].Name)
+		assert.Equal(t, "123456789012345678", recorder.events[0].DistinctID)
+		assert.Equal(t, "987654321098765432", recorder.events[0].GuildID)
+		assert.Equal(t, map[string]any{
+			"guild_id":     "987654321098765432",
+			"access_level": "admin",
+		}, recorder.events[0].Properties)
+	}
+}
+
+func TestHandleOAuthCallbackCancelLogOmitsQueryDescription(t *testing.T) {
+	var buf bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() {
+		slog.SetDefault(previous)
+	})
+
+	req := httptest.NewRequest(
+		http.MethodGet,
+		"/oauth/callback?error=access_denied&error_description=user+cancelled+with+secret",
+		nil,
+	)
+	rec := httptest.NewRecorder()
+
+	handleOAuthCallback(nil, 0, "", "", nil, false).ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusSeeOther, rec.Code)
+	assert.Equal(t, "/login", rec.Header().Get("Location"))
+
+	output := buf.String()
+	assert.Contains(t, output, "oauth: user cancelled consent")
+	assert.Contains(t, output, "error_present=true")
+	assert.Contains(t, output, "description_present=true")
+	assert.NotContains(t, output, "access_denied")
+	assert.NotContains(t, output, "user cancelled with secret")
+	assert.NotContains(t, output, "error_description")
 }

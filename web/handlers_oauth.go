@@ -15,6 +15,7 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/telemetry"
 )
 
 // oauthScopes are the OAuth2 scopes we request from Discord:
@@ -262,10 +263,11 @@ func handleOAuthCallback(
 		// Discord sends ?error=access_denied&error_description=... when
 		// the user clicks "Cancel" on consent. Treat as a normal bounce;
 		// Info because it is a user choice, not a fault.
-		if errParam := r.URL.Query().Get("error"); errParam != "" {
+		if r.URL.Query().Get("error") != "" {
+			description := r.URL.Query().Get("error_description")
 			slog.Info("oauth: user cancelled consent",
-				"error", errParam,
-				"description", r.URL.Query().Get("error_description"),
+				"error_present", true,
+				"description_present", description != "",
 			)
 			bounceToLogin("")
 			return
@@ -334,6 +336,15 @@ func handleOAuthCallback(
 			failLogin("failed to create admin session", err)
 			return
 		}
+
+		telemetry.Capture(r.Context(), telemetry.Event{
+			Name:       "dashboard_signed_in",
+			DistinctID: me.ID.String(),
+			Properties: map[string]any{
+				"return_to_present": stateRow.ReturnTo != "",
+				"oauth_scopes_ok":   true,
+			},
+		})
 
 		maxAge := int(time.Until(newSession.ExpiresAt).Seconds())
 		http.SetCookie(w, makeSessionCookie(newSession.Token, maxAge, secureCookie))

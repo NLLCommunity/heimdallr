@@ -9,6 +9,7 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/telemetry"
 )
 
 type sessionContextKey struct{}
@@ -155,4 +156,26 @@ func checkGuildPostMod(w http.ResponseWriter, r *http.Request, client *bot.Clien
 
 	http.Error(w, "you do not have permission to access the post dashboard in this guild", http.StatusForbidden)
 	return 0, false, false
+}
+
+func captureDashboardEvent(r *http.Request, name string, guildID string, properties map[string]any) {
+	session := sessionFromContext(r.Context())
+	if session == nil {
+		return
+	}
+
+	telemetry.Capture(r.Context(), telemetry.Event{
+		Name:       name,
+		DistinctID: session.UserID.String(),
+		GuildID:    guildID,
+		Properties: properties,
+	})
+}
+
+func captureSettingsSaved(r *http.Request, guildID, section, source string) {
+	captureDashboardEvent(r, "settings_saved", guildID, map[string]any{
+		"guild_id": guildID,
+		"section":  section,
+		"source":   source,
+	})
 }

@@ -205,6 +205,10 @@ func handleDashboard(client *bot.Client) http.HandlerFunc {
 			http.Error(w, "failed to load modmail settings", http.StatusInternalServerError)
 			return
 		}
+		captureDashboardEvent(r, "guild_selected", guildID.String(), map[string]any{
+			"guild_id":     guildID.String(),
+			"access_level": "admin",
+		})
 
 		channels := guildChannels(client, guildID)
 		roles := guildRoles(client, guildID)
@@ -369,6 +373,7 @@ func handleSavePosts(client *bot.Client) http.HandlerFunc {
 		}
 		logSettingsUpdate(sessionFromContext(r.Context()), guildID, "posts",
 			map[string]any{"mod_role": idStr(settings.PostsModRoleID)})
+		captureSettingsSaved(r, guildID.String(), "posts", "web")
 
 		renderSafe(w, r, partials.SettingsPosts(partials.PostsData{
 			GuildID:     guildIDStr,
@@ -421,6 +426,7 @@ func handleSaveModChannel(client *bot.Client) http.HandlerFunc {
 		}
 		logSettingsUpdate(sessionFromContext(r.Context()), guildID, "mod_channel",
 			map[string]any{"moderator_channel": idStr(settings.ModeratorChannel)})
+		captureSettingsSaved(r, guildID.String(), "mod_channel", "web")
 
 		renderSafe(w, r, partials.SettingsModChannel(partials.ModChannelData{
 			GuildID:          guildIDStr,
@@ -487,6 +493,7 @@ func handleSaveInfractions(client *bot.Client) http.HandlerFunc {
 			"notify_on_warned_user_join":     settings.NotifyOnWarnedUserJoin,
 			"notify_warn_severity_threshold": settings.NotifyWarnSeverityThreshold,
 		})
+		captureSettingsSaved(r, guildID.String(), "infractions", "web")
 
 		renderSafe(w, r, partials.SettingsInfractions(partials.InfractionsData{
 			GuildID:                     guildIDStr,
@@ -554,6 +561,7 @@ func handleSaveAntiSpam(client *bot.Client) http.HandlerFunc {
 			"count":            settings.AntiSpamCount,
 			"cooldown_seconds": settings.AntiSpamCooldownSeconds,
 		})
+		captureSettingsSaved(r, guildID.String(), "anti_spam", "web")
 
 		renderSafe(w, r, partials.SettingsAntiSpam(partials.AntiSpamData{
 			GuildID:         guildIDStr,
@@ -604,6 +612,7 @@ func handleSaveBanFooter(client *bot.Client) http.HandlerFunc {
 			"footer":      settings.BanFooter,
 			"always_send": settings.AlwaysSendBanFooter,
 		})
+		captureSettingsSaved(r, guildID.String(), "ban_footer", "web")
 
 		renderSafe(w, r, partials.SettingsBanFooter(partials.BanFooterData{
 			GuildID:     guildIDStr,
@@ -675,6 +684,7 @@ func handleSaveModmail(client *bot.Client) http.HandlerFunc {
 			"report_notification_channel": idStr(ms.ReportNotificationChannel),
 			"report_ping_role":            idStr(ms.ReportPingRole),
 		})
+		captureSettingsSaved(r, guildID.String(), "modmail", "web")
 
 		renderSafe(w, r, partials.SettingsModmail(partials.ModmailData{
 			GuildID:                   guildIDStr,
@@ -773,6 +783,7 @@ func handleSaveGatekeep(client *bot.Client) http.HandlerFunc {
 			"add_pending_role_on_join": settings.GatekeepAddPendingRoleOnJoin,
 			"approved_message_v2":      settings.GatekeepApprovedMessageV2,
 		})
+		captureSettingsSaved(r, guildID.String(), "gatekeep", "web")
 
 		renderSafe(w, r, partials.SettingsGatekeep(partials.GatekeepData{
 			GuildID:               guildIDStr,
@@ -882,6 +893,7 @@ func handleSaveJoinLeave(client *bot.Client) http.HandlerFunc {
 			"leave_message_v2":      settings.LeaveMessageV2,
 			"join_leave_channel":    idStr(settings.JoinLeaveChannel),
 		})
+		captureSettingsSaved(r, guildID.String(), "join_leave", "web")
 
 		renderSafe(w, r, partials.SettingsJoinLeave(partials.JoinLeaveData{
 			GuildID:             guildIDStr,

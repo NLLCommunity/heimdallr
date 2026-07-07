@@ -102,3 +102,19 @@ func TestValidatePostComponents(t *testing.T) {
 		})
 	}
 }
+
+func TestPostTelemetryCountsDoesNotExposeContent(t *testing.T) {
+	components := `[{"type":10,"content":"secret text"}]`
+
+	componentCount, messageCount := postTelemetryCounts(components)
+
+	assert.Equal(t, 1, componentCount)
+	assert.Equal(t, 1, messageCount)
+}
+
+func TestPostTelemetryCountsReturnsZeroForInvalidJSON(t *testing.T) {
+	componentCount, messageCount := postTelemetryCounts(`{"type":10}`)
+
+	assert.Zero(t, componentCount)
+	assert.Zero(t, messageCount)
+}

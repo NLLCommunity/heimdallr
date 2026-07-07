@@ -61,6 +61,10 @@ func parseSandboxMessageLink(link string) (guildID, channelID, messageID snowfla
 	return guildID, channelID, messageID, nil
 }
 
+func sandboxTelemetryCounts(componentsJSON string) (componentCount int, plannedMessageCount int) {
+	return postTelemetryCounts(componentsJSON)
+}
+
 func handleSandbox(client *bot.Client) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session := sessionFromContext(r.Context())
@@ -168,6 +172,12 @@ func handleSandboxSend(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 			renderError(http.StatusBadGateway, "Failed to send message.")
 			return
 		}
+		componentCount, plannedMessageCount := sandboxTelemetryCounts(componentsJSON)
+		captureDashboardEvent(r, "sandbox_message_sent", guildID.String(), map[string]any{
+			"guild_id":              guildID.String(),
+			"component_count":       componentCount,
+			"planned_message_count": plannedMessageCount,
+		})
 
 		renderSafe(w, r, components.AlertSuccess("Message sent!"))
 	}
