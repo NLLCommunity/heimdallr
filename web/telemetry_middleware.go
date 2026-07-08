@@ -92,6 +92,6 @@ func telemetryRequestLogMiddleware(next http.Handler) http.Handler {
 			attrs = append(attrs, "authenticated", false)
 		}
 
-		slog.InfoContext(r.Context(), "http request completed", attrs...)
+		slog.DebugContext(r.Context(), "http request completed", attrs...)
 	})
 }
