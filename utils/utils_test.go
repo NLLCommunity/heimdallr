@@ -1,6 +1,8 @@
 package utils
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -258,6 +260,55 @@ func TestParseLongDuration(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSplitStringToLengthByLine(t *testing.T) {
+	t.Run("short input returns single part", func(t *testing.T) {
+		parts := SplitStringToLengthByLine("hello\nworld", 2000)
+		require.Len(t, parts, 1)
+		assert.Contains(t, parts[0], "hello")
+		assert.Contains(t, parts[0], "world")
+	})
+
+	t.Run("no part exceeds length", func(t *testing.T) {
+		var lines []string
+		for range 100 {
+			lines = append(lines, strings.Repeat("x", 40))
+		}
+		input := strings.Join(lines, "\n")
+
+		parts := SplitStringToLengthByLine(input, 200)
+		require.Greater(t, len(parts), 1)
+		for i, part := range parts {
+			assert.LessOrEqual(t, len(part), 200, "part %d exceeds length", i)
+		}
+	})
+
+	t.Run("newline added on flush boundary does not exceed length", func(t *testing.T) {
+		// First line fills the buffer to 1960 chars (1959 + newline); the
+		// second line of 40 chars makes exactly 2000 before the trailing
+		// newline is appended, which must not push the part to 2001.
+		input := strings.Repeat("a", 1959) + "\n" + strings.Repeat("b", 40)
+
+		parts := SplitStringToLengthByLine(input, 2000)
+		for i, part := range parts {
+			assert.LessOrEqual(t, len(part), 2000, "part %d exceeds length", i)
+		}
+	})
+
+	t.Run("no content is lost", func(t *testing.T) {
+		var lines []string
+		for i := range 50 {
+			lines = append(lines, fmt.Sprintf("line-%d", i))
+		}
+		input := strings.Join(lines, "\n")
+
+		parts := SplitStringToLengthByLine(input, 100)
+		joined := strings.Join(parts, "")
+		for _, line := range lines {
+			assert.Contains(t, joined, line)
+		}
+	})
 }
 
 func TestFormatFloatUpToPrec(t *testing.T) {
