@@ -164,7 +164,8 @@ func SplitStringToLengthByLine(input string, length int) (output []string) {
 
 	buf := ""
 	for _, line := range inputLines {
-		if len(buf)+len(line) > length {
+		// +1 accounts for the newline appended below.
+		if buf != "" && len(buf)+len(line)+1 > length {
 			output = append(output, buf)
 			buf = ""
 		}

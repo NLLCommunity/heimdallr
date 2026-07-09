@@ -325,39 +325,57 @@ func PruneHandler(e *handler.CommandEvent) error {
 	}
 
 	pruneID := uuid.New()
-	message, err := preparePruneMembers(pruneID, prunableMembers)
+	messages, err := preparePruneMembers(pruneID, prunableMembers)
 	if err != nil {
 		slog.Error("Failed to prune members.", "err", err)
 		_, err = e.CreateFollowupMessage(ix.EphemeralMessageContent("Failed to prune members: could not process list."))
 		return err
 	}
 
-	_, err = e.CreateFollowupMessage(message)
+	for _, message := range messages {
+		if _, err = e.CreateFollowupMessage(message); err != nil {
+			return err
+		}
+	}
 
-	return err
+	return nil
 }
 
 func preparePruneMembers(pruneID uuid.UUID, members []discord.Member) (
-	discord.MessageCreate, error,
+	[]discord.MessageCreate, error,
 ) {
 	err := model.AddMembersToBePruned(pruneID, members)
 	if err != nil {
-		return discord.MessageCreate{}, err
+		return nil, err
 	}
 
+	return buildPruneConfirmMessages(pruneID, members), nil
+}
+
+// buildPruneConfirmMessages builds the confirmation messages for a prune. The
+// member list can exceed Discord's 2000 character message limit, so it is
+// split across as many messages as needed. The confirm/cancel buttons go on a
+// separate short final message, which also leaves room for PruneCancelHandler
+// to append to it on cancellation.
+func buildPruneConfirmMessages(pruneID uuid.UUID, members []discord.Member) []discord.MessageCreate {
 	var content strings.Builder
 	fmt.Fprintf(&content, "## The following %d members will be pruned and kicked from the server\n", len(members))
 	for _, member := range members {
 		fmt.Fprintf(&content, "- `%s` (`%s`)\n", member.User.Username, member.User.ID)
 	}
 
-	message := ix.EphemeralMessageContent(content.String()).
+	var messages []discord.MessageCreate
+	for _, part := range utils.SplitStringToLengthByLine(content.String(), 2000) {
+		messages = append(messages, ix.EphemeralMessageContent(part))
+	}
+
+	prompt := ix.EphemeralMessageContentf("Prune the %d members listed above?", len(members)).
 		AddActionRow(
 			discord.NewDangerButton("Prune members", fmt.Sprintf("/button/prune-members/confirm/%s", pruneID)),
 			discord.NewSecondaryButton("Cancel", fmt.Sprintf("/button/prune-members/cancel/%s", pruneID)),
 		)
 
-	return message, nil
+	return append(messages, prompt)
 }
 
 func getPrunableMembers(
