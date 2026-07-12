@@ -22,8 +22,10 @@ import (
 
 func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
 	r.Command("/quote", QuoteHandler)
+	r.Command("/Copy to New Forum Thread", CreateForumPostHandler)
+	r.Modal("/quote/forum-post/{channelID}/{messageID}", CreateForumPostModalHandler)
 
-	return []discord.ApplicationCommandCreate{QuoteCommand}
+	return []discord.ApplicationCommandCreate{QuoteCommand, CreateForumPostCommand}
 }
 
 var quoteUrlRegex = regexp.MustCompile(
