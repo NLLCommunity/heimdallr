@@ -43,7 +43,9 @@ func TestCreateForumPostModalOnlyLetsAuthorEditMessage(t *testing.T) {
 	otherUserModal := createForumPostModal("/quote/forum-post/2/3", message, 5)
 
 	assert.Len(t, authorModal.Components, 3)
-	assert.Len(t, otherUserModal.Components, 2)
+	assert.Len(t, otherUserModal.Components, 3)
+	assert.Equal(t, authorModal.Components[len(authorModal.Components)-1].Type(), discord.ComponentTypeLabel)
+	assert.Equal(t, otherUserModal.Components[len(otherUserModal.Components)-1].Type(), discord.ComponentTypeTextDisplay)
 
 	authorMessageField := authorModal.Components[2].(discord.LabelComponent)
 	assert.Equal(t, "Message", authorMessageField.Label)
@@ -54,7 +56,7 @@ func TestCreateForumPostModalOnlyLetsAuthorEditMessage(t *testing.T) {
 		Content: strings.Repeat("x", maxForumPostModalBodyRunes+1),
 		Author:  discord.User{ID: 4},
 	}
-	assert.Len(t, createForumPostModal("/quote/forum-post/2/3", longMessage, 4).Components, 2)
+	assert.Len(t, createForumPostModal("/quote/forum-post/2/3", longMessage, 4).Components, 3)
 }
 
 func TestSourceCopyNotice(t *testing.T) {
