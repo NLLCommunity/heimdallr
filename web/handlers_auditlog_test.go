@@ -8,7 +8,24 @@ import (
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/NLLCommunity/heimdallr/audit"
 )
+
+func TestSummariseDetail_MessageDeleteIncludesOriginalAuthor(t *testing.T) {
+	summary, sections := summariseDetail(nil, 0, string(audit.EventMessageDelete), map[string]any{
+		"author_id":       "123",
+		"author_username": "messageAuthor",
+		"before_content":  "Deleted by a moderator.",
+	})
+
+	assert.Equal(t, "@messageAuthor: Deleted by a moderator.", summary)
+	require.Len(t, sections, 2)
+	assert.Equal(t, "Message author", sections[0].Heading)
+	assert.Equal(t, "@messageAuthor", sections[0].Body)
+	assert.Equal(t, "Deleted message", sections[1].Heading)
+	assert.Equal(t, "Deleted by a moderator.", sections[1].Body)
+}
 
 func TestParsePage(t *testing.T) {
 	cases := []struct {

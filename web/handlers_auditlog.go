@@ -173,12 +173,28 @@ func summariseDetail(client *bot.Client, guildID snowflake.ID, eventType string,
 	switch eventType {
 	case string(audit.EventMessageDelete):
 		full := stringField(d, "before_content")
-		if full == "" {
+		author := messageAuthorFromDetails(d)
+		if full == "" && author == "" {
 			return "", nil
 		}
-		return truncate(full, 120), []partials.DetailSection{
-			{Heading: "Deleted message", Body: full},
+
+		sections := make([]partials.DetailSection, 0, 2)
+		if author != "" {
+			sections = append(sections, partials.DetailSection{Heading: "Message author", Body: author})
 		}
+		if full != "" {
+			sections = append(sections, partials.DetailSection{Heading: "Deleted message", Body: full})
+		}
+
+		summary := truncate(full, 120)
+		if author != "" {
+			if summary == "" {
+				summary = "Message by " + author
+			} else {
+				summary = author + ": " + summary
+			}
+		}
+		return summary, sections
 
 	case string(audit.EventMessageEdit):
 		before := stringField(d, "before_content")
@@ -238,6 +254,19 @@ func summariseDetail(client *bot.Client, guildID snowflake.ID, eventType string,
 		return stringField(d, "post_name"), nil
 	}
 	return "", nil
+}
+
+// messageAuthorFromDetails returns the original author captured when the
+// gateway delivers a message-delete event. This is distinct from the audit
+// entry actor, which is replaced with the moderator during native enrichment.
+func messageAuthorFromDetails(d map[string]any) string {
+	if username := stringField(d, "author_username"); username != "" {
+		return "@" + username
+	}
+	if id := stringField(d, "author_id"); id != "" {
+		return "@" + id
+	}
+	return ""
 }
 
 // settingsUpdateMetadataKeys are keys present in a settings.update
