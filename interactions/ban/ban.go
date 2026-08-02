@@ -254,9 +254,9 @@ func BanHandlerDataFromString(s string) (data BanHandlerData) {
 func createBanDMMessage(data BanHandlerData) discord.MessageCreate {
 	banExp := durationToRelTimestamp(data.Duration)
 
-	expiryText := fmt.Sprintf("This ban will expire %s.", banExp)
+	expiryText := fmt.Sprintf("This ban will expire %s.\n", banExp)
 	messageText := fmt.Sprintf(
-		"Along with the ban, this message was added:\n\n %s\n\n",
+		"Along with the ban, this message was added:\n\n%s\n",
 		data.Message,
 	)
 
@@ -268,7 +268,7 @@ func createBanDMMessage(data BanHandlerData) discord.MessageCreate {
 
 	return discord.NewMessageCreate().
 		WithContentf(
-			"You have been banned from %s.\n%s%s\n\n%s\n\n(You cannot respond to this message)",
+			"You have been banned from %s.\n%s%s\n%s\n\n-# (You cannot respond to this message)",
 			data.Guild.Name,
 			utils.Iif(data.Duration != "", expiryText, ""),
 			utils.Iif(data.Message != "", messageText, ""),
