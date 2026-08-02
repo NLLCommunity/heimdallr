@@ -357,3 +357,165 @@ func TestFormatFloatUpToPrec(t *testing.T) {
 		})
 	}
 }
+
+func TestPluralize(t *testing.T) {
+	tests := []struct {
+		name     string
+		count    int
+		singular string
+		plural   string
+		expected string
+	}{
+		{
+			name:     "singular",
+			count:    1,
+			singular: "apple",
+			plural:   "apples",
+			expected: "apple",
+		},
+		{
+			name:     "plural",
+			count:    2,
+			singular: "apple",
+			plural:   "apples",
+			expected: "apples",
+		},
+		{
+			name:     "zero",
+			count:    0,
+			singular: "apple",
+			plural:   "apples",
+			expected: "apples",
+		},
+		{
+			name:     "many",
+			count:    5,
+			singular: "apple",
+			plural:   "apples",
+			expected: "apples",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := Pluralize(tt.count, tt.singular, tt.plural)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestPluralizef(t *testing.T) {
+	tests := []struct {
+		name     string
+		count    int
+		singular string
+		plural   string
+		expected string
+	}{
+		{
+			name:     "singular",
+			count:    1,
+			singular: "%d apple",
+			plural:   "%d apples",
+			expected: "1 apple",
+		},
+		{
+			name:     "plural",
+			count:    2,
+			singular: "%d apple",
+			plural:   "%d apples",
+			expected: "2 apples",
+		},
+		{
+			name:     "zero",
+			count:    0,
+			singular: "%d apple",
+			plural:   "%d apples",
+			expected: "0 apples",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := Pluralizef(tt.count, tt.singular, tt.plural)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestHumanList(t *testing.T) {
+	tests := []struct {
+		name     string
+		items    []string
+		expected string
+	}{
+		{
+			name:     "empty list",
+			items:    []string{},
+			expected: "",
+		},
+		{
+			name:     "single item",
+			items:    []string{"apple"},
+			expected: "apple",
+		},
+		{
+			name:     "two items",
+			items:    []string{"apple", "banana"},
+			expected: "apple and banana",
+		},
+		{
+			name:     "three items",
+			items:    []string{"apple", "banana", "cherry"},
+			expected: "apple, banana, and cherry",
+		},
+		{
+			name:     "four items",
+			items:    []string{"apple", "banana", "cherry", "date"},
+			expected: "apple, banana, cherry, and date",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := HumanList(tt.items)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestDurationToHumanReadable(t *testing.T) {
+	tests := []struct {
+		name     string
+		duration time.Duration
+		expected string
+	}{
+		{
+			name:     "zero duration",
+			duration: 0,
+			expected: "",
+		},
+		{
+			name:     "seconds only",
+			duration: 45 * time.Second,
+			expected: "45 seconds",
+		},
+		{
+			name:     "minutes and seconds",
+			duration: 2*time.Minute + 30*time.Second,
+			expected: "2 minutes and 30 seconds",
+		},
+		{
+			name:     "hours, minutes, and seconds",
+			duration: 1*time.Hour + 15*time.Minute + 10*time.Second,
+			expected: "1 hour, 15 minutes, and 10 seconds",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := DurationToHumanReadable(tt.duration)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

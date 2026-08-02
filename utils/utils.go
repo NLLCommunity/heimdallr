@@ -2,6 +2,7 @@ package utils
 
 import (
 	"errors"
+	"fmt"
 	"iter"
 	"log/slog"
 	"math"
@@ -102,6 +103,81 @@ func ParseLongDuration(s string) (time.Duration, error) {
 
 	return duration, nil
 }
+
+func DurationToHumanReadable(duration time.Duration) string {
+	years := int(duration.Hours() / (24 * 365))
+	duration -= time.Duration(years) * 365 * 24 * time.Hour
+
+	months := int(duration.Hours() / (24 * 30))
+	duration -= time.Duration(months) * 30 * 24 * time.Hour
+
+	weeks := int(duration.Hours() / (24 * 7))
+	duration -= time.Duration(weeks) * 7 * 24 * time.Hour
+
+	days := int(duration.Hours() / 24)
+	duration -= time.Duration(days) * 24 * time.Hour
+
+	hours := int(duration.Hours())
+	duration -= time.Duration(hours) * time.Hour
+
+	minutes := int(duration.Minutes())
+	duration -= time.Duration(minutes) * time.Minute
+
+	seconds := int(duration.Seconds())
+
+	var parts []string
+	if years > 0 {
+		parts = append(parts, Pluralizef(years, "%d year", "%d years"))
+	}
+	if months > 0 {
+		parts = append(parts, Pluralizef(months, "%d month", "%d months"))
+	}
+	if weeks > 0 {
+		parts = append(parts, Pluralizef(weeks, "%d week", "%d weeks"))
+	}
+	if days > 0 {
+		parts = append(parts, Pluralizef(days, "%d day", "%d days"))
+	}
+	if hours > 0 {
+		parts = append(parts, Pluralizef(hours, "%d hour", "%d hours"))
+	}
+	if minutes > 0 {
+		parts = append(parts, Pluralizef(minutes, "%d minute", "%d minutes"))
+	}
+	if seconds > 0 {
+		parts = append(parts, Pluralizef(seconds, "%d second", "%d seconds"))
+	}
+
+	return HumanList(parts)
+}
+
+func Pluralize(count int, singular, plural string) string {
+	if count == 1 {
+		return singular
+	}
+	return plural
+}
+
+func Pluralizef(count int, singular, plural string) string {
+	if count == 1 {
+		return fmt.Sprintf(singular, count)
+	}
+	return fmt.Sprintf(plural, count)
+}
+
+func HumanList(items []string) string {
+	if len(items) == 0 {
+		return ""
+	} else if len(items) == 1 {
+		return items[0]
+	} else if len(items) == 2 {
+		return items[0] + " and " + items[1]
+	}
+
+	items[len(items)-1] = "and " + items[len(items)-1]
+	return strings.Join(items, ", ")
+}
+
 func FormatFloatUpToPrec(num float64, prec int) string {
 	str := strconv.FormatFloat(num, 'f', prec, 64)
 	str = strings.TrimRight(str, "0")

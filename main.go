@@ -34,6 +34,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/interactions/prune"
 	"github.com/NLLCommunity/heimdallr/interactions/quote"
 	"github.com/NLLCommunity/heimdallr/interactions/role_button"
+	"github.com/NLLCommunity/heimdallr/interactions/timeout"
 	"github.com/NLLCommunity/heimdallr/listeners"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/scheduled_tasks"
@@ -117,6 +118,7 @@ func main() {
 		quote.Register,
 		role_button.Register,
 		modmail.Register,
+		timeout.Register,
 	}
 
 	var commandCreates []discord.ApplicationCommandCreate
