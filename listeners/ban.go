@@ -36,35 +36,44 @@ func OnMemberBan(e *events.GuildBan) {
 	slog.Debug("Parsing ban reason", "reason", reason)
 	banData := banIx.BanHandlerDataFromString(reason)
 
-	embed := discord.NewEmbedBuilder().
-		SetTitlef("User %s was banned", e.User.EffectiveName()).
-		SetDescriptionf(
+	components := []discord.ContainerSubComponent{
+		discord.NewTextDisplayf(
+			"## User %s was banned.",
+			e.User.EffectiveName(),
+		),
+		discord.NewTextDisplayf(
+			"**Username:** %s\n"+
+				"**User ID:** %s\n"+
+				"**Banned by:** %s\n"+
+				"**Duration:** %s",
+			e.User.Username,
+			e.User.ID,
+			utils.Iif(banData.BanningUserID != 0, fmt.Sprintf("<@%d>", banData.BanningUserID), "unknown"),
+			utils.Iif(banData.Duration != "", banData.Duration, "permanent"),
+		),
+		discord.NewTextDisplayf(
 			"### Reason\n>>> %s",
-			utils.Iif(banData.Reason != "", banData.Reason, "none given"),
-		).
-		SetColor(0xFF0000).
-		AddField("Username", e.User.Username, true).
-		AddField("User ID", fmt.Sprintf("`%s`", e.User.ID), true)
+			utils.Iif(banData.Reason != "",
+				banData.Reason,
+				"none given"),
+		),
+	}
 
-	if banData.BanningUserID != 0 {
-		if banningUser, err := e.Client().Rest.GetUser(banData.BanningUserID); err == nil {
-			embed.AddField("Banning User", banningUser.Username, true)
-		}
-	}
-	if banData.Duration != "" {
-		embed.AddField("Duration", banData.Duration, true)
-	}
 	if banData.Message != "" {
 		if banData.Message == banData.Reason {
-			embed.AddField("Message", "_Sent reason as message, see above._", false)
+			components = append(components, discord.NewTextDisplay("_Sent reason as message, see above._"))
 		} else {
-			embed.AddField("Message", banData.Message, false)
+			components = append(components, discord.NewTextDisplayf(
+				"### Message\n>>> %s",
+				banData.Message,
+			))
 		}
 	}
 
-	_, _ = e.Client().Rest.CreateMessage(
-		guildSettings.ModeratorChannel, discord.NewMessageCreate().
-			AddEmbeds(embed.Build()).
-			WithAllowedMentions(&discord.AllowedMentions{}),
-	)
+	message := discord.NewMessageCreateV2(
+		discord.NewContainer(components...).
+			WithAccentColor(0xFF0000),
+	).WithAllowedMentions(&discord.AllowedMentions{})
+
+	_, _ = e.Client().Rest.CreateMessage(guildSettings.ModeratorChannel, message)
 }
