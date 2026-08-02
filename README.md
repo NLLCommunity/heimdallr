@@ -95,6 +95,34 @@ can be replicated to S3-compatible storage. Heroku's filesystem is ephemeral
 state is lost on every restart. See `litestream.yml` for the replica config
 and `app.json` for the full list of supported env vars.
 
+## Optional Telemetry
+
+Heimdallr supports two independent opt-in telemetry integrations:
+
+- OpenTelemetry log and trace export through OTLP/HTTP.
+- PostHog product events through the PostHog Go SDK.
+
+Both are disabled by default. OpenTelemetry can be enabled without PostHog, and
+PostHog can be enabled without OpenTelemetry.
+
+PostHog events intentionally send only Discord IDs, counts, booleans, and enums.
+They do not send message content, moderation reasons, names, OAuth/session
+tokens, cookies, IP addresses, raw request bodies, raw query strings, or raw
+audit-log details.
+
+```bash
+heroku config:set \
+  HEIMDALLR_TELEMETRY_OTEL_ENABLED=true \
+  HEIMDALLR_TELEMETRY_OTEL_ENDPOINT=collector.example.com:4318
+
+# The OpenTelemetry endpoint may also be a full OTLP/HTTP signal URL ending in
+# /v1/logs or /v1/traces; Heimdallr infers the sibling signal path from it.
+
+heroku config:set \
+  HEIMDALLR_TELEMETRY_POSTHOG_ENABLED=true \
+  HEIMDALLR_TELEMETRY_POSTHOG_API_KEY=phc_...
+```
+
 ## License
 
 [GPL-3.0](LICENSE)

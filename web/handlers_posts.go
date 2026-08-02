@@ -84,6 +84,18 @@ func validatePostComponents(componentsJSON string) error {
 	return nil
 }
 
+func postTelemetryCounts(componentsJSON string) (componentCount int, plannedMessageCount int) {
+	var arr []any
+	if err := json.Unmarshal([]byte(componentsJSON), &arr); err != nil {
+		return 0, 0
+	}
+	chunks, err := posts.Plan(arr)
+	if err != nil {
+		return 0, 0
+	}
+	return len(arr), len(chunks)
+}
+
 // channelInGuild reports whether channelID resolves to a known message channel
 // inside guildID. Used to keep cross-guild channel IDs out of the database and
 // to re-validate at publish time in case the bot lost access (or the row was
@@ -100,6 +112,10 @@ func handlePostsList(client *bot.Client) http.HandlerFunc {
 		if !ok {
 			return
 		}
+		accessLevel := "posts"
+		if isAdmin {
+			accessLevel = "admin"
+		}
 
 		postEntries, err := model.ListPostsWithCounts(guildID)
 		if err != nil {
@@ -107,6 +123,10 @@ func handlePostsList(client *bot.Client) http.HandlerFunc {
 			http.Error(w, "failed to load posts", http.StatusInternalServerError)
 			return
 		}
+		captureDashboardEvent(r, "guild_selected", guildID.String(), map[string]any{
+			"guild_id":     guildID.String(),
+			"access_level": accessLevel,
+		})
 
 		guild, _ := client.Caches.Guild(guildID)
 		nav := layouts.NavData{
@@ -198,6 +218,14 @@ func handlePostsCreate(client *bot.Client) http.HandlerFunc {
 			return
 		}
 		logPostUpdate(session, guildID, audit.EventWebPostCreate, post.ID, post.Name)
+		componentCount, plannedMessageCount := postTelemetryCounts(post.ComponentsJSON)
+		captureDashboardEvent(r, "post_created", guildID.String(), map[string]any{
+			"guild_id":              guildID.String(),
+			"post_id":               strconv.FormatUint(uint64(post.ID), 10),
+			"has_channel":           post.ChannelID != 0,
+			"component_count":       componentCount,
+			"planned_message_count": plannedMessageCount,
+		})
 
 		w.Header().Set("Content-Type", "application/json; charset=utf-8")
 		_ = json.NewEncoder(w).Encode(map[string]uint{
@@ -303,6 +331,14 @@ func handlePostSave(client *bot.Client) http.HandlerFunc {
 			return
 		}
 		logPostUpdate(sessionFromContext(r.Context()), guildID, audit.EventWebPostUpdate, updated.ID, updated.Name)
+		componentCount, plannedMessageCount := postTelemetryCounts(updated.ComponentsJSON)
+		captureDashboardEvent(r, "post_saved", guildID.String(), map[string]any{
+			"guild_id":              guildID.String(),
+			"post_id":               strconv.FormatUint(uint64(updated.ID), 10),
+			"has_channel":           updated.ChannelID != 0,
+			"component_count":       componentCount,
+			"planned_message_count": plannedMessageCount,
+		})
 
 		// Return the bumped version so the client can keep editing without
 		// reloading. Without this, the next save would 409 with a stale
@@ -493,6 +529,15 @@ func handlePostPublish(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 				return
 			}
 		}
+		captureDashboardEvent(r, "post_published", guildID.String(), map[string]any{
+			"guild_id":              guildID.String(),
+			"post_id":               strconv.FormatUint(uint64(post.ID), 10),
+			"planned_message_count": len(chunks),
+			"created_count":         len(result.Created),
+			"deleted_count":         result.DeletedCount,
+			"recreated_all":         result.RecreatedAll,
+			"delete_failure_count":  len(result.DeleteFailures),
+		})
 		w.WriteHeader(http.StatusNoContent)
 	}
 }
@@ -560,6 +605,11 @@ func handlePostUnpublish(client *bot.Client, limiter *keyedRateLimiter) http.Han
 			http.Error(w, fmt.Sprintf("unpublish incomplete: %d message(s) could not be removed from Discord; reload and retry", len(remaining)), http.StatusBadGateway)
 			return
 		}
+		captureDashboardEvent(r, "post_unpublished", guildID.String(), map[string]any{
+			"guild_id":               guildID.String(),
+			"post_id":                strconv.FormatUint(uint64(post.ID), 10),
+			"previous_message_count": len(existing),
+		})
 		w.WriteHeader(http.StatusNoContent)
 	}
 }

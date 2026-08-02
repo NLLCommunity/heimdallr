@@ -1,10 +1,23 @@
 package main
 
 import (
+	"bytes"
+	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+func TestBuildBaseLogHandlerRespectsLogLevel(t *testing.T) {
+	var buf bytes.Buffer
+	logger := slog.New(buildBaseLogHandler(&buf, slog.LevelWarn))
+
+	logger.Info("hidden")
+	logger.Warn("visible")
+
+	assert.NotContains(t, buf.String(), "hidden")
+	assert.Contains(t, buf.String(), "visible")
+}
 
 func TestGetLogLevel(t *testing.T) {
 	tests := []struct {

@@ -1,8 +1,11 @@
 package web
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -19,6 +22,34 @@ type staticComponent string
 func (s staticComponent) Render(_ context.Context, w io.Writer) error {
 	_, err := io.WriteString(w, string(s))
 	return err
+}
+
+type errComponent struct {
+	err error
+}
+
+func (c errComponent) Render(context.Context, io.Writer) error {
+	return c.err
+}
+
+type failingResponseWriter struct {
+	header http.Header
+	status int
+}
+
+func (w *failingResponseWriter) Header() http.Header {
+	if w.header == nil {
+		w.header = make(http.Header)
+	}
+	return w.header
+}
+
+func (w *failingResponseWriter) WriteHeader(status int) {
+	w.status = status
+}
+
+func (w *failingResponseWriter) Write([]byte) (int, error) {
+	return 0, errors.New("write failed")
 }
 
 func TestRenderSafe_DefaultsTo200WithHTMLContentType(t *testing.T) {
@@ -60,4 +91,48 @@ func TestRenderSafeStatus_SetsContentTypeBeforeStatus(t *testing.T) {
 			assert.Contains(t, rec.Body.String(), "err")
 		})
 	}
+}
+
+func TestRenderSafeStatusRenderErrorLogsSanitizedRoute(t *testing.T) {
+	var buf bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() {
+		slog.SetDefault(previous)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/guild/123/posts/456?token=secret", nil)
+	rec := httptest.NewRecorder()
+
+	renderSafeStatus(rec, req, http.StatusOK, errComponent{err: errors.New("render failed")})
+
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
+
+	output := buf.String()
+	assert.Contains(t, output, "failed to render template")
+	assert.Contains(t, output, "path=/guild/{id}/posts/{id}")
+	assert.NotContains(t, output, "/guild/123/posts/456")
+	assert.NotContains(t, output, "token=secret")
+}
+
+func TestRenderSafeStatusWriteErrorLogsSanitizedRoute(t *testing.T) {
+	var buf bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(&buf, nil)))
+	t.Cleanup(func() {
+		slog.SetDefault(previous)
+	})
+
+	req := httptest.NewRequest(http.MethodGet, "/guild/123/posts/456?token=secret", nil)
+	w := &failingResponseWriter{}
+
+	renderSafeStatus(w, req, http.StatusAccepted, staticComponent("<p>ok</p>"))
+
+	assert.Equal(t, http.StatusAccepted, w.status)
+
+	output := buf.String()
+	assert.Contains(t, output, "failed to write response")
+	assert.Contains(t, output, "path=/guild/{id}/posts/{id}")
+	assert.NotContains(t, output, "/guild/123/posts/456")
+	assert.NotContains(t, output, "token=secret")
 }

@@ -16,9 +16,10 @@ import (
 
 	"github.com/NLLCommunity/heimdallr/config"
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/telemetry"
 )
 
-func StartServer(ctx context.Context, addr string, client *bot.Client) error {
+func StartServer(ctx context.Context, addr string, client *bot.Client, telemetryRuntime *telemetry.Runtime) error {
 	devMode := viper.GetBool("dev_mode.enabled")
 
 	parsedURL, err := config.ParsedDashboardBaseURL()
@@ -177,6 +178,8 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 		// subdomain) can opt in by matching AllowedOrigins.
 		AllowCredentials: true,
 	}).Handler(withRateLimit)
+	handler := telemetryRequestLogMiddleware(corsHandler)
+	handler = telemetryRuntime.WrapHTTPHandler(handler)
 
 	// Session cleanup ticker — exits when ctx is cancelled.
 	go func() {
@@ -199,7 +202,7 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 
 	s := &http.Server{
 		Addr:              addr,
-		Handler:           corsHandler,
+		Handler:           handler,
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,

@@ -161,6 +161,7 @@ func handleSaveAuditLog(client *bot.Client) http.HandlerFunc {
 			"member_retention_days":  ptrUintToString(settings.AuditMemberRetentionDays),
 			"guild_retention_days":   ptrUintToString(settings.AuditGuildRetentionDays),
 		})
+		captureSettingsSaved(r, guildID.String(), "audit_log", "web")
 
 		data := buildAuditLogSettingsData(guildIDStr, settings)
 		data.SaveSuccess = true
