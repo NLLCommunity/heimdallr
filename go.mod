@@ -20,7 +20,7 @@ require (
 	gorm.io/gorm v1.31.2
 )
 
-require golang.org/x/sync v0.21.0
+require golang.org/x/sync v0.22.0
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
