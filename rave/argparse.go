@@ -2,6 +2,7 @@ package rave
 
 import (
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"unicode"
@@ -41,7 +42,10 @@ var parserTypeGetters = map[reflect.Type]getter{
 	},
 }
 
-var ErrUnsupportedParseType = errors.New("type parameter must be a struct")
+var (
+	ErrUnsupportedParseType = errors.New("type parameter must be a struct")
+	ErrUnsupportedFieldType = errors.New("unsupported slash command argument field type")
+)
 
 func ParseSlashCommandArgs[T any](e *handler.CommandEvent) (data *T, err error) {
 	data = new(T)
@@ -99,7 +103,13 @@ func ParseSlashCommandArgs[T any](e *handler.CommandEvent) (data *T, err error) 
 				setValue(targetFieldValue, v, ptrDepth)
 			}
 		default:
-			// none
+			return nil, fmt.Errorf(
+				"%w: field %s (option %q) has type %s",
+				ErrUnsupportedFieldType,
+				targetField.Name,
+				name,
+				targetField.Type,
+			)
 		}
 	}
 
