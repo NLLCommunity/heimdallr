@@ -2,10 +2,12 @@ package rave_test
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
+	"github.com/disgoorg/omit"
 	"github.com/stretchr/testify/require"
 
 	"github.com/NLLCommunity/heimdallr/rave"
@@ -13,6 +15,115 @@ import (
 
 func noopCommandHandler(*handler.CommandEvent) error {
 	return nil
+}
+
+func TestUserCommandBuildsContextCommandMetadata(t *testing.T) {
+	command := rave.UserCommand("Approve").
+		AddNameLocalization(discord.LocaleGerman, "Genehmigen").
+		WithDefaultMemberPermissions(discord.PermissionKickMembers).
+		AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
+		AddContexts(discord.InteractionContextTypeGuild).
+		WithNSFW(true).
+		Handle(noopCommandHandler)
+
+	built := command.Build()
+
+	nsfw := true
+	require.Equal(t, discord.UserCommandCreate{
+		Name: "Approve",
+		NameLocalizations: map[discord.Locale]string{
+			discord.LocaleGerman: "Genehmigen",
+		},
+		DefaultMemberPermissions: omit.NewPtr(discord.PermissionKickMembers),
+		IntegrationTypes: []discord.ApplicationIntegrationType{
+			discord.ApplicationIntegrationTypeGuildInstall,
+		},
+		Contexts: []discord.InteractionContextType{
+			discord.InteractionContextTypeGuild,
+		},
+		NSFW: &nsfw,
+	}, built)
+}
+
+func TestMessageCommandBuildsContextCommandMetadata(t *testing.T) {
+	command := rave.MessageCommand("Report Message").
+		WithNameLocalizations(map[discord.Locale]string{
+			discord.LocaleGerman: "Nachricht melden",
+		}).
+		WithIntegrationTypes([]discord.ApplicationIntegrationType{
+			discord.ApplicationIntegrationTypeGuildInstall,
+		}).
+		WithContexts([]discord.InteractionContextType{
+			discord.InteractionContextTypeGuild,
+		}).
+		Handle(noopCommandHandler)
+
+	built := command.Build()
+
+	require.Equal(t, discord.MessageCommandCreate{
+		Name:                     "Report Message",
+		DefaultMemberPermissions: omit.New[*discord.Permissions](nil),
+		NameLocalizations: map[discord.Locale]string{
+			discord.LocaleGerman: "Nachricht melden",
+		},
+		IntegrationTypes: []discord.ApplicationIntegrationType{
+			discord.ApplicationIntegrationTypeGuildInstall,
+		},
+		Contexts: []discord.InteractionContextType{
+			discord.InteractionContextTypeGuild,
+		},
+	}, built)
+}
+
+func TestContextCommandBuildRejectsInvalidNames(t *testing.T) {
+	tests := []struct {
+		name  string
+		build func() discord.ApplicationCommandCreate
+	}{
+		{
+			name: "empty user command name",
+			build: func() discord.ApplicationCommandCreate {
+				return rave.UserCommand("").Build()
+			},
+		},
+		{
+			name: "long message command name",
+			build: func() discord.ApplicationCommandCreate {
+				return rave.MessageCommand(strings.Repeat("a", 33)).Build()
+			},
+		},
+		{
+			name: "empty localized name",
+			build: func() discord.ApplicationCommandCreate {
+				return rave.UserCommand("Approve").
+					AddNameLocalization(discord.LocaleGerman, "").
+					Build()
+			},
+		},
+		{
+			name: "invalid UTF-8",
+			build: func() discord.ApplicationCommandCreate {
+				return rave.MessageCommand(string([]byte{0xff})).Build()
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.Panics(t, func() {
+				tt.build()
+			})
+		})
+	}
+}
+
+func TestContextCommandNameLengthCountsUnicodeCharacters(t *testing.T) {
+	require.NotPanics(t, func() {
+		rave.UserCommand(strings.Repeat("å", 32)).Build()
+	})
+	require.Panics(t, func() {
+		rave.MessageCommand(strings.Repeat("å", 33)).Build()
+	})
 }
 
 func TestSlashCommandBuildsPrimitiveOptions(t *testing.T) {

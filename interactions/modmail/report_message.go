@@ -11,13 +11,13 @@ import (
 	ix "github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/interactions/quote"
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/rave"
 )
 
-var ModmailReportMessageCommand = discord.MessageCommandCreate{
-	Name:             "Report Message",
-	Contexts:         []discord.InteractionContextType{discord.InteractionContextTypeGuild},
-	IntegrationTypes: []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
-}
+var ModmailReportMessageCommand = rave.MessageCommand("Report Message").
+	AddContexts(discord.InteractionContextTypeGuild).
+	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
+	Handle(ModmailReportMessageHandler)
 
 func ModmailReportMessageHandler(e *handler.CommandEvent) error {
 	message := e.MessageCommandInteractionData().TargetMessage()

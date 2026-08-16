@@ -11,12 +11,28 @@ import (
 
 type SlashCommandBuilder struct {
 	definitionBase[SlashCommandBuilder]
-	options                  []CommandOption
-	handler                  handler.CommandHandler
+	commandMetadataBase[SlashCommandBuilder]
+	options      []CommandOption
+	handler      handler.CommandHandler
+	slashHandler handler.SlashCommandHandler
+}
+
+type commandMetadataBase[T any] struct {
+	self                     *T
 	defaultMemberPermissions *discord.Permissions
 	integrationTypes         []discord.ApplicationIntegrationType
 	contexts                 []discord.InteractionContextType
 	nsfw                     *bool
+}
+
+func newCommandMetadataBase[T any](self *T) commandMetadataBase[T] {
+	return commandMetadataBase[T]{self: self}
+}
+
+func rejectMixedHandlerStyles(configuring, otherConfigured bool, commandKind string) {
+	if configuring && otherConfigured {
+		panic("Discord " + commandKind + " cannot mix generic and typed handlers")
+	}
 }
 
 type CommandOption interface {
@@ -32,41 +48,49 @@ func (s *SlashCommandBuilder) AddOptions(options ...CommandOption) *SlashCommand
 func Slash(name, description string) *SlashCommandBuilder {
 	s := &SlashCommandBuilder{}
 	s.definitionBase = newDefinitionBase(s, name, description)
+	s.commandMetadataBase = newCommandMetadataBase(s)
 	return s
 }
 
-func (s *SlashCommandBuilder) WithDefaultMemberPermissions(permissions discord.Permissions) *SlashCommandBuilder {
-	s.defaultMemberPermissions = &permissions
-	return s
+func (c *commandMetadataBase[T]) WithDefaultMemberPermissions(permissions discord.Permissions) *T {
+	c.defaultMemberPermissions = &permissions
+	return c.self
 }
 
-func (s *SlashCommandBuilder) WithIntegrationTypes(types []discord.ApplicationIntegrationType) *SlashCommandBuilder {
-	s.integrationTypes = types
-	return s
+func (c *commandMetadataBase[T]) WithIntegrationTypes(types []discord.ApplicationIntegrationType) *T {
+	c.integrationTypes = types
+	return c.self
 }
 
-func (s *SlashCommandBuilder) AddIntegrationTypes(integrationTypes ...discord.ApplicationIntegrationType) *SlashCommandBuilder {
-	s.integrationTypes = append(s.integrationTypes, integrationTypes...)
-	return s
+func (c *commandMetadataBase[T]) AddIntegrationTypes(integrationTypes ...discord.ApplicationIntegrationType) *T {
+	c.integrationTypes = append(c.integrationTypes, integrationTypes...)
+	return c.self
 }
 
-func (s *SlashCommandBuilder) WithContexts(contexts []discord.InteractionContextType) *SlashCommandBuilder {
-	s.contexts = contexts
-	return s
+func (c *commandMetadataBase[T]) WithContexts(contexts []discord.InteractionContextType) *T {
+	c.contexts = contexts
+	return c.self
 }
 
-func (s *SlashCommandBuilder) AddContexts(contexts ...discord.InteractionContextType) *SlashCommandBuilder {
-	s.contexts = append(s.contexts, contexts...)
-	return s
+func (c *commandMetadataBase[T]) AddContexts(contexts ...discord.InteractionContextType) *T {
+	c.contexts = append(c.contexts, contexts...)
+	return c.self
 }
 
-func (s *SlashCommandBuilder) WithNSFW(nsfw bool) *SlashCommandBuilder {
-	s.nsfw = &nsfw
-	return s
+func (c *commandMetadataBase[T]) WithNSFW(nsfw bool) *T {
+	c.nsfw = &nsfw
+	return c.self
 }
 
 func (s *SlashCommandBuilder) Handle(h handler.CommandHandler) *SlashCommandBuilder {
+	rejectMixedHandlerStyles(h != nil, s.slashHandler != nil, "slash command")
 	s.handler = h
+	return s
+}
+
+func (s *SlashCommandBuilder) HandleSlash(h handler.SlashCommandHandler) *SlashCommandBuilder {
+	rejectMixedHandlerStyles(h != nil, s.handler != nil, "slash command")
+	s.slashHandler = h
 	return s
 }
 
@@ -188,8 +212,9 @@ func (o *optionBase[T]) optionRequired() bool {
 
 type optionSubCommand struct {
 	definitionBase[optionSubCommand]
-	options []CommandOption
-	handler handler.CommandHandler
+	options      []CommandOption
+	handler      handler.CommandHandler
+	slashHandler handler.SlashCommandHandler
 }
 
 func (s *optionSubCommand) AddOptions(options ...CommandOption) *optionSubCommand {
@@ -198,7 +223,14 @@ func (s *optionSubCommand) AddOptions(options ...CommandOption) *optionSubComman
 }
 
 func (s *optionSubCommand) Handle(h handler.CommandHandler) *optionSubCommand {
+	rejectMixedHandlerStyles(h != nil, s.slashHandler != nil, "slash subcommand")
 	s.handler = h
+	return s
+}
+
+func (s *optionSubCommand) HandleSlash(h handler.SlashCommandHandler) *optionSubCommand {
+	rejectMixedHandlerStyles(h != nil, s.handler != nil, "slash subcommand")
+	s.slashHandler = h
 	return s
 }
 

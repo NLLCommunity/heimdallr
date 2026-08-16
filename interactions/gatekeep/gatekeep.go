@@ -21,10 +21,10 @@ var activeApprovalProcesses = make(map[snowflake.ID]bool)
 var activeApprovalMutex = &sync.Mutex{}
 
 func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	r.Command("/Approve", ApproveUserCommandHandler)
 	slash := ApproveSlash.Register(r)
+	user := ApproveUserCommand.Register(r)
 
-	return []discord.ApplicationCommandCreate{slash, ApproveUserCommand}
+	return []discord.ApplicationCommandCreate{slash, user}
 }
 
 func getGuild(e *handler.CommandEvent) (guild discord.Guild, success bool, inGuild bool) {

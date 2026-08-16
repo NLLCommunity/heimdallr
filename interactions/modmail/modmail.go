@@ -18,12 +18,12 @@ import (
 func Register(r handler.Router) []discord.ApplicationCommandCreate {
 	r.Component("/modmail/report-button/{role}/{channel}/{max-active}/{slow-mode}", ModmailReportButtonHandler)
 	r.Modal("/modmail/report-modal/{role}/{channel}/{max-active}/{slow-mode}", ModmailReportModalHandler)
-	r.Command("/Report Message", ModmailReportMessageHandler)
 	r.Modal("/modmail/report-message/{channelID}/{messageID}", ModmailReportMessageModalHandler)
 
 	slashModmailAdmin := ModmailAdmin.Register(r)
+	messageReport := ModmailReportMessageCommand.Register(r)
 
-	return []discord.ApplicationCommandCreate{slashModmailAdmin, ModmailReportMessageCommand}
+	return []discord.ApplicationCommandCreate{slashModmailAdmin, messageReport}
 }
 
 var ModmailAdmin = rave.Slash("modmail-admin", "Commands for receiving and sending Modmail.").

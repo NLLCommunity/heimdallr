@@ -21,13 +21,12 @@ import (
 )
 
 func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	r.Command("/quote", QuoteHandler)
-	r.Command("/Copy to New Forum Thread", CreateForumPostHandler)
 	r.Modal("/quote/forum-post/{channelID}/{messageID}", CreateForumPostModalHandler)
 
 	slashQuote := Quote.Register(r)
+	messageCreateForumPost := CreateForumPostCommand.Register(r)
 
-	return []discord.ApplicationCommandCreate{slashQuote, CreateForumPostCommand}
+	return []discord.ApplicationCommandCreate{slashQuote, messageCreateForumPost}
 }
 
 var quoteUrlRegex = regexp.MustCompile(
