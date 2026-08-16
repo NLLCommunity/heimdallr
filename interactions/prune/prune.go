@@ -11,59 +11,39 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/google/uuid"
 
 	ix "github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	r.Command("/prune-pending-members", PruneHandler)
 	r.Component("/button/prune-members/confirm/{pruneID}", PruneConfirmHandler)
 	r.Component("/button/prune-members/cancel/{pruneID}", PruneCancelHandler)
 
-	return []discord.ApplicationCommandCreate{PruneCommand}
+	slash := Prune.Register(r)
+
+	return []discord.ApplicationCommandCreate{slash}
 }
 
-var PruneCommand = discord.SlashCommandCreate{
-	Name: "prune-pending-members",
-	NameLocalizations: map[discord.Locale]string{
-		discord.LocaleNorwegian: "fjern-ventende-medlemmer",
-	},
-	Description: "Prune members.",
-	DescriptionLocalizations: map[discord.Locale]string{
-		discord.LocaleNorwegian: "Fjern medlemmer.",
-	},
-
-	Contexts: []discord.InteractionContextType{
-		discord.InteractionContextTypeGuild,
-	},
-	IntegrationTypes: []discord.ApplicationIntegrationType{
-		discord.ApplicationIntegrationTypeGuildInstall,
-	},
-
-	DefaultMemberPermissions: omit.NewPtr(discord.PermissionManageGuild),
-
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionInt{
-			Name: "days",
-			NameLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "dager",
-			},
-			Description: "The number of days to prune members for.",
-			DescriptionLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "Antall dager å fjerne medlemmer for.",
-			},
-			Required: true,
-
-			MinValue: new(0),
-			MaxValue: new(90),
-		},
-	},
-}
+var Prune = rave.Slash("prune-pending-members", "Prune members.").
+	AddNameLocalization(discord.LocaleNorwegian, "fjern-ventende-medlemmer").
+	AddDescriptionLocalization(discord.LocaleNorwegian, "Fjern medlemmer.").
+	AddContexts(discord.InteractionContextTypeGuild).
+	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
+	WithDefaultMemberPermissions(discord.PermissionManageGuild).
+	AddOptions(
+		rave.OptionInt("days", "The number of days a member has been pending.").
+			AddNameLocalization(discord.LocaleNorwegian, "dager").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Antall dager en bruker har vært i serveren og ikke blitt godkjent.").
+			WithRequired(true).
+			WithMinValue(0).
+			WithMaxValue(90),
+	).
+	Handle(PruneHandler)
 
 func PruneConfirmHandler(e *handler.ComponentEvent) error {
 	if e.GuildID() == nil {

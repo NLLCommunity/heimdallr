@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
@@ -12,34 +13,27 @@ import (
 )
 
 func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	r.Command("/timeout", TimeoutHandler)
-	return []discord.ApplicationCommandCreate{TimeoutCommand}
+	slash := Timeout.Register(r)
+	return []discord.ApplicationCommandCreate{slash}
 }
 
-var TimeoutCommand = discord.SlashCommandCreate{
-	Name:                     "timeout",
-	Description:              "Timeout a user from the server",
-	Contexts:                 []discord.InteractionContextType{discord.InteractionContextTypeGuild},
-	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
-	DefaultMemberPermissions: omit.NewPtr(discord.PermissionModerateMembers),
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionUser{
-			Name:        "user",
-			Description: "The user to timeout",
-			Required:    true,
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "duration",
-			Description: "The duration to timeout the user for (format: 3w2d1h4m28s)",
-			Required:    true,
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "reason",
-			Description: "Reason for timing out the user. Not sent to the user.",
-			Required:    false,
-		},
-	},
-}
+var Timeout = rave.Slash("timeout", "Timeout a user from the server").
+	AddNameLocalization(discord.LocaleNorwegian, "timeout").
+	AddDescriptionLocalization(discord.LocaleNorwegian, "Timeout en bruker fra serveren").
+	AddContexts(discord.InteractionContextTypeGuild).
+	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
+	WithDefaultMemberPermissions(discord.PermissionModerateMembers).
+	AddOptions(
+		rave.OptionUser("user", "The user to timeout").WithRequired(true).
+			AddNameLocalization(discord.LocaleNorwegian, "bruker").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Brukeren du vil gi timeout til."),
+		rave.OptionString("duration", "The duration to timeout the user for (format: 3w2d1h4m28s)").WithRequired(true).
+			AddNameLocalization(discord.LocaleNorwegian, "varighet").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Varigheten for timeouten (format: 3w2d1h4m28s)"),
+		rave.OptionString("reason", "Reason for timing out the user. Not sent to the user.").WithRequired(false).
+			AddNameLocalization(discord.LocaleNorwegian, "årsak").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Årsaken til timeouten. Ikke sendt til brukeren."),
+	).Handle(TimeoutHandler)
 
 func TimeoutHandler(e *handler.CommandEvent) error {
 	guild, isGuild := e.Guild()

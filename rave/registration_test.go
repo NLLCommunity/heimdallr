@@ -26,7 +26,7 @@ func TestSlashCommandRegisterRegistersRootHandler(t *testing.T) {
 
 	built := command.Register(mux)
 
-	require.Equal(t, "note", built[0].CommandName())
+	require.Equal(t, "note", built.CommandName())
 	require.True(t, muxHasCommandRoute(mux, "/note"))
 }
 

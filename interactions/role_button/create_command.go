@@ -7,63 +7,34 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/disgo/rest"
-	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-var CreateRoleButtonCommand = discord.SlashCommandCreate{
-	Name: "create-role-button",
-	NameLocalizations: map[discord.Locale]string{
-		discord.LocaleNorwegian: "lag-rolleknapp",
-	},
-	Description: "Create a button that assigns a role to the user when clicked.",
-	DescriptionLocalizations: map[discord.Locale]string{
-		discord.LocaleNorwegian: "Lag ein knapp som gjev brukaren ei rolle når han vert trykt på.",
-	},
-
-	Contexts:                 []discord.InteractionContextType{discord.InteractionContextTypeGuild},
-	DefaultMemberPermissions: omit.NewPtr(discord.PermissionManageRoles),
-	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
-
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionRole{
-			Name: "role",
-			NameLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "rolle",
-			},
-			Description: "The role to assign to the user.",
-			DescriptionLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "Rollen som skal gjevast til brukaren.",
-			},
-			Required: true,
-		},
-		discord.ApplicationCommandOptionString{
-			Name: "instructions",
-			NameLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "instruksjonar",
-			},
-			Description: "Instructions to display to the user above the button.",
-			DescriptionLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "Instruksjonar som skal visast til brukaren over knappen.",
-			},
-			Required: false,
-		},
-		discord.ApplicationCommandOptionString{
-			Name: "text",
-			NameLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "tekst",
-			},
-			Description: "The text to display on the button.",
-			DescriptionLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "Teksten som skal visast på knappen.",
-			},
-			Required: false,
-		},
-	},
-}
+var CreateRoleButton = rave.Slash("create-role-button", "Create a button that assigns a role to the user when clicked.").
+	AddNameLocalization(discord.LocaleNorwegian, "lag-rolleknapp").
+	AddDescriptionLocalization(discord.LocaleNorwegian, "Lag ein knapp som gjev brukaren ei rolle når han vert trykt på.").
+	AddContexts(discord.InteractionContextTypeGuild).
+	WithDefaultMemberPermissions(discord.PermissionManageRoles).
+	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
+	AddOptions(
+		rave.OptionRole("role", "The role to assign to the user.").
+			AddNameLocalization(discord.LocaleNorwegian, "rolle").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Rollen som skal gjevast til brukaren.").
+			WithRequired(true),
+		rave.OptionString("instructions", "Instructions to display to the user above the button.").
+			AddNameLocalization(discord.LocaleNorwegian, "instruksjonar").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Instruksjonar som skal visast til brukaren over knappen.").
+			WithRequired(false),
+		rave.OptionString("text", "The text to display on the button.").
+			AddNameLocalization(discord.LocaleNorwegian, "tekst").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Teksten som skal visast på knappen.").
+			WithRequired(false),
+	).
+	Handle(CreateRoleButtonHandler)
 
 func CreateRoleButtonHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("role button", e)

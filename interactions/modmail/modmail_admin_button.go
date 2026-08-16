@@ -13,55 +13,6 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-var createSubcommand = discord.ApplicationCommandOptionSubCommand{
-	Name:        "create-button",
-	Description: "Create a button for creating Modmail threads in the current channel.",
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionString{
-			Name:        "label",
-			Description: "The label to display on the button.",
-			Required:    true,
-			MinLength:   new(3),
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "button-color",
-			Description: "The color of the button.",
-			Required:    false,
-			Choices: []discord.ApplicationCommandOptionChoiceString{
-				{Name: "Red", Value: "red"},
-				{Name: "Green", Value: "green"},
-				{Name: "Blue", Value: "blue"},
-				{Name: "Gray", Value: "gray"},
-			},
-		},
-		discord.ApplicationCommandOptionRole{
-			Name:        "role",
-			Description: "Role that should be mentioned/notified when a new thread is created.",
-			Required:    false,
-		},
-		discord.ApplicationCommandOptionChannel{
-			Name:        "channel",
-			Description: "Channel that notifications should be sent to.",
-			Required:    false,
-			ChannelTypes: []discord.ChannelType{
-				discord.ChannelTypeGuildText,
-			},
-		},
-		discord.ApplicationCommandOptionInt{
-			Name:        "max-active-reports",
-			Description: "The maximum number of active reports that a user can have in the channel.",
-			Required:    false,
-			MinValue:    new(0),
-			MaxValue:    new(100),
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "slow-mode-time",
-			Description: "Enable slow mode for the report thread in the format '1h5m30s1' ('0s' = disabled)",
-			Required:    false,
-		},
-	},
-}
-
 var stringToButtonStyle = map[string]discord.ButtonStyle{
 	"red":   discord.ButtonStyleDanger,
 	"green": discord.ButtonStyleSuccess,

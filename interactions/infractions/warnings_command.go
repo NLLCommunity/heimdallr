@@ -9,23 +9,16 @@ import (
 	"github.com/disgoorg/disgo/handler"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-// UserInfractionsCommand lets users view their own infractions.
-var UserInfractionsCommand = discord.SlashCommandCreate{
-	Name: "warnings",
-	NameLocalizations: map[discord.Locale]string{
-		discord.LocaleNorwegian: "advarsler",
-	},
-	Description: "View your warnings.",
-	DescriptionLocalizations: map[discord.Locale]string{
-		discord.LocaleNorwegian: "Se advarslene dine.",
-	},
-
-	Contexts:         []discord.InteractionContextType{discord.InteractionContextTypeGuild},
-	IntegrationTypes: []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
-}
+var UserInfractions = rave.Slash("warnings", "View your warnings.").
+	AddNameLocalization(discord.LocaleNorwegian, "advarsler").
+	AddDescriptionLocalization(discord.LocaleNorwegian, "Se advarslene dine.").
+	AddContexts(discord.InteractionContextTypeGuild).
+	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
+	Handle(UserInfractionsHandler)
 
 func UserInfractionsHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("infractions", e)

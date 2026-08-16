@@ -5,19 +5,17 @@ import (
 	"github.com/disgoorg/disgo/handler"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	r.Command("/ping", PingHandler)
+	slash := Ping.Register(r)
 
-	return []discord.ApplicationCommandCreate{PingCommand}
+	return []discord.ApplicationCommandCreate{slash}
 }
 
-var PingCommand = discord.SlashCommandCreate{
-	Name:        "ping",
-	Description: "ping",
-}
+var Ping = rave.Slash("ping", "Ping the bot").Handle(PingHandler)
 
 func PingHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("ping", e)

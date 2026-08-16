@@ -13,10 +13,10 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/disgo/rest"
-	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
@@ -25,51 +25,30 @@ func Register(r handler.Router) []discord.ApplicationCommandCreate {
 	r.Command("/Copy to New Forum Thread", CreateForumPostHandler)
 	r.Modal("/quote/forum-post/{channelID}/{messageID}", CreateForumPostModalHandler)
 
-	return []discord.ApplicationCommandCreate{QuoteCommand, CreateForumPostCommand}
+	slashQuote := Quote.Register(r)
+
+	return []discord.ApplicationCommandCreate{slashQuote, CreateForumPostCommand}
 }
 
 var quoteUrlRegex = regexp.MustCompile(
 	`https://discord.com/channels/(?P<guild>\d+)/(?P<channel>\d+)/(?P<message>\d+)`,
 )
 
-var QuoteCommand = discord.SlashCommandCreate{
-	Name: "quote",
-	NameLocalizations: map[discord.Locale]string{
-		discord.LocaleNorwegian: "siter",
-	},
-	Description: "Quote a message from a channel, using a message link.",
-	DescriptionLocalizations: map[discord.Locale]string{
-		discord.LocaleNorwegian: "Lag et sitat av ei melding.",
-	},
-
-	Contexts:                 []discord.InteractionContextType{discord.InteractionContextTypeGuild},
-	DefaultMemberPermissions: omit.NewPtr(discord.PermissionSendMessages),
-
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionString{
-			Name: "link",
-			NameLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "lenke",
-			},
-			Description: "Link to the message you want to quote.",
-			DescriptionLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "Lenke til meldinga du vil sitere.",
-			},
-			Required: true,
-		},
-		discord.ApplicationCommandOptionBool{
-			Name: "show-reply-to",
-			NameLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "vis-svar-til",
-			},
-			Description: "Whether to show and link the message that the quoted message replies to. (Default: true)",
-			DescriptionLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "Om du vil vise og lenke til meldingen som sitatet er et svar til. (Standard er å vise)",
-			},
-			Required: false,
-		},
-	},
-}
+var Quote = rave.Slash("quote", "Quote a message from a channel, using a message link.").
+	AddNameLocalization(discord.LocaleNorwegian, "siter").
+	AddDescriptionLocalization(discord.LocaleNorwegian, "Lag et sitat av ei melding.").
+	WithDefaultMemberPermissions(discord.PermissionSendMessages).
+	AddContexts(discord.InteractionContextTypeGuild).
+	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
+	AddOptions(
+		rave.OptionString("link", "Link to the message you want to quote.").
+			AddNameLocalization(discord.LocaleNorwegian, "lenke").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Lenke til meldinga du vil sitere.").
+			WithRequired(true),
+		rave.OptionBool("show-reply-to", "Show a snippet that this message was responding to. (default: true)").
+			AddNameLocalization(discord.LocaleNorwegian, "vis-svar-til").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Vis et utklipp av meldingen som blir svart på (standard: ja)"),
+	).Handle(QuoteHandler)
 
 func QuoteHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("quote", e)

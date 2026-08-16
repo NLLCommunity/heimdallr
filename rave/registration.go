@@ -9,7 +9,7 @@ import (
 
 // Register installs every executable command route on router and returns the
 // Discord command payload built from the same command tree.
-func (s *SlashCommandBuilder) Register(router handler.Router) []discord.ApplicationCommandCreate {
+func (s *SlashCommandBuilder) Register(router handler.Router) discord.ApplicationCommandCreate {
 	built := s.Build()
 	path := "/" + s.name
 
@@ -18,11 +18,11 @@ func (s *SlashCommandBuilder) Register(router handler.Router) []discord.Applicat
 			panic("Discord command containers cannot have handlers: " + path)
 		}
 		s.registerChildren(router, path)
-		return []discord.ApplicationCommandCreate{built}
+		return built
 	}
 
 	registerExecutable(router, path, s.handler, s.options)
-	return []discord.ApplicationCommandCreate{built}
+	return built
 }
 
 func (s *SlashCommandBuilder) registerChildren(router handler.Router, parentPath string) {

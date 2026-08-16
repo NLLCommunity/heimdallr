@@ -5,9 +5,9 @@ import (
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/omit"
 
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
@@ -15,62 +15,151 @@ func Register(r handler.Router) []discord.ApplicationCommandCreate {
 	r.Route(
 		"/admin", func(r handler.Router) {
 			r.Component("/show-all-button", AdminShowAllButtonHandler)
-			r.Command("/info", AdminInfoHandler)
-			r.Command("/mod-channel", AdminModChannelHandler)
-			r.Command("/infractions", AdminInfractionsHandler)
-			r.Command("/gatekeep", AdminGatekeepHandler)
-			r.Command("/gatekeep-message", AdminGatekeepMessageHandler)
 			r.Component("/gatekeep-message/button", AdminGatekeepMessageButtonHandler)
 			r.Modal("/gatekeep-message/modal", AdminGatekeepMessageModalHandler)
-			r.Command("/join-leave", AdminJoinLeaveHandler)
 
-			r.Command("/join-message", AdminJoinMessageHandler)
 			r.Component("/join-message/button", AdminJoinMessageButtonHandler)
 			r.Modal("/join-message/modal", AdminJoinMessageModalHandler)
 
-			r.Command("/leave-message", AdminLeaveMessageHandler)
 			r.Component("/leave-message/button", AdminLeaveMessageButtonHandler)
 			r.Modal("/leave-message/modal", AdminLeaveMessageModalHandler)
 
-			r.Command("/anti-spam", AdminAntiSpamHandler)
-
-			r.Command("/ban-footer", AdminBanFooterHandler)
 			r.Component("/ban-footer/button", AdminBanFooterButtonHandler)
 			r.Modal("/ban-footer/modal", AdminBanFooterModalHandler)
-
-			r.Command("/posts", AdminPostsHandler)
-			r.Command("/audit-log", AdminAuditLogHandler)
 		},
 	)
 
-	return []discord.ApplicationCommandCreate{AdminCommand}
+	slash := Admin.Register(r)
+
+	return []discord.ApplicationCommandCreate{slash}
 }
 
-var AdminCommand = discord.SlashCommandCreate{
-	Name:                     "admin",
-	Description:              "admin commands",
-	DefaultMemberPermissions: omit.NewPtr(discord.PermissionAdministrator),
-	Contexts:                 []discord.InteractionContextType{discord.InteractionContextTypeGuild},
-	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionSubCommand{
-			Name:        "info",
-			Description: "Show information about server configuration",
-		},
+var Admin = rave.Slash("admin", "admin commands").
+	AddContexts(discord.InteractionContextTypeGuild).
+	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
+	WithDefaultMemberPermissions(discord.PermissionAdministrator).
+	AddOptions(
+		rave.SubCommand("info", "Show information about server configuration").
+			Handle(AdminInfoHandler),
 
-		modChannelSubcommand,
-		infractionsSubCommand,
-		gatekeepSubcommand,
-		gatekeepMessageSubcommand,
-		joinLeaveSubcommand,
-		joinMessageSubcommand,
-		leaveMessageSubcommand,
-		antiSpamSubcommand,
-		banFooterSubcommand,
-		postsSubcommand,
-		auditLogSubcommand,
-	},
-}
+		rave.SubCommand("mod-channel", "Configure the moderator channel").
+			AddOptions(
+				rave.OptionChannel("channel", "The channel to set as the moderator channel").
+					AddChannelTypes(discord.ChannelTypeGuildText),
+				rave.OptionString("reset", "Reset the moderator channel").
+					AddChoice("Reset", "reset"),
+			).Handle(AdminModChannelHandler),
+
+		rave.SubCommand("infractions", "View or set infraction-related settings").
+			AddOptions(
+				rave.OptionFloat("half-life", "The half-life of infractions in days (0 = no half-life)").
+					WithMinValue(0.0).
+					WithMaxValue(365.0),
+				rave.OptionBool("notify-warned-user-join", "Whether to notify moderator channel when warned user (re)joins the server"),
+				rave.OptionFloat("notify-threshold", "The minimum severity of infractions to notify on (0 = always)").
+					WithMinValue(0.0).
+					WithMaxValue(100.0),
+				rave.OptionString("reset", "Reset a setting to its default value").
+					AddChoice("Half-life", "half-life").
+					AddChoice("Notify on warned user join", "notify-warned-user-join").
+					AddChoice("Notify threshold", "notify-threshold").
+					AddChoice("All", "all"),
+			).Handle(AdminInfractionsHandler),
+
+		rave.SubCommand("gatekeep", "View or set gatekeep-related settings").
+			AddOptions(
+				rave.OptionBool("enabled", "Whether to enable the gatekeep system"),
+				rave.OptionRole("pending-role", "The role to give to users pending approval"),
+				rave.OptionRole("approved-role", "The role to give to approved users"),
+				rave.OptionBool("use-pending-role", "Whether to give the pending role to users when they join"),
+				rave.OptionString("reset", "Reset a setting to its default value").
+					AddChoice("Enabled", "enabled").
+					AddChoice("Pending role", "pending-role").
+					AddChoice("Approved role", "approved-role").
+					AddChoice("Use pending role", "use-pending-role").
+					AddChoice("All", "all"),
+			).Handle(AdminGatekeepHandler),
+
+		rave.SubCommand("gatekeep-message", "View or set the gatekeep message").
+			AddOptions(
+				rave.OptionString("message", "The message to send to users when they join and are pending approval"),
+				rave.OptionString("reset", "Reset the gatekeep message to its default value").
+					AddChoice("Reset", "reset"),
+			).Handle(AdminGatekeepMessageHandler),
+
+		rave.SubCommand("join-leave", "View or set join/leave-related settings").
+			AddOptions(
+				rave.OptionBool("join-enabled", "Whether to enable join messages"),
+				rave.OptionBool("leave-enabled", "Whether to enable leave messages"),
+				rave.OptionChannel("channel", "The channel to send join and leave messages").
+					AddChannelTypes(discord.ChannelTypeGuildText),
+				rave.OptionString("reset", "Reset a setting to its default value").
+					AddChoice("Join enabled", "join-enabled").
+					AddChoice("Leave enabled", "leave-enabled").
+					AddChoice("Channel", "channel").
+					AddChoice("All", "all"),
+			).Handle(AdminJoinLeaveHandler),
+
+		rave.SubCommand("join-message", "View or set the join message").
+			AddOptions(
+				rave.OptionString("reset", "Reset the message to its default value.").
+					AddChoice("Reset", "reset"),
+			).Handle(AdminJoinMessageHandler),
+		rave.SubCommand("leave-message", "View or set the leave message").
+			AddOptions(
+				rave.OptionString("reset", "Reset the message to its default value.").
+					AddChoice("Reset", "reset"),
+			).Handle(AdminLeaveMessageHandler),
+
+		rave.SubCommand("anti-spam", "View or set anti-spam settings").
+			AddOptions(
+				rave.OptionBool("enabled", "Whether to enable the anti-spam system"),
+				rave.OptionInt("count", "The number of messages allowed before Heimdallr takes action (within the cooldown period)").
+					WithMinValue(1).
+					WithMaxValue(15),
+				rave.OptionInt("cooldown", "The time in seconds to wait before resetting the message count").
+					WithMinValue(1).
+					WithMaxValue(60),
+				rave.OptionInt("timeout", "The time in minutes to timeout a user who has exceeded the message count").
+					WithMinValue(1).
+					WithMaxValue(10080), // 7 days
+				rave.OptionString("reset", "Reset a setting to its default value").
+					AddChoice("Enabled", "enabled").
+					AddChoice("Count", "count").
+					AddChoice("Cooldown", "cooldown").
+					AddChoice("Timeout", "timeout").
+					AddChoice("All", "all"),
+			).Handle(AdminAntiSpamHandler),
+
+		rave.SubCommand("ban-footer", "View or set the ban footer message").
+			AddOptions(
+				rave.OptionBool("always-send", "Whether to always send the footer, even if there is no ban message."),
+				rave.OptionString("reset", "Reset the message to its default value.").
+					AddChoice("Reset", "reset"),
+			).Handle(AdminBanFooterHandler),
+
+		rave.SubCommand("posts", "View or set posts-related settings").
+			AddOptions(
+				rave.OptionRole("mod-role", "Role allowed to manage posts in the dashboard (admins always have access)."),
+				rave.OptionString("reset", "Reset a setting to its default value").
+					AddChoice("Mod role", "mod-role").
+					AddChoice("All", "all"),
+			).Handle(AdminPostsHandler),
+
+		rave.SubCommand("audit-log", "View or set audit log settings").
+			AddOptions(
+				rave.OptionBool("enabled", "Whether to record audit log events for this guild."),
+				rave.OptionInt("message-retention", "Override message-event retention in days."),
+				rave.OptionInt("member-retention", "Override member-event retention in days."),
+				rave.OptionInt("guild-retention", "Override guild-event retention in days."),
+				rave.OptionString("reset", "Reset a setting to use the bot-operator default.").
+					AddChoice("Enabled", "enabled").
+					AddChoice("Message retention", "message-retention").
+					AddChoice("Member retention", "member-retention").
+					AddChoice("Guild retention", "guild-retention").
+					AddChoice("All", "all"),
+			).Handle(AdminAuditLogHandler),
+	)
 
 func AdminInfoHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("admin", e)

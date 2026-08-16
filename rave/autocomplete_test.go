@@ -62,7 +62,7 @@ func TestAutocompleteDispatchesFocusedStringOptionAndResponds(t *testing.T) {
 				}),
 		)
 
-	built := command.Register(mux)[0].(discord.SlashCommandCreate)
+	built := command.Register(mux).(discord.SlashCommandCreate)
 
 	require.True(t, muxHasAutocompleteRoute(mux, "/search"))
 	stringOption := built.Options[0].(discord.ApplicationCommandOptionString)

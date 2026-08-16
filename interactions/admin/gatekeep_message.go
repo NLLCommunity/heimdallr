@@ -10,21 +10,6 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-var gatekeepMessageSubcommand = discord.ApplicationCommandOptionSubCommand{
-	Name:        "gatekeep-message",
-	Description: "Set the message to send to approved users",
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionString{
-			Name:        "reset",
-			Description: "Reset the message to its default value",
-			Required:    false,
-			Choices: []discord.ApplicationCommandOptionChoiceString{
-				{Name: "Reset", Value: "reset"},
-			},
-		},
-	},
-}
-
 func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("admin", e)
 

@@ -7,8 +7,16 @@ import (
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/omit"
 
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
+
+var ApproveSlash = rave.Slash("approve", "Approve a user into the server").
+	WithDefaultMemberPermissions(discord.PermissionKickMembers).
+	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
+	AddContexts(discord.InteractionContextTypeGuild).
+	AddOptions(rave.OptionUser("user", "The user to approve").WithRequired(true)).
+	Handle(ApproveSlashCommandHandler)
 
 var ApproveSlashCommand = discord.SlashCommandCreate{
 	Name:                     "approve",

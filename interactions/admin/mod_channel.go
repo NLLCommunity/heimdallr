@@ -3,34 +3,12 @@ package admin
 import (
 	"fmt"
 
-	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
-
-var modChannelSubcommand = discord.ApplicationCommandOptionSubCommand{
-	Name:        "mod-channel",
-	Description: "View or set the moderator channel",
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionChannel{
-			Name:         "channel",
-			Description:  "The channel to set as the moderator channel",
-			Required:     false,
-			ChannelTypes: []discord.ChannelType{discord.ChannelTypeGuildText},
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "reset",
-			Description: "Reset the moderator channel setting",
-			Required:    false,
-			Choices: []discord.ApplicationCommandOptionChoiceString{
-				{Name: "Reset", Value: "reset"},
-			},
-		},
-	},
-}
 
 func AdminModChannelHandler(e *handler.CommandEvent) error {
 	data := e.SlashCommandInteractionData()

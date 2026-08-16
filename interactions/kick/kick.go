@@ -6,47 +6,37 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/disgo/rest"
-	"github.com/disgoorg/omit"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	r.Route(
-		"/kick", func(r handler.Router) {
-			r.Command("/with-message", KickWithMessageHandler)
-		},
+	slash := KickWithMessage.Register(r)
+
+	return []discord.ApplicationCommandCreate{slash}
+}
+
+var KickWithMessage = rave.Slash("kick", "Kick a user from the server").
+	AddNameLocalization(discord.LocaleNorwegian, "spark-ut").
+	AddDescriptionLocalization(discord.LocaleNorwegian, "Spark en bruker ut av serveren").
+	AddContexts(discord.InteractionContextTypeGuild).
+	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
+	WithDefaultMemberPermissions(discord.PermissionKickMembers).
+	AddOptions(
+		rave.SubCommand("with-message", "Kick a user, sending a message immediately before the kick").
+			AddNameLocalization(discord.LocaleNorwegian, "med-melding").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Spark en bruker ut av serveren, og send en melding til brukeren før sparkingen.").
+			AddOptions(
+				rave.OptionUser("user", "The user to kick.").
+					AddNameLocalization(discord.LocaleNorwegian, "bruker").
+					AddDescriptionLocalization(discord.LocaleNorwegian, "Brukeren du vil sparke ut."),
+				rave.OptionString("message", "The message to give the user before kicking them.").
+					AddNameLocalization(discord.LocaleNorwegian, "melding").
+					AddDescriptionLocalization(discord.LocaleNorwegian, "Meldingen som skal sendes til brukeren før sparkingen."),
+			).Handle(KickWithMessageHandler),
 	)
-
-	return []discord.ApplicationCommandCreate{KickCommand}
-}
-
-var KickCommand = discord.SlashCommandCreate{
-	Name:                     "kick",
-	Description:              "Kick a user from the server",
-	Contexts:                 []discord.InteractionContextType{discord.InteractionContextTypeGuild},
-	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
-	DefaultMemberPermissions: omit.NewPtr(discord.PermissionKickMembers),
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionSubCommand{
-			Name:        "with-message",
-			Description: "Kick a user, sending a message immediately before the kick",
-			Options: []discord.ApplicationCommandOption{
-				discord.ApplicationCommandOptionUser{
-					Name:        "user",
-					Description: "The user to kick",
-					Required:    true,
-				},
-				discord.ApplicationCommandOptionString{
-					Name:        "message",
-					Description: "The message to give the user before kicking them",
-					Required:    true,
-				},
-			},
-		},
-	},
-}
 
 func KickWithMessageHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("kick", e)

@@ -19,19 +19,16 @@ import (
 func Register(r handler.Router) []discord.ApplicationCommandCreate {
 	r.Command("/warn", WarnHandler)
 	r.Command("/warnings", UserInfractionsHandler)
-	r.Route(
-		"/infractions", func(r handler.Router) {
-			r.Command("/list", InfractionsListHandler)
-			r.Command("/remove", InfractionsRemoveHandler)
-		},
-	)
 	r.Component("/infractions-user/{offset}", UserInfractionButtonHandler)
 	r.Component("/infractions-mod/{userID}/{offset}", InfractionsListComponentHandler)
+	slashInfractions := Infractions.Register(r)
+	slashWarn := Warn.Register(r)
+	slashWarnings := UserInfractions.Register(r)
 
 	return []discord.ApplicationCommandCreate{
-		InfractionsCommand,
-		UserInfractionsCommand,
-		WarnCommand,
+		slashInfractions,
+		slashWarn,
+		slashWarnings,
 	}
 }
 

@@ -10,36 +10,6 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-var joinMessageSubcommand = discord.ApplicationCommandOptionSubCommand{
-	Name:        "join-message",
-	Description: "Set the message to send when a user joins",
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionString{
-			Name:        "reset",
-			Description: "Reset the message to its default value",
-			Required:    false,
-			Choices: []discord.ApplicationCommandOptionChoiceString{
-				{Name: "Reset", Value: "reset"},
-			},
-		},
-	},
-}
-
-var leaveMessageSubcommand = discord.ApplicationCommandOptionSubCommand{
-	Name:        "leave-message",
-	Description: "Set the message to send when a user leaves",
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionString{
-			Name:        "reset",
-			Description: "Reset the message to its default value",
-			Required:    false,
-			Choices: []discord.ApplicationCommandOptionChoiceString{
-				{Name: "Reset", Value: "reset"},
-			},
-		},
-	},
-}
-
 func AdminJoinMessageHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("admin", e)
 	guild, isGuild := e.Guild()

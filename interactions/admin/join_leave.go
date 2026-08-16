@@ -45,47 +45,6 @@ func createJoinLeaveSettingsModal(guildSettings *model.GuildSettings) discord.Mo
 		)
 }
 
-var joinLeaveSubcommand = discord.ApplicationCommandOptionSubCommand{
-	Name:        "join-leave",
-	Description: "View or set join and leave message settings",
-	Options: []discord.ApplicationCommandOption{
-		/*
-			discord.ApplicationCommandOptionBool{
-				Name:        "new-modal",
-				Description: "Whether to use the new modal interface for join/leave settings",
-				Required:    false,
-			},
-		*/
-		discord.ApplicationCommandOptionBool{
-			Name:        "join-enabled",
-			Description: "Whether to enable join messages",
-			Required:    false,
-		},
-		discord.ApplicationCommandOptionBool{
-			Name:        "leave-enabled",
-			Description: "Whether to enable leave messages",
-			Required:    false,
-		},
-		discord.ApplicationCommandOptionChannel{
-			Name:         "channel",
-			Description:  "The channel to send join and leave messages",
-			Required:     false,
-			ChannelTypes: []discord.ChannelType{discord.ChannelTypeGuildText},
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "reset",
-			Description: "Reset a setting to its default value",
-			Required:    false,
-			Choices: []discord.ApplicationCommandOptionChoiceString{
-				{Name: "Join enabled", Value: "join-enabled"},
-				{Name: "Leave enabled", Value: "leave-enabled"},
-				{Name: "Channel", Value: "channel"},
-				{Name: "All", Value: "all"},
-			},
-		},
-	},
-}
-
 func AdminJoinLeaveHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("admin", e)
 

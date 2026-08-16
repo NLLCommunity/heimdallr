@@ -3,50 +3,12 @@ package admin
 import (
 	"fmt"
 
-	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
-
-var infractionsSubCommand = discord.ApplicationCommandOptionSubCommand{
-	Name:        "infractions",
-	Description: "View or set infraction-related settings",
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionFloat{
-			Name:        "half-life",
-			Description: "The half-life of infractions in days (0 = no half-life)",
-			Required:    false,
-			MinValue:    new(0.0),
-			MaxValue:    new(365.0),
-		},
-		discord.ApplicationCommandOptionBool{
-			Name:        "notify-warned-user-join",
-			Description: "Whether to notify moderator channel when warned user (re)joins the server",
-			Required:    false,
-		},
-		discord.ApplicationCommandOptionFloat{
-			Name:        "notify-threshold",
-			Description: "The minimum severity of infractions to notify on (0 = always)",
-			Required:    false,
-			MinValue:    new(0.0),
-			MaxValue:    new(100.0),
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "reset",
-			Description: "Reset a setting to its default value",
-			Required:    false,
-			Choices: []discord.ApplicationCommandOptionChoiceString{
-				{Name: "Half-life", Value: "half-life"},
-				{Name: "Notify on warned user join", Value: "notify-warned-user-join"},
-				{Name: "Notify threshold", Value: "notify-threshold"},
-				{Name: "All", Value: "all"},
-			},
-		},
-	},
-}
 
 func AdminInfractionsHandler(e *handler.CommandEvent) error {
 	data := e.SlashCommandInteractionData()

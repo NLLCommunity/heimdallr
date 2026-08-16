@@ -10,101 +10,42 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/disgo/rest"
-	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	r.Command("/ban", BanHandler)
-	return []discord.ApplicationCommandCreate{BanCommand}
+	slash := Ban.Register(r)
+	return []discord.ApplicationCommandCreate{slash}
 }
 
-var BanCommand = discord.SlashCommandCreate{
-	Name:                     "ban",
-	Description:              "Ban a user from the server",
-	Contexts:                 []discord.InteractionContextType{discord.InteractionContextTypeGuild},
-	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
-	DefaultMemberPermissions: omit.NewPtr(discord.PermissionBanMembers),
-	Options: []discord.ApplicationCommandOption{
-
-		discord.ApplicationCommandOptionUser{
-			Name:        "user",
-			Description: "The user to ban",
-			Required:    true,
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "reason",
-			Description: "Reason for banning the user. Not sent to the user. (Defaults to message)",
-			Required:    false,
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "message",
-			Description: "The message sent to the user when banned.",
-			Required:    false,
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "duration",
-			Description: "The duration to ban the user for",
-			Required:    false,
-			Choices:     durationChoices,
-		},
-		discord.ApplicationCommandOptionInt{
-			Name:        "delete-messages",
-			Description: "Whether to delete recent messages when banning the user",
-			Required:    false,
-			Choices: []discord.ApplicationCommandOptionChoiceInt{
-				{
-					Name:  "Do not delete messages",
-					Value: 0,
-				},
-				{
-					Name:  "Last 15 minutes",
-					Value: 15 * 60,
-				},
-				{
-					Name:  "Last 30 minutes",
-					Value: 30 * 60,
-				},
-				{
-					Name:  "Last hour",
-					Value: 60 * 60,
-				},
-				{
-					Name:  "Last 2 hours",
-					Value: 2 * 60 * 60,
-				},
-				{
-					Name:  "Last 4 hours",
-					Value: 4 * 60 * 60,
-				},
-				{
-					Name:  "Last 12 hours",
-					Value: 12 * 60 * 60,
-				},
-				{
-					Name:  "Last 24 hours",
-					Value: 24 * 60 * 60,
-				},
-				{
-					Name:  "Last 2 days",
-					Value: 2 * 24 * 60 * 60,
-				},
-				{
-					Name:  "Last week",
-					Value: 7 * 24 * 60 * 60,
-				},
-			},
-		},
-		discord.ApplicationCommandOptionBool{
-			Name:        "dont-auto-dm",
-			Description: "Override server-default always send ban footer. message/duration will still trigger it",
-		},
-	},
-}
+var Ban = rave.Slash("ban", "Ban a user from the server").
+	WithDefaultMemberPermissions(discord.PermissionKickMembers).
+	AddContexts(discord.InteractionContextTypeGuild).
+	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
+	AddOptions(
+		rave.OptionUser("user", "The user to ban").WithRequired(true),
+		rave.OptionString("reason", "Reason for banning the user. Not sent to the user. (Defaults to message)"),
+		rave.OptionString("message", "The message sent to the user when banned."),
+		rave.OptionString("duration", "The duration to ban the user for").WithChoices(durationChoices),
+		rave.OptionInt("delete-messages", "Whether to delete recent messages when banning the user").
+			AddChoice("Do not delete messages", 0).
+			AddChoice("Last 15 minutes", 15*60).
+			AddChoice("Last 30 minutes", 30*60).
+			AddChoice("Last hour", 60*60).
+			AddChoice("Last 2 hours", 2*60*60).
+			AddChoice("Last 4 hours", 4*60*60).
+			AddChoice("Last 12 hours", 12*60*60).
+			AddChoice("Last 24 hours", 24*60*60).
+			AddChoice("Last 2 days", 2*24*60*60).
+			AddChoice("Last week", 7*24*60*60),
+		rave.OptionBool("dont-auto-dm", "Override server-default always send ban footer. message/duration will still trigger it"),
+	).
+	Handle(BanHandler)
 
 func BanHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("ban", e)

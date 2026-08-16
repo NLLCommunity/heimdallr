@@ -14,48 +14,6 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-var auditLogSubcommand = discord.ApplicationCommandOptionSubCommand{
-	Name:        "audit-log",
-	Description: "View or set audit log settings",
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionBool{
-			Name:        "enabled",
-			Description: "Whether to record audit log events for this guild",
-			Required:    false,
-		},
-		discord.ApplicationCommandOptionInt{
-			Name:        "message-retention",
-			Description: "Override message-event retention in days. 0 = forever (only if bot ceiling is 0).",
-			Required:    false,
-			MinValue:    new(0),
-		},
-		discord.ApplicationCommandOptionInt{
-			Name:        "member-retention",
-			Description: "Override member-event retention in days. 0 = forever (only if bot ceiling is 0).",
-			Required:    false,
-			MinValue:    new(0),
-		},
-		discord.ApplicationCommandOptionInt{
-			Name:        "guild-retention",
-			Description: "Override guild-event retention in days. 0 = forever (only if bot ceiling is 0).",
-			Required:    false,
-			MinValue:    new(0),
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "reset",
-			Description: "Reset a setting to use the bot-operator default",
-			Required:    false,
-			Choices: []discord.ApplicationCommandOptionChoiceString{
-				{Name: "Enabled", Value: "enabled"},
-				{Name: "Message retention", Value: "message-retention"},
-				{Name: "Member retention", Value: "member-retention"},
-				{Name: "Guild retention", Value: "guild-retention"},
-				{Name: "All", Value: "all"},
-			},
-		},
-	},
-}
-
 func AdminAuditLogHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("admin", e)
 

@@ -6,8 +6,9 @@ import (
 )
 
 func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	r.Command("/create-role-button", CreateRoleButtonHandler)
 	r.Component("/role/assign/{roleID}", RoleAssignButtonHandler)
 
-	return []discord.ApplicationCommandCreate{CreateRoleButtonCommand}
+	slash := CreateRoleButton.Register(r)
+
+	return []discord.ApplicationCommandCreate{slash}
 }

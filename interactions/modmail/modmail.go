@@ -7,69 +7,95 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 
 	ix "github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	r.Command("/modmail-admin/create-button", ModmailAdminCreateButtonHandler)
-	r.Command("/modmail-admin/settings", ModmailSettingsHandler)
 	r.Component("/modmail/report-button/{role}/{channel}/{max-active}/{slow-mode}", ModmailReportButtonHandler)
 	r.Modal("/modmail/report-modal/{role}/{channel}/{max-active}/{slow-mode}", ModmailReportModalHandler)
 	r.Command("/Report Message", ModmailReportMessageHandler)
 	r.Modal("/modmail/report-message/{channelID}/{messageID}", ModmailReportMessageModalHandler)
 
-	return []discord.ApplicationCommandCreate{ModmailAdminCommand, ModmailReportMessageCommand}
+	slashModmailAdmin := ModmailAdmin.Register(r)
+
+	return []discord.ApplicationCommandCreate{slashModmailAdmin, ModmailReportMessageCommand}
 }
 
-var ModmailAdminCommand = discord.SlashCommandCreate{
-	Name:                     "modmail-admin",
-	Description:              "Commands for receiving and sending Modmail.",
-	DefaultMemberPermissions: omit.NewPtr(discord.PermissionKickMembers),
-	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
-	Contexts: []discord.InteractionContextType{
-		discord.InteractionContextTypeGuild,
-	},
-	Options: []discord.ApplicationCommandOption{
-		createSubcommand,
-		settingsSubcommand,
-	},
-}
+var ModmailAdmin = rave.Slash("modmail-admin", "Commands for receiving and sending Modmail.").
+	AddNameLocalization(discord.LocaleNorwegian, "modmail-admin").
+	AddDescriptionLocalization(discord.LocaleNorwegian, "Kommandoer for å motta og sende Modmail.").
+	WithDefaultMemberPermissions(discord.PermissionKickMembers).
+	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
+	AddContexts(discord.InteractionContextTypeGuild).
+	AddOptions(createSubCommand, settingsSubCommand)
 
-var settingsSubcommand = discord.ApplicationCommandOptionSubCommand{
-	Name:        "settings",
-	Description: "Modmail settings",
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionChannel{
-			Name:         "report-channel",
-			Description:  "Channel that reports will go into. (Does not apply to report buttons)",
-			ChannelTypes: []discord.ChannelType{discord.ChannelTypeGuildText},
-		},
-		discord.ApplicationCommandOptionRole{
-			Name:        "report-ping-role",
-			Description: "The role that will be pinged when a report is made",
-		},
-		discord.ApplicationCommandOptionChannel{
-			Name:         "notification-channel",
-			Description:  "Channel that report notifications will be posted to",
-			ChannelTypes: []discord.ChannelType{discord.ChannelTypeGuildText},
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "reset",
-			Description: "Reset a setting to its default value.",
-			Choices: []discord.ApplicationCommandOptionChoiceString{
-				{Name: "report-channel", Value: "report-channel"},
-				{Name: "notification-channel", Value: "notification-channel"},
-				{Name: "report-ping-role", Value: "report-ping-role"},
-				{Name: "all", Value: "all"},
-			},
-		},
-	},
-}
+var createSubCommand = rave.SubCommand("create-button", "Create a Modmail report button.").
+	AddNameLocalization(discord.LocaleNorwegian, "opprett-knapp").
+	AddDescriptionLocalization(discord.LocaleNorwegian, "Opprett en rapport-knapp for Modmail.").
+	AddOptions(
+		rave.OptionString("label", "The label to display on the button.").
+			AddNameLocalization(discord.LocaleNorwegian, "tekst").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Teksten som skal vises på knappen.").
+			WithRequired(true),
+		rave.OptionString("button-color", "The color of the button.").
+			AddNameLocalization(discord.LocaleNorwegian, "knapp-farge").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Fargen på knappen.").
+			WithRequired(false).
+			AddChoice("Red", "red").
+			AddChoice("Green", "green").
+			AddChoice("Blue", "blue").
+			AddChoice("Gray", "gray"),
+		rave.OptionRole("role", "Role that should be mentioned/notified when a new thread is created.").
+			AddNameLocalization(discord.LocaleNorwegian, "rolle").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Rollen som skal nevnes/varsles når en ny tråd opprettes.").
+			WithRequired(false),
+		rave.OptionChannel("channel", "Channel that notifications should be sent to.").
+			AddNameLocalization(discord.LocaleNorwegian, "kanal").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Kanal som varsler skal sendes til.").
+			WithRequired(false).
+			AddChannelTypes(discord.ChannelTypeGuildText),
+		rave.OptionInt("max-active-reports", "The maximum number of active reports that a user can have in the channel.").
+			AddNameLocalization(discord.LocaleNorwegian, "maks-aktive-rapporter").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Maksimalt antall aktive rapporter en bruker kan ha i kanalen.").
+			WithRequired(false).
+			WithMinValue(0).
+			WithMaxValue(100),
+		rave.OptionString("slow-mode-time", "Enable slow mode for the report thread in the format '1h5m30s1' ('0s' = disabled)").
+			AddNameLocalization(discord.LocaleNorwegian, "treg-modus-tid").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Aktiver treg modus for rapport-tråden i formatet '1t5m30s1' ('0s' = deaktivert)").
+			WithRequired(false),
+	).
+	Handle(ModmailAdminCreateButtonHandler)
+
+var settingsSubCommand = rave.SubCommand("settings", "Modmail settings").
+	AddNameLocalization(discord.LocaleNorwegian, "innstillinger").
+	AddDescriptionLocalization(discord.LocaleNorwegian, "Modmail-innstillinger.").
+	AddOptions(
+		rave.OptionChannel("report-channel", "Channel that reports will go into. (Does not apply to report buttons)").
+			AddNameLocalization(discord.LocaleNorwegian, "rapport-kanal").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Kanal som rapporter vil gå inn i. (Gjelder ikke for rapportknapper)").
+			AddChannelTypes(discord.ChannelTypeGuildText),
+		rave.OptionRole("report-ping-role", "The role that will be pinged when a report is made").
+			AddNameLocalization(discord.LocaleNorwegian, "rapport-varsle-rolle").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Rollen som vil bli varslet når en rapport blir laget."),
+		rave.OptionChannel("notification-channel", "Channel that report notifications will be posted to").
+			AddNameLocalization(discord.LocaleNorwegian, "varsel-kanal").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Kanal som rapportvarsler vil bli lagt ut i.").
+			AddChannelTypes(discord.ChannelTypeGuildText),
+		rave.OptionString("reset", "Reset a setting to its default value.").
+			AddNameLocalization(discord.LocaleNorwegian, "tilbakestill").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Tilbakestill en innstilling til standardverdien.").
+			AddChoice("report-channel", "report-channel").
+			AddChoice("notification-channel", "notification-channel").
+			AddChoice("report-ping-role", "report-ping-role").
+			AddChoice("all", "all"),
+	).
+	Handle(ModmailSettingsHandler)
 
 func ModmailSettingsHandler(e *handler.CommandEvent) error {
 	data := e.SlashCommandInteractionData()
