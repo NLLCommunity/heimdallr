@@ -20,8 +20,17 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
+type forumPostModalVars struct {
+	ChannelID snowflake.ID `rave:"channelID"`
+	MessageID snowflake.ID `rave:"messageID"`
+}
+
+var forumPostModalRoute = rave.ModalOf[forumPostModalVars](
+	"/quote/forum-post/{channelID}/{messageID}",
+).Handle(CreateForumPostModalHandler)
+
 func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	r.Modal("/quote/forum-post/{channelID}/{messageID}", CreateForumPostModalHandler)
+	forumPostModalRoute.Register(r)
 
 	slashQuote := Quote.Register(r)
 	messageCreateForumPost := CreateForumPostCommand.Register(r)

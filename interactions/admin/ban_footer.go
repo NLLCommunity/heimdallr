@@ -63,7 +63,7 @@ func AdminBanFooterHandler(e *handler.CommandEvent) error {
 			utils.Iif(settings.AlwaysSendBanFooter, "yes", "no"),
 		).
 			WithEmbeds(embed).
-			AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/ban-footer/button")),
+			AddActionRow(discord.NewPrimaryButton("Edit message", adminBanFooterButtonRoute.StaticCustomID())),
 	)
 }
 
@@ -82,7 +82,7 @@ func AdminBanFooterButtonHandler(e *handler.ComponentEvent) error {
 
 	return e.Modal(
 		messageModal(
-			"/admin/ban-footer/modal",
+			adminBanFooterModalRoute.StaticCustomID(),
 			"Ban footer",
 			settings.BanFooter,
 		),

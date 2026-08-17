@@ -45,7 +45,13 @@ func CreateForumPostHandler(e *handler.CommandEvent) error {
 		return e.CreateMessage(interactions.EphemeralMessageContent("You don't have permission to read this message."))
 	}
 
-	customID := fmt.Sprintf("/quote/forum-post/%s/%s", message.ChannelID, message.ID)
+	customID, err := forumPostModalRoute.CustomID(forumPostModalVars{
+		ChannelID: message.ChannelID,
+		MessageID: message.ID,
+	})
+	if err != nil {
+		return err
+	}
 	return e.Modal(createForumPostModal(customID, &message, e.User().ID))
 }
 

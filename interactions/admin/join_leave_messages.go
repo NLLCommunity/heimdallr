@@ -60,7 +60,7 @@ func AdminJoinMessageHandler(e *handler.CommandEvent) error {
 	return e.CreateMessage(
 		interactions.EphemeralMessageContent("").
 			WithEmbeds(embed, templateInfoEmbed).
-			AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/join-message/button")),
+			AddActionRow(discord.NewPrimaryButton("Edit message", adminJoinMessageButtonRoute.StaticCustomID())),
 	)
 }
 
@@ -87,7 +87,7 @@ func AdminJoinMessageButtonHandler(e *handler.ComponentEvent) error {
 
 	return e.Modal(
 		messageModal(
-			"/admin/join-message/modal",
+			adminJoinMessageModalRoute.StaticCustomID(),
 			"Join message",
 			settings.JoinMessage,
 		),
@@ -183,7 +183,7 @@ func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
 	return e.CreateMessage(
 		interactions.EphemeralMessageContent("").
 			WithEmbeds(embed, templateInfoEmbed).
-			AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/leave-message/button")),
+			AddActionRow(discord.NewPrimaryButton("Edit message", adminLeaveMessageButtonRoute.StaticCustomID())),
 	)
 }
 
@@ -210,7 +210,7 @@ func AdminLeaveMessageButtonHandler(e *handler.ComponentEvent) error {
 
 	return e.Modal(
 		messageModal(
-			"/admin/leave-message/modal",
+			adminLeaveMessageModalRoute.StaticCustomID(),
 			"Leave message",
 			settings.LeaveMessage,
 		),

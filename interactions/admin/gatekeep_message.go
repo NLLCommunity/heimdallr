@@ -61,7 +61,7 @@ func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
 	return e.CreateMessage(
 		interactions.EphemeralMessageContent("").
 			WithEmbeds(embed, templateInfoEmbed).
-			AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/gatekeep-message/button")),
+			AddActionRow(discord.NewPrimaryButton("Edit message", adminGatekeepMessageButtonRoute.StaticCustomID())),
 	)
 }
 
@@ -88,7 +88,7 @@ func AdminGatekeepMessageButtonHandler(e *handler.ComponentEvent) error {
 
 	return e.Modal(
 		messageModal(
-			"/admin/gatekeep-message/modal",
+			adminGatekeepMessageModalRoute.StaticCustomID(),
 			"Gatekeep approved message",
 			settings.GatekeepApprovedMessage,
 		),

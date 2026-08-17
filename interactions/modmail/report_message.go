@@ -22,7 +22,13 @@ var ModmailReportMessageCommand = rave.MessageCommand("Report Message").
 func ModmailReportMessageHandler(e *handler.CommandEvent) error {
 	message := e.MessageCommandInteractionData().TargetMessage()
 
-	customID := fmt.Sprintf("/modmail/report-message/%s/%s", message.ChannelID, message.ID)
+	customID, err := modmailReportMessageRoute.CustomID(modmailReportMessageVars{
+		ChannelID: message.ChannelID,
+		MessageID: message.ID,
+	})
+	if err != nil {
+		return err
+	}
 
 	modal := discord.NewModalCreate(customID, "Report message", nil).
 		AddLabel(

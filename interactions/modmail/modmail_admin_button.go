@@ -1,7 +1,6 @@
 package modmail
 
 import (
-	"fmt"
 	"log/slog"
 	"strconv"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/disgoorg/disgo/handler"
 
 	ix "github.com/NLLCommunity/heimdallr/interactions"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
@@ -54,20 +54,31 @@ func ModmailAdminCreateButtonHandler(e *handler.CommandEvent) error {
 		)
 	}
 
+	customID, err := modmailReportButtonRoute.CustomID(modmailReportVars{
+		Role:      role.ID,
+		Channel:   channel.ID,
+		MaxActive: maxActive,
+		SlowMode:  slowModeCustomIDValue(slowMode),
+	})
+	if err != nil {
+		return err
+	}
+
 	return e.CreateMessage(
 		discord.NewMessageCreate().
 			AddActionRow(
 				discord.NewButton(
 					stringToButtonStyle[color],
 					label,
-					fmt.Sprintf(
-						"/modmail/report-button/%s/%s/%d/%.0f",
-						role.ID, channel.ID, maxActive, slowMode.Seconds(),
-					),
+					customID,
 					"", 0,
 				),
 			),
 	)
+}
+
+func slowModeCustomIDValue(slowMode time.Duration) string {
+	return strconv.FormatFloat(slowMode.Seconds(), 'f', 0, 64)
 }
 
 func ModmailReportButtonHandler(e *handler.ComponentEvent) error {
@@ -98,7 +109,12 @@ func ModmailReportButtonHandler(e *handler.ComponentEvent) error {
 		)
 	}
 
-	customID := fmt.Sprintf("/modmail/report-modal/%s/%s/%s/%s", role, channel, maxActiveStr, slowModeStr)
+	customID, err := modmailReportModalRoute.CustomIDVars(rave.Vars{
+		"role": role, "channel": channel, "max-active": maxActiveStr, "slow-mode": slowModeStr,
+	})
+	if err != nil {
+		return err
+	}
 
 	slog.Info("Sending modal", "custom_id", customID)
 

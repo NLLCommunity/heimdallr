@@ -15,10 +15,34 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
+type modmailReportVars struct {
+	Role      snowflake.ID `rave:"role"`
+	Channel   snowflake.ID `rave:"channel"`
+	MaxActive int          `rave:"max-active"`
+	SlowMode  string       `rave:"slow-mode"`
+}
+
+type modmailReportMessageVars struct {
+	ChannelID snowflake.ID `rave:"channelID"`
+	MessageID snowflake.ID `rave:"messageID"`
+}
+
+var modmailReportButtonRoute = rave.ComponentOf[modmailReportVars](
+	"/modmail/report-button/{role}/{channel}/{max-active}/{slow-mode}",
+).Handle(ModmailReportButtonHandler)
+
+var modmailReportModalRoute = rave.ModalOf[modmailReportVars](
+	"/modmail/report-modal/{role}/{channel}/{max-active}/{slow-mode}",
+).Handle(ModmailReportModalHandler)
+
+var modmailReportMessageRoute = rave.ModalOf[modmailReportMessageVars](
+	"/modmail/report-message/{channelID}/{messageID}",
+).Handle(ModmailReportMessageModalHandler)
+
 func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	r.Component("/modmail/report-button/{role}/{channel}/{max-active}/{slow-mode}", ModmailReportButtonHandler)
-	r.Modal("/modmail/report-modal/{role}/{channel}/{max-active}/{slow-mode}", ModmailReportModalHandler)
-	r.Modal("/modmail/report-message/{channelID}/{messageID}", ModmailReportMessageModalHandler)
+	modmailReportButtonRoute.Register(r)
+	modmailReportModalRoute.Register(r)
+	modmailReportMessageRoute.Register(r)
 
 	slashModmailAdmin := ModmailAdmin.Register(r)
 	messageReport := ModmailReportMessageCommand.Register(r)

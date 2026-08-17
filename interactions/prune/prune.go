@@ -20,9 +20,21 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
+type pruneRouteVars struct {
+	PruneID uuid.UUID `rave:"pruneID"`
+}
+
+var pruneConfirmRoute = rave.ComponentOf[pruneRouteVars](
+	"/button/prune-members/confirm/{pruneID}",
+).Handle(PruneConfirmHandler)
+
+var pruneCancelRoute = rave.ComponentOf[pruneRouteVars](
+	"/button/prune-members/cancel/{pruneID}",
+).Handle(PruneCancelHandler)
+
 func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	r.Component("/button/prune-members/confirm/{pruneID}", PruneConfirmHandler)
-	r.Component("/button/prune-members/cancel/{pruneID}", PruneCancelHandler)
+	pruneConfirmRoute.Register(r)
+	pruneCancelRoute.Register(r)
 
 	slash := Prune.Register(r)
 
@@ -329,7 +341,7 @@ func preparePruneMembers(pruneID uuid.UUID, members []discord.Member) (
 		return nil, err
 	}
 
-	return buildPruneConfirmMessages(pruneID, members), nil
+	return buildPruneConfirmMessages(pruneID, members)
 }
 
 // buildPruneConfirmMessages builds the confirmation messages for a prune. The
@@ -337,7 +349,16 @@ func preparePruneMembers(pruneID uuid.UUID, members []discord.Member) (
 // split across as many messages as needed. The confirm/cancel buttons go on a
 // separate short final message, which also leaves room for PruneCancelHandler
 // to append to it on cancellation.
-func buildPruneConfirmMessages(pruneID uuid.UUID, members []discord.Member) []discord.MessageCreate {
+func buildPruneConfirmMessages(pruneID uuid.UUID, members []discord.Member) ([]discord.MessageCreate, error) {
+	confirmID, err := pruneConfirmRoute.CustomID(pruneRouteVars{PruneID: pruneID})
+	if err != nil {
+		return nil, err
+	}
+	cancelID, err := pruneCancelRoute.CustomID(pruneRouteVars{PruneID: pruneID})
+	if err != nil {
+		return nil, err
+	}
+
 	var content strings.Builder
 	fmt.Fprintf(&content, "## The following %d members will be pruned and kicked from the server\n", len(members))
 	for _, member := range members {
@@ -351,11 +372,11 @@ func buildPruneConfirmMessages(pruneID uuid.UUID, members []discord.Member) []di
 
 	prompt := ix.EphemeralMessageContentf("Prune the %d members listed above?", len(members)).
 		AddActionRow(
-			discord.NewDangerButton("Prune members", fmt.Sprintf("/button/prune-members/confirm/%s", pruneID)),
-			discord.NewSecondaryButton("Cancel", fmt.Sprintf("/button/prune-members/cancel/%s", pruneID)),
+			discord.NewDangerButton("Prune members", confirmID),
+			discord.NewSecondaryButton("Cancel", cancelID),
 		)
 
-	return append(messages, prompt)
+	return append(messages, prompt), nil
 }
 
 func getPrunableMembers(

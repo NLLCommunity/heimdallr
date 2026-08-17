@@ -106,12 +106,17 @@ func CreateRoleButtonHandler(e *handler.CommandEvent) error {
 		text = "Get role"
 	}
 
+	customID, err := assignRoleRoute.CustomID(rave.Vars{"roleID": role.ID})
+	if err != nil {
+		return err
+	}
+
 	// Create the button
 
 	return e.CreateMessage(
 		discord.NewMessageCreate().
 			WithContent(instructions).
-			AddActionRow(discord.NewPrimaryButton(text, fmt.Sprintf("/role/assign/%s", role.ID.String()))).
+			AddActionRow(discord.NewPrimaryButton(text, customID)).
 			WithAllowedMentions(&discord.AllowedMentions{}),
 	)
 }

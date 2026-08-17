@@ -5,9 +5,23 @@ import (
 	"testing"
 
 	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestRegisterInstallsForumPostModalRoute(t *testing.T) {
+	router := handler.New()
+	Register(router)
+	require.True(t, router.Match("/quote/forum-post/2/3", discord.InteractionTypeModalSubmit, 0))
+}
+
+func TestForumPostModalRouteID(t *testing.T) {
+	id, err := forumPostModalRoute.CustomID(forumPostModalVars{ChannelID: 2, MessageID: 3})
+	require.NoError(t, err)
+	require.Equal(t, "/quote/forum-post/2/3", id)
+}
 
 func TestForumPostBodyTooLongUsesCharacterCount(t *testing.T) {
 	assert.False(t, forumPostBodyTooLong(strings.Repeat("å", maxForumPostEmbedDescriptionRunes)))

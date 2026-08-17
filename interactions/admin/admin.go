@@ -11,23 +11,26 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
+var adminShowAllRoute = rave.Component("/admin/show-all-button").Handle(AdminShowAllButtonHandler)
+var adminGatekeepMessageButtonRoute = rave.Component("/admin/gatekeep-message/button").Handle(AdminGatekeepMessageButtonHandler)
+var adminGatekeepMessageModalRoute = rave.Modal("/admin/gatekeep-message/modal").Handle(AdminGatekeepMessageModalHandler)
+var adminJoinMessageButtonRoute = rave.Component("/admin/join-message/button").Handle(AdminJoinMessageButtonHandler)
+var adminJoinMessageModalRoute = rave.Modal("/admin/join-message/modal").Handle(AdminJoinMessageModalHandler)
+var adminLeaveMessageButtonRoute = rave.Component("/admin/leave-message/button").Handle(AdminLeaveMessageButtonHandler)
+var adminLeaveMessageModalRoute = rave.Modal("/admin/leave-message/modal").Handle(AdminLeaveMessageModalHandler)
+var adminBanFooterButtonRoute = rave.Component("/admin/ban-footer/button").Handle(AdminBanFooterButtonHandler)
+var adminBanFooterModalRoute = rave.Modal("/admin/ban-footer/modal").Handle(AdminBanFooterModalHandler)
+
 func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	r.Route(
-		"/admin", func(r handler.Router) {
-			r.Component("/show-all-button", AdminShowAllButtonHandler)
-			r.Component("/gatekeep-message/button", AdminGatekeepMessageButtonHandler)
-			r.Modal("/gatekeep-message/modal", AdminGatekeepMessageModalHandler)
-
-			r.Component("/join-message/button", AdminJoinMessageButtonHandler)
-			r.Modal("/join-message/modal", AdminJoinMessageModalHandler)
-
-			r.Component("/leave-message/button", AdminLeaveMessageButtonHandler)
-			r.Modal("/leave-message/modal", AdminLeaveMessageModalHandler)
-
-			r.Component("/ban-footer/button", AdminBanFooterButtonHandler)
-			r.Modal("/ban-footer/modal", AdminBanFooterModalHandler)
-		},
-	)
+	adminShowAllRoute.Register(r)
+	adminGatekeepMessageButtonRoute.Register(r)
+	adminGatekeepMessageModalRoute.Register(r)
+	adminJoinMessageButtonRoute.Register(r)
+	adminJoinMessageModalRoute.Register(r)
+	adminLeaveMessageButtonRoute.Register(r)
+	adminLeaveMessageModalRoute.Register(r)
+	adminBanFooterButtonRoute.Register(r)
+	adminBanFooterModalRoute.Register(r)
 
 	slash := Admin.Register(r)
 
@@ -202,7 +205,7 @@ func AdminInfoHandler(e *handler.CommandEvent) error {
 			WithEphemeral(true).
 			WithAllowedMentions(&discord.AllowedMentions{}).
 			WithEmbeds(embeds...).
-			AddActionRow(discord.NewPrimaryButton("Display for everyone", "/admin/show-all-button")),
+			AddActionRow(discord.NewPrimaryButton("Display for everyone", adminShowAllRoute.StaticCustomID())),
 	)
 }
 

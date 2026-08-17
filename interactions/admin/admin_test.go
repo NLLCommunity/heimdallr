@@ -3,8 +3,37 @@ package admin
 import (
 	"testing"
 
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/handler"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestRegisterInstallsAdminComponentAndModalRoutes(t *testing.T) {
+	router := handler.New()
+	Register(router)
+
+	componentPaths := []string{
+		"/admin/show-all-button",
+		"/admin/gatekeep-message/button",
+		"/admin/join-message/button",
+		"/admin/leave-message/button",
+		"/admin/ban-footer/button",
+	}
+	for _, path := range componentPaths {
+		require.True(t, router.Match(path, discord.InteractionTypeComponent, int(discord.ComponentTypeButton)), path)
+	}
+
+	modalPaths := []string{
+		"/admin/gatekeep-message/modal",
+		"/admin/join-message/modal",
+		"/admin/leave-message/modal",
+		"/admin/ban-footer/modal",
+	}
+	for _, path := range modalPaths {
+		require.True(t, router.Match(path, discord.InteractionTypeModalSubmit, 0), path)
+	}
+}
 
 func TestSectionEmbed_StripsLeadingHeading(t *testing.T) {
 	// Six of the seven *Info helpers begin with "## Title\n…". The
