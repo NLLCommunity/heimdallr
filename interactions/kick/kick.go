@@ -12,11 +12,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	slash := KickWithMessage.Register(r)
-
-	return []discord.ApplicationCommandCreate{slash}
-}
+var Interactions = rave.Bundle(KickWithMessage)
 
 var KickWithMessage = rave.Slash("kick", "Kick a user from the server").
 	AddNameLocalization(discord.LocaleNorwegian, "spark-ut").

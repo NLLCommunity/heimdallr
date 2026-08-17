@@ -11,7 +11,7 @@ import (
 
 func TestRegisterInstallsAdminComponentAndModalRoutes(t *testing.T) {
 	router := handler.New()
-	Register(router)
+	Interactions(router)
 
 	componentPaths := []string{
 		"/admin/show-all-button",

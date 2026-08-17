@@ -1,7 +1,6 @@
 package ping
 
 import (
-	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
@@ -9,11 +8,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	slash := Ping.Register(r)
-
-	return []discord.ApplicationCommandCreate{slash}
-}
+var Interactions = rave.Bundle(Ping)
 
 var Ping = rave.Slash("ping", "Ping the bot").Handle(PingHandler)
 

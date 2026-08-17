@@ -13,7 +13,7 @@ import (
 
 func TestRegisterInstallsForumPostModalRoute(t *testing.T) {
 	router := handler.New()
-	Register(router)
+	Interactions(router)
 	require.True(t, router.Match("/quote/forum-post/2/3", discord.InteractionTypeModalSubmit, 0))
 }
 

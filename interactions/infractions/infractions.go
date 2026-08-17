@@ -8,13 +8,20 @@ import (
 	"time"
 
 	"github.com/disgoorg/disgo/discord"
-	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
+)
+
+var Interactions = rave.Bundle(
+	Infractions,
+	Warn,
+	UserInfractions,
+	userInfractionRoute.Handle(UserInfractionButtonHandler),
+	moderatorInfractionRoute.Handle(InfractionsListComponentHandler),
 )
 
 type userInfractionRouteVars struct {
@@ -33,22 +40,6 @@ var userInfractionRoute = rave.ComponentOf[userInfractionRouteVars](
 var moderatorInfractionRoute = rave.ComponentOf[moderatorInfractionRouteVars](
 	"/infractions-mod/{userID}/{offset}",
 )
-
-func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	r.Command("/warn", WarnHandler)
-	r.Command("/warnings", UserInfractionsHandler)
-	userInfractionRoute.Handle(UserInfractionButtonHandler).Register(r)
-	moderatorInfractionRoute.Handle(InfractionsListComponentHandler).Register(r)
-	slashInfractions := Infractions.Register(r)
-	slashWarn := Warn.Register(r)
-	slashWarnings := UserInfractions.Register(r)
-
-	return []discord.ApplicationCommandCreate{
-		slashInfractions,
-		slashWarn,
-		slashWarnings,
-	}
-}
 
 // pageSize is the size of one page of infractions
 const pageSize = 5

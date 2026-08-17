@@ -11,7 +11,7 @@ import (
 
 func TestInfractionRoutesPreserveRegistrationAndCustomIDs(t *testing.T) {
 	router := handler.New()
-	Register(router)
+	Interactions(router)
 	require.True(t, router.Match("/infractions-user/5", discord.InteractionTypeComponent, int(discord.ComponentTypeButton)))
 	require.True(t, router.Match("/infractions-mod/42/10", discord.InteractionTypeComponent, int(discord.ComponentTypeButton)))
 

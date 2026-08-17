@@ -10,6 +10,6 @@ import (
 
 func TestRegisterInstallsAssignRoleRoute(t *testing.T) {
 	router := handler.New()
-	Register(router)
+	Interactions(router)
 	require.True(t, router.Match("/role/assign/42", discord.InteractionTypeComponent, int(discord.ComponentTypeButton)))
 }

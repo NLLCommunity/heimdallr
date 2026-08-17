@@ -27,6 +27,14 @@ type modmailReportMessageVars struct {
 	MessageID snowflake.ID `rave:"messageID"`
 }
 
+var Interactions = rave.Bundle(
+	ModmailAdmin,
+	ModmailReportMessageCommand,
+	modmailReportButtonRoute,
+	modmailReportModalRoute,
+	modmailReportMessageRoute,
+)
+
 var modmailReportButtonRoute = rave.ComponentOf[modmailReportVars](
 	"/modmail/report-button/{role}/{channel}/{max-active}/{slow-mode}",
 ).Handle(ModmailReportButtonHandler)
@@ -38,17 +46,6 @@ var modmailReportModalRoute = rave.ModalOf[modmailReportVars](
 var modmailReportMessageRoute = rave.ModalOf[modmailReportMessageVars](
 	"/modmail/report-message/{channelID}/{messageID}",
 ).Handle(ModmailReportMessageModalHandler)
-
-func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	modmailReportButtonRoute.Register(r)
-	modmailReportModalRoute.Register(r)
-	modmailReportMessageRoute.Register(r)
-
-	slashModmailAdmin := ModmailAdmin.Register(r)
-	messageReport := ModmailReportMessageCommand.Register(r)
-
-	return []discord.ApplicationCommandCreate{slashModmailAdmin, messageReport}
-}
 
 var ModmailAdmin = rave.Slash("modmail-admin", "Commands for receiving and sending Modmail.").
 	AddNameLocalization(discord.LocaleNorwegian, "modmail-admin").

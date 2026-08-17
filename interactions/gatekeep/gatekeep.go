@@ -14,18 +14,17 @@ import (
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
 var activeApprovalProcesses = make(map[snowflake.ID]bool)
 var activeApprovalMutex = &sync.Mutex{}
 
-func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	slash := ApproveSlash.Register(r)
-	user := ApproveUserCommand.Register(r)
-
-	return []discord.ApplicationCommandCreate{slash, user}
-}
+var Interactions = rave.Bundle(
+	ApproveSlash,
+	ApproveUserCommand,
+)
 
 func getGuild(e *handler.CommandEvent) (guild discord.Guild, success bool, inGuild bool) {
 	if e.GuildID() == nil {

@@ -12,14 +12,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-// Register installs /dashboard. The command is a thin deep-link helper:
-// authentication itself happens via Discord OAuth on the web side, so the
-// command stays open to everyone in the guild and the dashboard enforces
-// per-page access via OAuth + the configured PostsModRoleID setting.
-func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	slash := Dashboard.Register(r)
-	return []discord.ApplicationCommandCreate{slash}
-}
+var Interactions = rave.Bundle(Dashboard)
 
 var Dashboard = rave.Slash("dashboard", "Get a link to the web dashboard").
 	AddContexts(discord.InteractionContextTypeGuild).

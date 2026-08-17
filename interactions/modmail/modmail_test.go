@@ -14,7 +14,7 @@ import (
 
 func TestRegisterInstallsModmailRoutes(t *testing.T) {
 	router := handler.New()
-	Register(router)
+	Interactions(router)
 
 	require.True(t, router.Match("/modmail/report-button/1/2/3/4", discord.InteractionTypeComponent, int(discord.ComponentTypeButton)))
 	require.True(t, router.Match("/modmail/report-modal/1/2/3/4", discord.InteractionTypeModalSubmit, 0))

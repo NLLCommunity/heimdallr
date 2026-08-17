@@ -7,7 +7,7 @@ import (
 	"github.com/disgoorg/disgo/handler"
 )
 
-func (c *UserCommandBuilder) Register(router handler.Router) discord.ApplicationCommandCreate {
+func (c *UserCommandBuilder) register(router handler.Router) (command discord.ApplicationCommandCreate, hasCommand bool) {
 	built := c.Build()
 	path := "/" + c.name
 	if c.userHandler != nil {
@@ -17,10 +17,15 @@ func (c *UserCommandBuilder) Register(router handler.Router) discord.Application
 	} else {
 		panic("executable Discord command is missing a handler: " + path)
 	}
-	return built
+	return built, true
 }
 
-func (c *MessageCommandBuilder) Register(router handler.Router) discord.ApplicationCommandCreate {
+func (c *UserCommandBuilder) Register(router handler.Router) discord.ApplicationCommandCreate {
+	cmd, _ := c.register(router)
+	return cmd
+}
+
+func (c *MessageCommandBuilder) register(router handler.Router) (command discord.ApplicationCommandCreate, hasCommand bool) {
 	built := c.Build()
 	path := "/" + c.name
 	if c.messageHandler != nil {
@@ -30,12 +35,17 @@ func (c *MessageCommandBuilder) Register(router handler.Router) discord.Applicat
 	} else {
 		panic("executable Discord command is missing a handler: " + path)
 	}
-	return built
+	return built, true
+}
+
+func (c *MessageCommandBuilder) Register(router handler.Router) discord.ApplicationCommandCreate {
+	cmd, _ := c.register(router)
+	return cmd
 }
 
 // Register installs every executable command route on router and returns the
 // Discord command payload built from the same command tree.
-func (s *SlashCommandBuilder) Register(router handler.Router) discord.ApplicationCommandCreate {
+func (s *SlashCommandBuilder) register(router handler.Router) (command discord.ApplicationCommandCreate, hasCommand bool) {
 	built := s.Build()
 	path := "/" + s.name
 
@@ -44,11 +54,16 @@ func (s *SlashCommandBuilder) Register(router handler.Router) discord.Applicatio
 			panic("Discord command containers cannot have handlers: " + path)
 		}
 		s.registerChildren(router, path)
-		return built
+		return built, true
 	}
 
 	registerExecutable(router, path, s.handler, s.slashHandler, s.options)
-	return built
+	return built, true
+}
+
+func (s *SlashCommandBuilder) Register(router handler.Router) discord.ApplicationCommandCreate {
+	cmd, _ := s.register(router)
+	return cmd
 }
 
 func (s *SlashCommandBuilder) registerChildren(router handler.Router, parentPath string) {

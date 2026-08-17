@@ -11,31 +11,30 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-var adminShowAllRoute = rave.Component("/admin/show-all-button").Handle(AdminShowAllButtonHandler)
-var adminGatekeepMessageButtonRoute = rave.Component("/admin/gatekeep-message/button").Handle(AdminGatekeepMessageButtonHandler)
-var adminGatekeepMessageModalRoute = rave.Modal("/admin/gatekeep-message/modal").Handle(AdminGatekeepMessageModalHandler)
-var adminJoinMessageButtonRoute = rave.Component("/admin/join-message/button").Handle(AdminJoinMessageButtonHandler)
-var adminJoinMessageModalRoute = rave.Modal("/admin/join-message/modal").Handle(AdminJoinMessageModalHandler)
-var adminLeaveMessageButtonRoute = rave.Component("/admin/leave-message/button").Handle(AdminLeaveMessageButtonHandler)
-var adminLeaveMessageModalRoute = rave.Modal("/admin/leave-message/modal").Handle(AdminLeaveMessageModalHandler)
-var adminBanFooterButtonRoute = rave.Component("/admin/ban-footer/button").Handle(AdminBanFooterButtonHandler)
-var adminBanFooterModalRoute = rave.Modal("/admin/ban-footer/modal").Handle(AdminBanFooterModalHandler)
+var Interactions = rave.Bundle(
+	adminShowAllRoute,
+	adminGatekeepMessageButtonRoute,
+	adminGatekeepMessageModalRoute,
+	adminJoinMessageButtonRoute,
+	adminJoinMessageModalRoute,
+	adminLeaveMessageButtonRoute,
+	adminLeaveMessageModalRoute,
+	adminBanFooterButtonRoute,
+	adminBanFooterModalRoute,
+	Admin,
+)
 
-func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	adminShowAllRoute.Register(r)
-	adminGatekeepMessageButtonRoute.Register(r)
-	adminGatekeepMessageModalRoute.Register(r)
-	adminJoinMessageButtonRoute.Register(r)
-	adminJoinMessageModalRoute.Register(r)
-	adminLeaveMessageButtonRoute.Register(r)
-	adminLeaveMessageModalRoute.Register(r)
-	adminBanFooterButtonRoute.Register(r)
-	adminBanFooterModalRoute.Register(r)
-
-	slash := Admin.Register(r)
-
-	return []discord.ApplicationCommandCreate{slash}
-}
+var (
+	adminShowAllRoute               = rave.Component("/admin/show-all-button").Handle(AdminShowAllButtonHandler)
+	adminGatekeepMessageButtonRoute = rave.Component("/admin/gatekeep-message/button").Handle(AdminGatekeepMessageButtonHandler)
+	adminGatekeepMessageModalRoute  = rave.Modal("/admin/gatekeep-message/modal").Handle(AdminGatekeepMessageModalHandler)
+	adminJoinMessageButtonRoute     = rave.Component("/admin/join-message/button").Handle(AdminJoinMessageButtonHandler)
+	adminJoinMessageModalRoute      = rave.Modal("/admin/join-message/modal").Handle(AdminJoinMessageModalHandler)
+	adminLeaveMessageButtonRoute    = rave.Component("/admin/leave-message/button").Handle(AdminLeaveMessageButtonHandler)
+	adminLeaveMessageModalRoute     = rave.Modal("/admin/leave-message/modal").Handle(AdminLeaveMessageModalHandler)
+	adminBanFooterButtonRoute       = rave.Component("/admin/ban-footer/button").Handle(AdminBanFooterButtonHandler)
+	adminBanFooterModalRoute        = rave.Modal("/admin/ban-footer/modal").Handle(AdminBanFooterModalHandler)
+)
 
 var Admin = rave.Slash("admin", "admin commands").
 	AddContexts(discord.InteractionContextTypeGuild).

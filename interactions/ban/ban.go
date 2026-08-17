@@ -18,10 +18,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	slash := Ban.Register(r)
-	return []discord.ApplicationCommandCreate{slash}
-}
+var Interactions = rave.Bundle(Ban)
 
 var Ban = rave.Slash("ban", "Ban a user from the server").
 	WithDefaultMemberPermissions(discord.PermissionKickMembers).

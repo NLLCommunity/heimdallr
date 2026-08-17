@@ -12,10 +12,7 @@ import (
 	"github.com/disgoorg/omit"
 )
 
-func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	slash := Timeout.Register(r)
-	return []discord.ApplicationCommandCreate{slash}
-}
+var Interactions = rave.Bundle(Timeout)
 
 var Timeout = rave.Slash("timeout", "Timeout a user from the server").
 	AddNameLocalization(discord.LocaleNorwegian, "timeout").

@@ -20,6 +20,12 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
+var Interactions = rave.Bundle(
+	Quote,
+	CreateForumPostCommand,
+	forumPostModalRoute,
+)
+
 type forumPostModalVars struct {
 	ChannelID snowflake.ID `rave:"channelID"`
 	MessageID snowflake.ID `rave:"messageID"`
@@ -28,15 +34,6 @@ type forumPostModalVars struct {
 var forumPostModalRoute = rave.ModalOf[forumPostModalVars](
 	"/quote/forum-post/{channelID}/{messageID}",
 ).Handle(CreateForumPostModalHandler)
-
-func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	forumPostModalRoute.Register(r)
-
-	slashQuote := Quote.Register(r)
-	messageCreateForumPost := CreateForumPostCommand.Register(r)
-
-	return []discord.ApplicationCommandCreate{slashQuote, messageCreateForumPost}
-}
 
 var quoteUrlRegex = regexp.MustCompile(
 	`https://discord.com/channels/(?P<guild>\d+)/(?P<channel>\d+)/(?P<message>\d+)`,

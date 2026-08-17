@@ -20,6 +20,12 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
+var Interactions = rave.Bundle(
+	Prune,
+	pruneCancelRoute,
+	pruneConfirmRoute,
+)
+
 type pruneRouteVars struct {
 	PruneID uuid.UUID `rave:"pruneID"`
 }
@@ -31,15 +37,6 @@ var pruneConfirmRoute = rave.ComponentOf[pruneRouteVars](
 var pruneCancelRoute = rave.ComponentOf[pruneRouteVars](
 	"/button/prune-members/cancel/{pruneID}",
 ).Handle(PruneCancelHandler)
-
-func Register(r handler.Router) []discord.ApplicationCommandCreate {
-	pruneConfirmRoute.Register(r)
-	pruneCancelRoute.Register(r)
-
-	slash := Prune.Register(r)
-
-	return []discord.ApplicationCommandCreate{slash}
-}
 
 var Prune = rave.Slash("prune-pending-members", "Prune members.").
 	AddNameLocalization(discord.LocaleNorwegian, "fjern-ventende-medlemmer").

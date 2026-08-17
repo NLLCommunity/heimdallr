@@ -5,6 +5,7 @@ import (
 	"reflect"
 	"unicode/utf8"
 
+	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 )
 
@@ -105,7 +106,7 @@ func (r *ModalRouteBuilder[T]) Handle(h handler.ModalHandler) *ModalRouteBuilder
 	return r
 }
 
-func (r *ComponentRouteBuilder[T]) Register(router handler.Router) {
+func (r *ComponentRouteBuilder[T]) register(router handler.Router) (command discord.ApplicationCommandCreate, hasCommand bool) {
 	pattern, err := compileCustomIDPattern(r.pattern)
 	if err != nil {
 		panic(err)
@@ -127,7 +128,11 @@ func (r *ComponentRouteBuilder[T]) Register(router handler.Router) {
 	panic("component route is missing a handler: " + r.pattern)
 }
 
-func (r *ModalRouteBuilder[T]) Register(router handler.Router) {
+func (r *ComponentRouteBuilder[T]) Register(router handler.Router) {
+	r.register(router)
+}
+
+func (r *ModalRouteBuilder[T]) register(router handler.Router) (command discord.ApplicationCommandCreate, hasCommand bool) {
 	pattern, err := compileCustomIDPattern(r.pattern)
 	if err != nil {
 		panic(err)
@@ -142,4 +147,9 @@ func (r *ModalRouteBuilder[T]) Register(router handler.Router) {
 		panic("modal route is missing a handler: " + r.pattern)
 	}
 	router.Modal(r.pattern, r.handler)
+	return nil, false
+}
+
+func (r *ModalRouteBuilder[T]) Register(router handler.Router) {
+	r.register(router)
 }

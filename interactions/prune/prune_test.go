@@ -15,7 +15,7 @@ import (
 
 func TestRegisterInstallsPruneRoutes(t *testing.T) {
 	router := handler.New()
-	Register(router)
+	Interactions(router)
 	require.True(t, router.Match("/button/prune-members/confirm/id", discord.InteractionTypeComponent, int(discord.ComponentTypeButton)))
 	require.True(t, router.Match("/button/prune-members/cancel/id", discord.InteractionTypeComponent, int(discord.ComponentTypeButton)))
 }
