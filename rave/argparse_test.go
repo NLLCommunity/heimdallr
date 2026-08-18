@@ -337,6 +337,73 @@ func TestParseSlashCommandArgsRejectsFloatScalarOverflow(t *testing.T) {
 	require.Equal(t, float32(0), data.Ratio)
 }
 
+func TestParseSlashCommandArgsAssignsMentionableValuesByDeclaredType(t *testing.T) {
+	type args struct {
+		User   discord.MentionableValue  `rave:"user"`
+		Role   *discord.MentionableValue `rave:"role"`
+		Member *discord.MentionableValue `rave:"member"`
+	}
+
+	var interactionData discord.SlashCommandInteractionData
+	require.NoError(t, json.Unmarshal([]byte(`{
+		"id": "1",
+		"name": "mentionable-test",
+		"type": 1,
+		"resolved": {
+			"users": {
+				"101": {"id": "101", "username": "user"},
+				"103": {"id": "103", "username": "member"}
+			},
+			"roles": {
+				"102": {"id": "102", "name": "role"}
+			},
+			"members": {
+				"103": {"roles": []}
+			}
+		},
+		"options": [
+			{"name": "user", "type": 9, "value": "101"},
+			{"name": "role", "type": 9, "value": "102"},
+			{"name": "member", "type": 9, "value": "103"}
+		]
+	}`), &interactionData))
+
+	data, err := rave.ParseSlashCommandArgs[args](&handler.CommandEvent{
+		ApplicationCommandInteractionCreate: &events.ApplicationCommandInteractionCreate{
+			ApplicationCommandInteraction: discord.ApplicationCommandInteraction{Data: interactionData},
+		},
+	})
+
+	require.NoError(t, err)
+	require.IsType(t, discord.User{}, data.User)
+	require.NotNil(t, data.Role)
+	require.IsType(t, discord.Role{}, *data.Role)
+	require.NotNil(t, data.Member)
+	require.IsType(t, discord.ResolvedMember{}, *data.Member)
+}
+
+func TestParseSlashCommandArgsAssignsNamedPrimitivePointers(t *testing.T) {
+	type name string
+	type enabled bool
+	type args struct {
+		Name    *name    `rave:"name"`
+		Enabled *enabled `rave:"enabled"`
+	}
+
+	data, err := rave.ParseSlashCommandArgs[args](
+		commandEventWithNumericOptions(t,
+			numericOptionFixture{name: "name", optionType: discord.ApplicationCommandOptionTypeString, value: `"rune"`},
+			numericOptionFixture{name: "enabled", optionType: discord.ApplicationCommandOptionTypeBool, value: "true"},
+		),
+	)
+
+	require.NoError(t, err)
+	require.NotNil(t, data.Name)
+	require.Equal(t, name("rune"), *data.Name)
+	require.NotNil(t, data.Enabled)
+	require.Equal(t, enabled(true), *data.Enabled)
+}
+
 func TestParseSlashCommandArgsRejectsUnsupportedFieldType(t *testing.T) {
 	type args struct {
 		Channel discord.Channel `rave:"channel"`

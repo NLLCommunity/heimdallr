@@ -11,6 +11,7 @@ import (
 var (
 	ErrAutocompleteHandlerNotFound = errors.New("autocomplete handler not found")
 	ErrTooManyAutocompleteChoices  = errors.New("autocomplete cannot return more than 25 choices")
+	ErrInvalidAutocompleteChoice   = errors.New("invalid autocomplete choice")
 )
 
 type AutocompleteValue interface {
@@ -58,12 +59,33 @@ func adaptAutocomplete[T AutocompleteValue](
 		if len(choices) > 25 {
 			return fmt.Errorf("%w: got %d", ErrTooManyAutocompleteChoices, len(choices))
 		}
+		for i, choice := range choices {
+			if !validDiscordChoiceName(choice.Name) {
+				return fmt.Errorf("%w at index %d: invalid name", ErrInvalidAutocompleteChoice, i)
+			}
+			if !validAutocompleteChoiceValue(choice.Value) {
+				return fmt.Errorf("%w at index %d: invalid value", ErrInvalidAutocompleteChoice, i)
+			}
+		}
 
 		result := make([]discord.AutocompleteChoice, len(choices))
 		for i, choice := range choices {
 			result[i] = convert(choice)
 		}
 		return e.AutocompleteResult(result)
+	}
+}
+
+func validAutocompleteChoiceValue[T AutocompleteValue](value T) bool {
+	switch value := any(value).(type) {
+	case string:
+		return validDiscordStringChoiceValue(value)
+	case int:
+		return validDiscordIntegerChoiceValue(value)
+	case float64:
+		return validDiscordNumberChoiceValue(value)
+	default:
+		return false
 	}
 }
 

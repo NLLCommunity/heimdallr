@@ -12,8 +12,10 @@ func (c *UserCommandBuilder) register(router handler.Router) (command discord.Ap
 	path := "/" + c.name
 	if c.userHandler != nil {
 		router.UserCommand(path, c.userHandler)
-	} else if c.handler != nil {
-		router.Command(path, c.handler)
+	} else if h := c.handler; h != nil {
+		router.UserCommand(path, func(_ discord.UserCommandInteractionData, e *handler.CommandEvent) error {
+			return h(e)
+		})
 	} else {
 		panic("executable Discord command is missing a handler: " + path)
 	}
@@ -30,8 +32,10 @@ func (c *MessageCommandBuilder) register(router handler.Router) (command discord
 	path := "/" + c.name
 	if c.messageHandler != nil {
 		router.MessageCommand(path, c.messageHandler)
-	} else if c.handler != nil {
-		router.Command(path, c.handler)
+	} else if h := c.handler; h != nil {
+		router.MessageCommand(path, func(_ discord.MessageCommandInteractionData, e *handler.CommandEvent) error {
+			return h(e)
+		})
 	} else {
 		panic("executable Discord command is missing a handler: " + path)
 	}
@@ -99,7 +103,9 @@ func registerExecutable(
 	if slashHandler != nil {
 		router.SlashCommand(path, slashHandler)
 	} else if h != nil {
-		router.Command(path, h)
+		router.SlashCommand(path, func(_ discord.SlashCommandInteractionData, e *handler.CommandEvent) error {
+			return h(e)
+		})
 	} else {
 		panic("executable Discord command is missing a handler: " + path)
 	}

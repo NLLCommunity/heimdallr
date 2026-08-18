@@ -1,6 +1,7 @@
 package rave_test
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -20,6 +21,108 @@ func noopButtonHandler(discord.ButtonInteractionData, *handler.ComponentEvent) e
 
 func noopModalHandler(*handler.ModalEvent) error { return nil }
 
+func dispatchComponentInteraction(t *testing.T, router handler.Router, customID string) {
+	t.Helper()
+	dispatchInteraction(t, router, fmt.Sprintf(`{
+		"id":"1","application_id":"2","type":3,"token":"token","version":1,
+		"data":{"component_type":2,"custom_id":%q}
+	}`, customID))
+}
+
+func dispatchModalInteraction(t *testing.T, router handler.Router, customID string) {
+	t.Helper()
+	dispatchInteraction(t, router, fmt.Sprintf(`{
+		"id":"1","application_id":"2","type":5,"token":"token","version":1,
+		"data":{"custom_id":%q}
+	}`, customID))
+}
+
+func TestComponentRoutesMatchExactCustomIDInAnyRegistrationOrder(t *testing.T) {
+	tests := []struct {
+		name  string
+		order []string
+	}{
+		{name: "short first", order: []string{"short", "long"}},
+		{name: "long first", order: []string{"long", "short"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := handler.New()
+			var calls []string
+			register := map[string]func(){
+				"short": func() {
+					rave.Component("/poll/{id}").Handle(func(*handler.ComponentEvent) error {
+						calls = append(calls, "short")
+						return nil
+					}).Register(router)
+				},
+				"long": func() {
+					rave.Component("/poll/{id}/delete").Handle(func(*handler.ComponentEvent) error {
+						calls = append(calls, "long")
+						return nil
+					}).Register(router)
+				},
+			}
+			for _, route := range tt.order {
+				register[route]()
+			}
+
+			dispatchComponentInteraction(t, router, "/poll/7/delete")
+			require.Equal(t, []string{"long"}, calls)
+
+			for _, customID := range []string{"/poll/7/unexpected", "/poll/7/", "/poll/7//unexpected"} {
+				calls = nil
+				dispatchComponentInteraction(t, router, customID)
+				require.Empty(t, calls, customID)
+			}
+		})
+	}
+}
+
+func TestModalRoutesMatchExactCustomIDInAnyRegistrationOrder(t *testing.T) {
+	tests := []struct {
+		name  string
+		order []string
+	}{
+		{name: "short first", order: []string{"short", "long"}},
+		{name: "long first", order: []string{"long", "short"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := handler.New()
+			var calls []string
+			register := map[string]func(){
+				"short": func() {
+					rave.Modal("/poll/{id}").Handle(func(*handler.ModalEvent) error {
+						calls = append(calls, "short")
+						return nil
+					}).Register(router)
+				},
+				"long": func() {
+					rave.Modal("/poll/{id}/delete").Handle(func(*handler.ModalEvent) error {
+						calls = append(calls, "long")
+						return nil
+					}).Register(router)
+				},
+			}
+			for _, route := range tt.order {
+				register[route]()
+			}
+
+			dispatchModalInteraction(t, router, "/poll/7/delete")
+			require.Equal(t, []string{"long"}, calls)
+
+			for _, customID := range []string{"/poll/7/unexpected", "/poll/7/", "/poll/7//unexpected"} {
+				calls = nil
+				dispatchModalInteraction(t, router, customID)
+				require.Empty(t, calls, customID)
+			}
+		})
+	}
+}
+
 func TestComponentRouteRegistersGenericHandler(t *testing.T) {
 	router := handler.New()
 	rave.Component("/button/{id}").Handle(noopComponentHandler).Register(router)
@@ -36,6 +139,26 @@ func TestComponentRouteRegistersButtonHandler(t *testing.T) {
 	require.False(t, router.Match("/button/1", discord.InteractionTypeComponent, int(discord.ComponentTypeStringSelectMenu)))
 }
 
+func TestButtonComponentRouteDispatchesOnlyExactCustomID(t *testing.T) {
+	router := handler.New()
+	var calls int
+	rave.Component("/button/{id}").HandleButton(func(data discord.ButtonInteractionData, event *handler.ComponentEvent) error {
+		calls++
+		require.Equal(t, "/button/1", data.CustomID())
+		require.Equal(t, "1", event.Vars["id"])
+		return nil
+	}).Register(router)
+
+	dispatchComponentInteraction(t, router, "/button/1")
+	require.Equal(t, 1, calls)
+
+	for _, customID := range []string{"/button/1/", "/button/1//unexpected"} {
+		calls = 0
+		dispatchComponentInteraction(t, router, customID)
+		require.Zero(t, calls, customID)
+	}
+}
+
 func TestModalRouteRegistersHandler(t *testing.T) {
 	router := handler.New()
 	rave.Modal("/modal/{id}").Handle(noopModalHandler).Register(router)
@@ -46,6 +169,15 @@ func TestModalRouteRegistersHandler(t *testing.T) {
 type typedRouteVars struct {
 	ChannelID uint64 `rave:"channelID"`
 	MessageID uint64 `rave:"messageID"`
+}
+
+type unsupportedCustomIDRouteVars struct {
+	ID []byte
+}
+
+type duplicateCustomIDRouteVars struct {
+	ID    string
+	Alias string `rave:"id"`
 }
 
 type typedBoolRouteVars struct {
@@ -103,6 +235,46 @@ func TestTypedRouteCustomIDRejectsRuntimeVarsForAnySchema(t *testing.T) {
 	require.ErrorIs(t, err, rave.ErrInvalidCustomIDValues)
 }
 
+func TestTypedComponentRouteRejectsUnsupportedCustomIDFieldType(t *testing.T) {
+	route := rave.ComponentOf[unsupportedCustomIDRouteVars]("/component/{id}").Handle(noopComponentHandler)
+
+	_, err := route.CustomID(unsupportedCustomIDRouteVars{ID: []byte("value")})
+	require.ErrorIs(t, err, rave.ErrInvalidCustomIDValues)
+	require.Panics(t, func() {
+		route.Register(handler.New())
+	})
+}
+
+func TestTypedModalRouteRejectsUnsupportedCustomIDFieldType(t *testing.T) {
+	route := rave.ModalOf[unsupportedCustomIDRouteVars]("/modal/{id}").Handle(noopModalHandler)
+
+	_, err := route.CustomID(unsupportedCustomIDRouteVars{ID: []byte("value")})
+	require.ErrorIs(t, err, rave.ErrInvalidCustomIDValues)
+	require.Panics(t, func() {
+		route.Register(handler.New())
+	})
+}
+
+func TestTypedComponentRouteRejectsDuplicateCustomIDFieldNames(t *testing.T) {
+	route := rave.ComponentOf[duplicateCustomIDRouteVars]("/component/{id}").Handle(noopComponentHandler)
+
+	_, err := route.CustomID(duplicateCustomIDRouteVars{ID: "first", Alias: "second"})
+	require.ErrorIs(t, err, rave.ErrInvalidCustomIDValues)
+	require.Panics(t, func() {
+		route.Register(handler.New())
+	})
+}
+
+func TestTypedModalRouteRejectsDuplicateCustomIDFieldNames(t *testing.T) {
+	route := rave.ModalOf[duplicateCustomIDRouteVars]("/modal/{id}").Handle(noopModalHandler)
+
+	_, err := route.CustomID(duplicateCustomIDRouteVars{ID: "first", Alias: "second"})
+	require.ErrorIs(t, err, rave.ErrInvalidCustomIDValues)
+	require.Panics(t, func() {
+		route.Register(handler.New())
+	})
+}
+
 func TestRouteRegistrationRejectsVarsPointerSchema(t *testing.T) {
 	route := rave.ComponentOf[*rave.Vars]("/component/{id}").Handle(noopComponentHandler)
 
@@ -115,6 +287,9 @@ func TestStaticCustomID(t *testing.T) {
 	require.Equal(t, "/admin/show", rave.Component("/admin/show").StaticCustomID())
 	require.Panics(t, func() {
 		rave.Component("/admin/{action}").StaticCustomID()
+	})
+	require.Panics(t, func() {
+		rave.Component("/admin/\xff").StaticCustomID()
 	})
 	require.Panics(t, func() {
 		rave.Component("/" + strings.Repeat("å", 100)).StaticCustomID()

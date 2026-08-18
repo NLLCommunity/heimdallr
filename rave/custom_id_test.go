@@ -1,7 +1,9 @@
 package rave
 
 import (
+	"encoding"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -49,6 +51,11 @@ func TestCompileCustomIDPatternRejectsMalformedPatterns(t *testing.T) {
 	}
 }
 
+func TestCompileCustomIDPatternRejectsInvalidUTF8(t *testing.T) {
+	_, err := compileCustomIDPattern("/literal/\xff")
+	require.ErrorIs(t, err, ErrInvalidCustomIDPattern)
+}
+
 func TestCustomIDLengthUsesUnicodeCodePoints(t *testing.T) {
 	pattern, err := compileCustomIDPattern("/id/{value}")
 	require.NoError(t, err)
@@ -64,6 +71,47 @@ type customIDStructValues struct {
 	RoleID    uint64
 	MaxActive int    `rave:"max-active"`
 	Ignored   string `rave:"-"`
+}
+
+type duplicateCustomIDStructValues struct {
+	ID    string
+	Alias string `rave:"id"`
+}
+
+type schemaTextMarshalerValue struct{}
+
+func (schemaTextMarshalerValue) MarshalText() ([]byte, error) { return []byte("text"), nil }
+
+type schemaStringerValue struct{}
+
+func (schemaStringerValue) String() string { return "string" }
+
+type pointerOnlySchemaStringerValue struct{}
+
+func (*pointerOnlySchemaStringerValue) String() string { return "pointer-string" }
+
+type supportedCustomIDSchemaValues struct {
+	TextMarshaler          schemaTextMarshalerValue
+	Stringer               schemaStringerValue
+	TextMarshalerInterface encoding.TextMarshaler
+	StringerInterface      fmt.Stringer
+	String                 string
+	Bool                   bool
+	Int                    int
+	Int8                   int8
+	Int16                  int16
+	Int32                  int32
+	Int64                  int64
+	Uint                   uint
+	Uint8                  uint8
+	Uint16                 uint16
+	Uint32                 uint32
+	Uint64                 uint64
+	Uintptr                uintptr
+	Float32                float32
+	Float64                float64
+	Pointer                **string
+	PointerStringer        *pointerOnlySchemaStringerValue
 }
 
 func TestVarsFromStructUsesRaveNamingRules(t *testing.T) {
@@ -96,6 +144,72 @@ func TestValidateCustomIDSchemaAcceptsOnlyExactVarsType(t *testing.T) {
 
 	require.NoError(t, validateCustomIDSchema[Vars](pattern))
 	require.ErrorIs(t, validateCustomIDSchema[*Vars](pattern), ErrInvalidCustomIDValues)
+}
+
+func TestValidateCustomIDSchemaAcceptsEncoderDispatchTypes(t *testing.T) {
+	pattern, err := compileCustomIDPattern("/id/{text-marshaler}/{stringer}/{text-marshaler-interface}/{stringer-interface}/{string}/{bool}/{int}/{int8}/{int16}/{int32}/{int64}/{uint}/{uint8}/{uint16}/{uint32}/{uint64}/{uintptr}/{float32}/{float64}/{pointer}/{pointer-stringer}")
+	require.NoError(t, err)
+
+	require.NoError(t, validateCustomIDSchema[supportedCustomIDSchemaValues](pattern))
+}
+
+func TestValidateCustomIDSchemaRejectsUnsupportedFieldTypes(t *testing.T) {
+	pattern, err := compileCustomIDPattern("/button/{id}")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name     string
+		validate func() error
+	}{
+		{
+			name: "slice",
+			validate: func() error {
+				type values struct{ ID []byte }
+				return validateCustomIDSchema[values](pattern)
+			},
+		},
+		{
+			name: "interface",
+			validate: func() error {
+				type values struct{ ID any }
+				return validateCustomIDSchema[values](pattern)
+			},
+		},
+		{
+			name: "struct",
+			validate: func() error {
+				type values struct{ ID struct{} }
+				return validateCustomIDSchema[values](pattern)
+			},
+		},
+		{
+			name: "scalar with pointer-only stringer",
+			validate: func() error {
+				type values struct {
+					ID pointerOnlySchemaStringerValue
+				}
+				return validateCustomIDSchema[values](pattern)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			require.ErrorIs(t, test.validate(), ErrInvalidCustomIDValues)
+		})
+	}
+}
+
+func TestValidateCustomIDSchemaRejectsDuplicateResolvedNames(t *testing.T) {
+	pattern, err := compileCustomIDPattern("/button/{id}")
+	require.NoError(t, err)
+
+	require.ErrorIs(t, validateCustomIDSchema[duplicateCustomIDStructValues](pattern), ErrInvalidCustomIDValues)
+}
+
+func TestVarsFromStructRejectsDuplicateResolvedNames(t *testing.T) {
+	_, err := varsFromStruct(duplicateCustomIDStructValues{ID: "first", Alias: "second"})
+	require.ErrorIs(t, err, ErrInvalidCustomIDValues)
 }
 
 func TestEncodeCustomIDValueRejectsNilUnsupportedAndSlash(t *testing.T) {
@@ -135,6 +249,14 @@ type emptyCustomStringValue struct{}
 
 func (emptyCustomStringValue) String() string { return "" }
 
+type invalidUTF8CustomTextValue struct{}
+
+func (invalidUTF8CustomTextValue) MarshalText() ([]byte, error) { return []byte{0xff}, nil }
+
+type invalidUTF8CustomStringValue struct{}
+
+func (invalidUTF8CustomStringValue) String() string { return "\xff" }
+
 func TestCustomIDFromVarsRejectsEmptyEncodedValues(t *testing.T) {
 	pattern, err := compileCustomIDPattern("/id/{value}")
 	require.NoError(t, err)
@@ -146,6 +268,27 @@ func TestCustomIDFromVarsRejectsEmptyEncodedValues(t *testing.T) {
 		{name: "string", value: ""},
 		{name: "text marshaler", value: emptyCustomTextValue{}},
 		{name: "stringer", value: emptyCustomStringValue{}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := customIDFromVars(pattern, Vars{"value": test.value})
+			require.ErrorIs(t, err, ErrInvalidCustomIDValues)
+		})
+	}
+}
+
+func TestCustomIDFromVarsRejectsInvalidUTF8EncodedValues(t *testing.T) {
+	pattern, err := compileCustomIDPattern("/id/{value}")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name  string
+		value any
+	}{
+		{name: "string", value: "\xff"},
+		{name: "text marshaler", value: invalidUTF8CustomTextValue{}},
+		{name: "stringer", value: invalidUTF8CustomStringValue{}},
 	}
 
 	for _, test := range tests {

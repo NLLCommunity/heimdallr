@@ -1,6 +1,7 @@
 package rave
 
 import (
+	"math"
 	"strconv"
 	"unicode"
 	"unicode/utf8"
@@ -8,6 +9,18 @@ import (
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/omit"
+)
+
+const (
+	discordMaxCommandOptions     = 25
+	discordMaxCommandChoices     = 25
+	discordMaxStringOptionLength = 6000
+	discordMaxChoiceNameLength   = 100
+	discordMaxStringChoiceLength = 100
+	discordMaxIntegerChoiceValue = 1<<53 - 1
+	discordMinIntegerChoiceValue = -discordMaxIntegerChoiceValue
+	discordMaxNumberChoiceValue  = 1 << 53
+	discordMinNumberChoiceValue  = -discordMaxNumberChoiceValue
 )
 
 type SlashCommandBuilder struct {
@@ -350,11 +363,11 @@ func (s *optionString) WithMaxLength(max int) *optionString {
 func (s *optionString) build() discord.ApplicationCommandOption {
 	s.validateBase("option")
 
-	if s.minLength != nil && *s.minLength < 0 {
+	if s.minLength != nil && (*s.minLength < 0 || *s.minLength > discordMaxStringOptionLength) {
 		panic("invalid Discord command option min length: " + strconv.Itoa(*s.minLength))
 	}
 
-	if s.maxLength != nil && *s.maxLength < 1 {
+	if s.maxLength != nil && (*s.maxLength < 1 || *s.maxLength > discordMaxStringOptionLength) {
 		panic("invalid Discord command option max length: " + strconv.Itoa(*s.maxLength))
 	}
 
@@ -362,9 +375,10 @@ func (s *optionString) build() discord.ApplicationCommandOption {
 		panic("invalid Discord command option min/max length: min length cannot be greater than max length")
 	}
 
-	if len(s.choices) > 25 {
+	if !validDiscordChoiceCount(len(s.choices)) {
 		panic("invalid Discord command option choices: cannot have more than 25 choices")
 	}
+	validateDiscordStringChoices(s.choices)
 
 	if len(s.choices) > 0 && s.autocompleteHandler != nil {
 		panic("invalid Discord command option: cannot have both choices and autocomplete enabled")
@@ -438,10 +452,17 @@ func (i *optionInt) build() discord.ApplicationCommandOption {
 	if i.minValue != nil && i.maxValue != nil && *i.minValue > *i.maxValue {
 		panic("invalid Discord command option min/max value: min value cannot be greater than max value")
 	}
+	if i.minValue != nil && !validDiscordIntegerChoiceValue(*i.minValue) {
+		panic("invalid Discord command option min value")
+	}
+	if i.maxValue != nil && !validDiscordIntegerChoiceValue(*i.maxValue) {
+		panic("invalid Discord command option max value")
+	}
 
-	if len(i.choices) > 25 {
+	if !validDiscordChoiceCount(len(i.choices)) {
 		panic("invalid Discord command option choices: cannot have more than 25 choices")
 	}
+	validateDiscordIntegerChoices(i.choices)
 
 	if len(i.choices) > 0 && i.autocompleteHandler != nil {
 		panic("invalid Discord command option: cannot have both choices and autocomplete enabled")
@@ -637,9 +658,16 @@ func (f *optionFloat) build() discord.ApplicationCommandOption {
 	if f.minValue != nil && f.maxValue != nil && *f.minValue > *f.maxValue {
 		panic("invalid Discord command option min/max value: min value cannot be greater than max value")
 	}
-	if len(f.choices) > 25 {
+	if f.minValue != nil && !validDiscordNumberChoiceValue(*f.minValue) {
+		panic("invalid Discord command option min value")
+	}
+	if f.maxValue != nil && !validDiscordNumberChoiceValue(*f.maxValue) {
+		panic("invalid Discord command option max value")
+	}
+	if !validDiscordChoiceCount(len(f.choices)) {
 		panic("invalid Discord command option choices: cannot have more than 25 choices")
 	}
+	validateDiscordNumberChoices(f.choices)
 	if len(f.choices) > 0 && f.autocompleteHandler != nil {
 		panic("invalid Discord command option: cannot have both choices and autocomplete enabled")
 	}
@@ -685,7 +713,78 @@ func OptionAttachment(name, description string) *optionAttachment {
 	return o
 }
 
+func validDiscordChoiceCount(count int) bool {
+	return count <= discordMaxCommandChoices
+}
+
+func validDiscordChoiceName(name string) bool {
+	return validUTF8RuneLength(name, 1, discordMaxChoiceNameLength)
+}
+
+func validDiscordStringChoiceValue(value string) bool {
+	return validUTF8RuneLength(value, 0, discordMaxStringChoiceLength)
+}
+
+func validDiscordIntegerChoiceValue(value int) bool {
+	return value >= discordMinIntegerChoiceValue && value <= discordMaxIntegerChoiceValue
+}
+
+func validDiscordNumberChoiceValue(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0) &&
+		value >= discordMinNumberChoiceValue && value <= discordMaxNumberChoiceValue
+}
+
+func validUTF8RuneLength(value string, minLength, maxLength int) bool {
+	if !utf8.ValidString(value) {
+		return false
+	}
+	length := utf8.RuneCountInString(value)
+	return length >= minLength && length <= maxLength
+}
+
+func validateDiscordChoiceNames(name string, localizations map[discord.Locale]string) {
+	if !validDiscordChoiceName(name) {
+		panic("invalid Discord command option choice name: " + name)
+	}
+	for _, localization := range localizations {
+		if !validDiscordChoiceName(localization) {
+			panic("invalid Discord command option choice name localization: " + localization)
+		}
+	}
+}
+
+func validateDiscordStringChoices(choices []discord.ApplicationCommandOptionChoiceString) {
+	for _, choice := range choices {
+		validateDiscordChoiceNames(choice.Name, choice.NameLocalizations)
+		if !validDiscordStringChoiceValue(choice.Value) {
+			panic("invalid Discord string command option choice value")
+		}
+	}
+}
+
+func validateDiscordIntegerChoices(choices []discord.ApplicationCommandOptionChoiceInt) {
+	for _, choice := range choices {
+		validateDiscordChoiceNames(choice.Name, choice.NameLocalizations)
+		if !validDiscordIntegerChoiceValue(choice.Value) {
+			panic("invalid Discord integer command option choice value")
+		}
+	}
+}
+
+func validateDiscordNumberChoices(choices []discord.ApplicationCommandOptionChoiceFloat) {
+	for _, choice := range choices {
+		validateDiscordChoiceNames(choice.Name, choice.NameLocalizations)
+		if !validDiscordNumberChoiceValue(choice.Value) {
+			panic("invalid Discord number command option choice value")
+		}
+	}
+}
+
 func validateCommandOptions(options []CommandOption) {
+	if len(options) > discordMaxCommandOptions {
+		panic("invalid Discord command options: cannot have more than 25 options")
+	}
+
 	names := make(map[string]struct{}, len(options))
 	hasPrimitive := false
 	hasNested := false
@@ -748,25 +847,24 @@ func validateCommandDefinition(
 
 // validDiscordName validates a Discord command option name:
 // - 1 to 32 characters
-// - No capital letters
-// - Only lowercase letters, digits, hyphens, and underscores
+// - No rune with a distinct lowercase mapping
+// - Letters, numbers, Devanagari/Thai script runes, hyphens, underscores, and apostrophes
 func validDiscordName(name string) bool {
-	if !utf8.ValidString(name) {
-		return false
-	}
-	length := utf8.RuneCountInString(name)
-	if length < 1 || length > 32 {
+	if !validUTF8RuneLength(name, 1, 32) {
 		return false
 	}
 
-	// rune range covers Unicode edge cases (e.g., multi-byte UTF-8)
 	for _, r := range name {
+		if unicode.ToLower(r) != r {
+			return false
+		}
 		switch {
-		case unicode.IsLower(r):
-		case unicode.IsDigit(r):
-		case r == '-' || r == '_':
+		case r == '-' || r == '_' || r == '\'':
+		case unicode.IsLetter(r):
+		case unicode.IsNumber(r):
+		case unicode.In(r, unicode.Devanagari, unicode.Thai):
 		default:
-			return false // rejects caps, spaces, symbols
+			return false
 		}
 	}
 	return true

@@ -27,8 +27,31 @@ type customIDPattern struct {
 	names        map[string]struct{}
 }
 
+func (p customIDPattern) matchesExactly(customID string) bool {
+	if !strings.HasPrefix(customID, "/") {
+		return false
+	}
+
+	segments := strings.Split(strings.TrimPrefix(customID, "/"), "/")
+	if len(segments) != len(p.segments) {
+		return false
+	}
+	for index, segment := range p.segments {
+		if _, placeholder := p.placeholders[index]; placeholder {
+			if segments[index] == "" {
+				return false
+			}
+			continue
+		}
+		if segments[index] != segment {
+			return false
+		}
+	}
+	return true
+}
+
 func compileCustomIDPattern(pattern string) (customIDPattern, error) {
-	if pattern == "" || !strings.HasPrefix(pattern, "/") {
+	if !utf8.ValidString(pattern) || pattern == "" || !strings.HasPrefix(pattern, "/") {
 		return customIDPattern{}, fmt.Errorf("%w: %q", ErrInvalidCustomIDPattern, pattern)
 	}
 
@@ -74,6 +97,9 @@ func customIDFromVars(pattern customIDPattern, values Vars) (string, error) {
 		encoded, err := encodeCustomIDValue(values[name])
 		if err != nil {
 			return "", fmt.Errorf("%w: %s: %v", ErrInvalidCustomIDValues, name, err)
+		}
+		if !utf8.ValidString(encoded) {
+			return "", fmt.Errorf("%w: %s is not valid UTF-8", ErrInvalidCustomIDValues, name)
 		}
 		if encoded == "" {
 			return "", fmt.Errorf("%w: %s is empty", ErrInvalidCustomIDValues, name)
@@ -133,6 +159,30 @@ func encodeCustomIDValue(value any) (string, error) {
 	}
 }
 
+func customIDTypeUsesCustomEncoder(typeOfValue reflect.Type) bool {
+	return typeOfValue.Implements(reflect.TypeFor[encoding.TextMarshaler]()) ||
+		typeOfValue.Implements(reflect.TypeFor[fmt.Stringer]())
+}
+
+func isCustomIDTypeEncodable(typeOfValue reflect.Type) bool {
+	if customIDTypeUsesCustomEncoder(typeOfValue) {
+		return true
+	}
+	for typeOfValue.Kind() == reflect.Pointer {
+		typeOfValue = typeOfValue.Elem()
+	}
+
+	switch typeOfValue.Kind() {
+	case reflect.String, reflect.Bool,
+		reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64,
+		reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64, reflect.Uintptr,
+		reflect.Float32, reflect.Float64:
+		return true
+	default:
+		return false
+	}
+}
+
 func varsFromStruct(value any) (Vars, error) {
 	if value == nil {
 		return nil, fmt.Errorf("%w: expected struct, got nil", ErrInvalidCustomIDValues)
@@ -160,6 +210,9 @@ func varsFromStruct(value any) (Vars, error) {
 		if !ok {
 			continue
 		}
+		if _, exists := values[name]; exists {
+			return nil, fmt.Errorf("%w: duplicate %q", ErrInvalidCustomIDValues, name)
+		}
 		values[name] = reflected.Field(index).Interface()
 	}
 	return values, nil
@@ -184,9 +237,16 @@ func validateCustomIDSchema[T any](pattern customIDPattern) error {
 			continue
 		}
 		name, ok := optionName(field)
-		if ok {
-			names[name] = struct{}{}
+		if !ok {
+			continue
 		}
+		if _, exists := names[name]; exists {
+			return fmt.Errorf("%w: duplicate %q", ErrInvalidCustomIDValues, name)
+		}
+		if !isCustomIDTypeEncodable(field.Type) {
+			return fmt.Errorf("%w: %s has unsupported type %s", ErrInvalidCustomIDValues, name, field.Type)
+		}
+		names[name] = struct{}{}
 	}
 
 	for name := range pattern.names {

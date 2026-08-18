@@ -3,7 +3,9 @@ package rave
 import (
 	"errors"
 	"fmt"
+	"reflect"
 	"sync"
+	"unsafe"
 
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
@@ -37,6 +39,7 @@ type RaveClient struct {
 	bundleMu             sync.Mutex
 	bundlesInstalled     bool
 	installedBundleCount int
+	installedBundles     []BundledInteractions
 	installedCommands    []discord.ApplicationCommandCreate
 }
 
@@ -62,6 +65,9 @@ func (c *RaveClient) RegisterAndSyncBundlesGlobal(interactions ...BundledInterac
 	return c.RegisterAndSyncBundles(nil, interactions...)
 }
 
+// RegisterAndSyncBundles installs and synchronizes the supplied bundles. Retry
+// calls must reuse the exact same stored function values in the same order;
+// freshly evaluated equivalent closures are rejected.
 func (c *RaveClient) RegisterAndSyncBundles(guilds []snowflake.ID, interactions ...BundledInteractions) error {
 	c.bundleMu.Lock()
 	defer c.bundleMu.Unlock()
@@ -71,6 +77,7 @@ func (c *RaveClient) RegisterAndSyncBundles(guilds []snowflake.ID, interactions 
 			c.installedCommands = append(c.installedCommands, register(c.Router)...)
 		}
 		c.installedBundleCount = len(interactions)
+		c.installedBundles = append([]BundledInteractions(nil), interactions...)
 		c.bundlesInstalled = true
 	} else if len(interactions) != c.installedBundleCount {
 		return fmt.Errorf(
@@ -78,7 +85,40 @@ func (c *RaveClient) RegisterAndSyncBundles(guilds []snowflake.ID, interactions 
 			c.installedBundleCount,
 			len(interactions),
 		)
+	} else if !sameBundleIdentities(c.installedBundles, interactions) {
+		return errors.New("bundle installation already initialized with different bundles")
 	}
 
 	return handler.SyncCommands(c.Client, c.installedCommands, guilds)
+}
+
+type bundledInteractionIdentity struct {
+	entry uintptr
+	value uintptr
+}
+
+func sameBundleIdentities(installed, bundles []BundledInteractions) bool {
+	if len(installed) != len(bundles) {
+		return false
+	}
+	for i, bundle := range bundles {
+		if bundleIdentity(installed[i]) != bundleIdentity(bundle) {
+			return false
+		}
+	}
+	return true
+}
+
+func bundleIdentity(bundle BundledInteractions) bundledInteractionIdentity {
+	return bundledInteractionIdentity{
+		entry: reflect.ValueOf(bundle).Pointer(),
+		value: functionValuePointer(bundle),
+	}
+}
+
+// functionValuePointer returns the runtime func-value allocation backing bundle.
+// Go does not guarantee this representation, so this process-local identity is
+// intentionally isolated and paired with the documented function entry pointer.
+func functionValuePointer(bundle BundledInteractions) uintptr {
+	return uintptr(*(*unsafe.Pointer)(unsafe.Pointer(&bundle)))
 }

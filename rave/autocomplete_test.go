@@ -2,6 +2,9 @@ package rave_test
 
 import (
 	"errors"
+	"fmt"
+	"math"
+	"strings"
 	"testing"
 
 	"github.com/disgoorg/disgo/discord"
@@ -16,6 +19,7 @@ import (
 type capturedAutocompleteResponse struct {
 	responseType discord.InteractionResponseType
 	data         discord.InteractionResponseData
+	calls        int
 }
 
 func newAutocompleteInteractionEvent(
@@ -36,6 +40,7 @@ func newAutocompleteInteractionEvent(
 				data discord.InteractionResponseData,
 				_ ...rest.RequestOpt,
 			) error {
+				captured.calls++
 				captured.responseType = responseType
 				captured.data = data
 				return nil
@@ -43,6 +48,98 @@ func newAutocompleteInteractionEvent(
 		},
 		Vars: make(map[string]string),
 	}
+}
+
+func dispatchStringAutocomplete(t *testing.T, choices []rave.Choice[string]) (*capturedAutocompleteResponse, error) {
+	t.Helper()
+
+	mux := handler.New()
+	rave.Slash("search", "Search messages").
+		Handle(noopCommandHandler).
+		AddOptions(
+			rave.OptionString("query", "Search query").
+				Autocomplete(func(rave.AutocompleteContext[string]) ([]rave.Choice[string], error) {
+					return choices, nil
+				}),
+		).
+		Register(mux)
+
+	captured := &capturedAutocompleteResponse{}
+	err := mux.Handle("/search", newAutocompleteInteractionEvent("search", map[string]discord.AutocompleteOption{
+		"query": {
+			Name:    "query",
+			Type:    discord.ApplicationCommandOptionTypeString,
+			Value:   []byte(`"query"`),
+			Focused: true,
+		},
+	}, captured))
+	return captured, err
+}
+
+func dispatchIntAutocomplete(t *testing.T, choices []rave.Choice[int]) (*capturedAutocompleteResponse, error) {
+	t.Helper()
+
+	mux := handler.New()
+	rave.Slash("search", "Search messages").
+		Handle(noopCommandHandler).
+		AddOptions(
+			rave.OptionInt("limit", "Result limit").
+				Autocomplete(func(rave.AutocompleteContext[int]) ([]rave.Choice[int], error) {
+					return choices, nil
+				}),
+		).
+		Register(mux)
+
+	captured := &capturedAutocompleteResponse{}
+	err := mux.Handle("/search", newAutocompleteInteractionEvent("search", map[string]discord.AutocompleteOption{
+		"limit": {
+			Name:    "limit",
+			Type:    discord.ApplicationCommandOptionTypeInt,
+			Value:   []byte(`1`),
+			Focused: true,
+		},
+	}, captured))
+	return captured, err
+}
+
+func dispatchFloatAutocomplete(t *testing.T, choices []rave.Choice[float64]) (*capturedAutocompleteResponse, error) {
+	t.Helper()
+
+	mux := handler.New()
+	rave.Slash("search", "Search messages").
+		Handle(noopCommandHandler).
+		AddOptions(
+			rave.OptionFloat("factor", "Scale factor").
+				Autocomplete(func(rave.AutocompleteContext[float64]) ([]rave.Choice[float64], error) {
+					return choices, nil
+				}),
+		).
+		Register(mux)
+
+	captured := &capturedAutocompleteResponse{}
+	err := mux.Handle("/search", newAutocompleteInteractionEvent("search", map[string]discord.AutocompleteOption{
+		"factor": {
+			Name:    "factor",
+			Type:    discord.ApplicationCommandOptionTypeFloat,
+			Value:   []byte(`1`),
+			Focused: true,
+		},
+	}, captured))
+	return captured, err
+}
+
+func requireInvalidAutocompleteChoice(
+	t *testing.T,
+	err error,
+	captured *capturedAutocompleteResponse,
+	index int,
+	field string,
+) {
+	t.Helper()
+
+	require.ErrorIs(t, err, rave.ErrInvalidAutocompleteChoice)
+	require.ErrorContains(t, err, fmt.Sprintf("at index %d: invalid %s", index, field))
+	require.Zero(t, captured.calls)
 }
 
 func muxHasAutocompleteRoute(mux handler.Router, path string) bool {
@@ -224,6 +321,121 @@ func TestAutocompleteRejectsMoreThanTwentyFiveChoices(t *testing.T) {
 	err := mux.Handle("/search", event)
 
 	require.ErrorIs(t, err, rave.ErrTooManyAutocompleteChoices)
+}
+
+func TestAutocompleteRejectsInvalidChoiceNames(t *testing.T) {
+	cases := []struct {
+		name    string
+		choices []rave.Choice[string]
+		field   string
+	}{
+		{name: "empty", choices: []rave.Choice[string]{{Name: "First", Value: "first"}, {Name: "", Value: "value"}}, field: "name"},
+		{name: "100 runes", choices: []rave.Choice[string]{{Name: strings.Repeat("界", 100), Value: "value"}}},
+		{name: "101 runes", choices: []rave.Choice[string]{{Name: "First", Value: "first"}, {Name: strings.Repeat("界", 101), Value: "value"}}, field: "name"},
+		{name: "invalid UTF-8", choices: []rave.Choice[string]{{Name: "First", Value: "first"}, {Name: string([]byte{0xff}), Value: "value"}}, field: "name"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			captured, err := dispatchStringAutocomplete(t, tc.choices)
+
+			if tc.field != "" {
+				requireInvalidAutocompleteChoice(t, err, captured, 1, tc.field)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, 1, captured.calls)
+		})
+	}
+}
+
+func TestAutocompleteRejectsInvalidStringChoiceValues(t *testing.T) {
+	cases := []struct {
+		name    string
+		choices []rave.Choice[string]
+		field   string
+	}{
+		{name: "empty", choices: []rave.Choice[string]{{Name: "Choice", Value: ""}}},
+		{name: "100 runes", choices: []rave.Choice[string]{{Name: "Choice", Value: strings.Repeat("界", 100)}}},
+		{name: "101 runes", choices: []rave.Choice[string]{{Name: "First", Value: "first"}, {Name: "Choice", Value: strings.Repeat("界", 101)}}, field: "value"},
+		{name: "invalid UTF-8", choices: []rave.Choice[string]{{Name: "First", Value: "first"}, {Name: "Choice", Value: string([]byte{0xff})}}, field: "value"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			captured, err := dispatchStringAutocomplete(t, tc.choices)
+
+			if tc.field != "" {
+				requireInvalidAutocompleteChoice(t, err, captured, 1, tc.field)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, 1, captured.calls)
+		})
+	}
+}
+
+func TestAutocompleteRejectsOutOfRangeIntegerChoiceValues(t *testing.T) {
+	const maxSafeInteger = 1<<53 - 1
+
+	cases := []struct {
+		name    string
+		choices []rave.Choice[int]
+		field   string
+	}{
+		{name: "minimum", choices: []rave.Choice[int]{{Name: "Minimum", Value: -maxSafeInteger}}},
+		{name: "maximum", choices: []rave.Choice[int]{{Name: "Maximum", Value: maxSafeInteger}}},
+		{name: "below minimum", choices: []rave.Choice[int]{{Name: "First", Value: 1}, {Name: "Below", Value: -maxSafeInteger - 1}}, field: "value"},
+		{name: "above maximum", choices: []rave.Choice[int]{{Name: "First", Value: 1}, {Name: "Above", Value: maxSafeInteger + 1}}, field: "value"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			captured, err := dispatchIntAutocomplete(t, tc.choices)
+
+			if tc.field != "" {
+				requireInvalidAutocompleteChoice(t, err, captured, 1, tc.field)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, 1, captured.calls)
+		})
+	}
+}
+
+func TestAutocompleteRejectsInvalidNumberChoiceValues(t *testing.T) {
+	const maxNumber = 1 << 53
+
+	cases := []struct {
+		name    string
+		choices []rave.Choice[float64]
+		field   string
+	}{
+		{name: "minimum", choices: []rave.Choice[float64]{{Name: "Minimum", Value: -maxNumber}}},
+		{name: "maximum", choices: []rave.Choice[float64]{{Name: "Maximum", Value: maxNumber}}},
+		{name: "below minimum", choices: []rave.Choice[float64]{{Name: "First", Value: 1}, {Name: "Below", Value: math.Nextafter(-maxNumber, math.Inf(-1))}}, field: "value"},
+		{name: "above maximum", choices: []rave.Choice[float64]{{Name: "First", Value: 1}, {Name: "Above", Value: math.Nextafter(maxNumber, math.Inf(1))}}, field: "value"},
+		{name: "NaN", choices: []rave.Choice[float64]{{Name: "First", Value: 1}, {Name: "NaN", Value: math.NaN()}}, field: "value"},
+		{name: "positive infinity", choices: []rave.Choice[float64]{{Name: "First", Value: 1}, {Name: "Positive infinity", Value: math.Inf(1)}}, field: "value"},
+		{name: "negative infinity", choices: []rave.Choice[float64]{{Name: "First", Value: 1}, {Name: "Negative infinity", Value: math.Inf(-1)}}, field: "value"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			captured, err := dispatchFloatAutocomplete(t, tc.choices)
+
+			if tc.field != "" {
+				requireInvalidAutocompleteChoice(t, err, captured, 1, tc.field)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, 1, captured.calls)
+		})
+	}
 }
 
 func TestAutocompleteRouteIsNotRegisteredWithoutAutocompleteOptions(t *testing.T) {

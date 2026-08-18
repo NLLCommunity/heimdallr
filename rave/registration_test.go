@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/stretchr/testify/require"
 
@@ -36,6 +37,77 @@ func noopUserCommandHandler(discord.UserCommandInteractionData, *handler.Command
 
 func noopMessageCommandHandler(discord.MessageCommandInteractionData, *handler.CommandEvent) error {
 	return nil
+}
+
+func dispatchInteraction(t *testing.T, router handler.Router, rawInteraction string) {
+	t.Helper()
+	interaction, err := discord.UnmarshalInteraction([]byte(rawInteraction))
+	require.NoError(t, err)
+	router.OnEvent(&events.InteractionCreate{Interaction: interaction})
+}
+
+func TestGenericCommandHandlersDispatchSameNameByTypeInAnyRegistrationOrder(t *testing.T) {
+	tests := []struct {
+		name  string
+		order []string
+	}{
+		{name: "slash first", order: []string{"slash", "user", "message"}},
+		{name: "message first", order: []string{"message", "user", "slash"}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			router := handler.New()
+			var calls []string
+			register := map[string]func(){
+				"slash": func() {
+					rave.Slash("inspect", "Inspect something").
+						Handle(func(*handler.CommandEvent) error {
+							calls = append(calls, "slash")
+							return nil
+						}).
+						Register(router)
+				},
+				"user": func() {
+					rave.UserCommand("inspect").
+						Handle(func(*handler.CommandEvent) error {
+							calls = append(calls, "user")
+							return nil
+						}).
+						Register(router)
+				},
+				"message": func() {
+					rave.MessageCommand("inspect").
+						Handle(func(*handler.CommandEvent) error {
+							calls = append(calls, "message")
+							return nil
+						}).
+						Register(router)
+				},
+			}
+			for _, commandType := range tt.order {
+				register[commandType]()
+			}
+
+			dispatchInteraction(t, router, `{
+				"id":"1","application_id":"2","type":2,"token":"token","version":1,
+				"data":{"id":"3","name":"inspect","type":1}
+			}`)
+			require.Equal(t, []string{"slash"}, calls)
+
+			dispatchInteraction(t, router, `{
+				"id":"4","application_id":"2","type":2,"token":"token","version":1,
+				"data":{"id":"5","name":"inspect","type":2,"target_id":"6","resolved":{}}
+			}`)
+			require.Equal(t, []string{"slash", "user"}, calls)
+
+			dispatchInteraction(t, router, `{
+				"id":"7","application_id":"2","type":2,"token":"token","version":1,
+				"data":{"id":"8","name":"inspect","type":3,"target_id":"9","resolved":{}}
+			}`)
+			require.Equal(t, []string{"slash", "user", "message"}, calls)
+		})
+	}
 }
 
 func TestSlashCommandRegisterRegistersTypedHandlerOnlyForSlashCommands(t *testing.T) {
@@ -114,7 +186,7 @@ func TestUserCommandRegisterRegistersGenericHandler(t *testing.T) {
 
 	require.IsType(t, discord.UserCommandCreate{}, built)
 	require.True(t, muxHasCommandRouteForType(mux, "/Approve", discord.ApplicationCommandTypeUser))
-	require.True(t, muxHasCommandRouteForType(mux, "/Approve", discord.ApplicationCommandTypeSlash))
+	require.False(t, muxHasCommandRouteForType(mux, "/Approve", discord.ApplicationCommandTypeSlash))
 }
 
 func TestUserCommandRegisterRegistersTypedHandlerOnlyForUserCommands(t *testing.T) {
@@ -165,7 +237,7 @@ func TestMessageCommandRegisterRegistersGenericHandler(t *testing.T) {
 
 	require.IsType(t, discord.MessageCommandCreate{}, built)
 	require.True(t, muxHasCommandRouteForType(mux, "/Report Message", discord.ApplicationCommandTypeMessage))
-	require.True(t, muxHasCommandRouteForType(mux, "/Report Message", discord.ApplicationCommandTypeSlash))
+	require.False(t, muxHasCommandRouteForType(mux, "/Report Message", discord.ApplicationCommandTypeSlash))
 }
 
 func TestMessageCommandRegisterRegistersTypedHandlerOnlyForMessageCommands(t *testing.T) {

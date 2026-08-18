@@ -77,7 +77,9 @@ func ParseSlashCommandArgs[T any](e *handler.CommandEvent) (data *T, err error) 
 
 		if g, ok := parserTypeGetters[baseType]; ok {
 			if v, ok := g(scid, name); ok {
-				setValue(targetFieldValue, v, ptrDepth)
+				if err := setValue(targetFieldValue, v, ptrDepth); err != nil {
+					return nil, unsupportedFieldTypeError(targetField, name, err)
+				}
 			}
 			continue
 		}
@@ -85,7 +87,9 @@ func ParseSlashCommandArgs[T any](e *handler.CommandEvent) (data *T, err error) 
 		switch baseType.Kind() {
 		case reflect.Bool:
 			if v, ok := scid.OptBool(name); ok {
-				setValue(targetFieldValue, v, ptrDepth)
+				if err := setValue(targetFieldValue, v, ptrDepth); err != nil {
+					return nil, unsupportedFieldTypeError(targetField, name, err)
+				}
 			}
 		case reflect.Float32, reflect.Float64:
 			if v, ok := scid.OptFloat(name); ok {
@@ -107,16 +111,12 @@ func ParseSlashCommandArgs[T any](e *handler.CommandEvent) (data *T, err error) 
 			}
 		case reflect.String:
 			if v, ok := scid.OptString(name); ok {
-				setValue(targetFieldValue, v, ptrDepth)
+				if err := setValue(targetFieldValue, v, ptrDepth); err != nil {
+					return nil, unsupportedFieldTypeError(targetField, name, err)
+				}
 			}
 		default:
-			return nil, fmt.Errorf(
-				"%w: field %s (option %q) has type %s",
-				ErrUnsupportedFieldType,
-				targetField.Name,
-				name,
-				targetField.Type,
-			)
+			return nil, unsupportedFieldTypeError(targetField, name, nil)
 		}
 	}
 
@@ -179,24 +179,49 @@ func derefType(t reflect.Type) (baseType reflect.Type, ptrDepth int) {
 	return
 }
 
-func setValue(field reflect.Value, v any, ptrDepth int) {
-	value := reflect.ValueOf(v)
+func setValue(field reflect.Value, source any, ptrDepth int) error {
+	declaredLeaf, _ := derefType(field.Type())
+	sourceValue := reflect.ValueOf(source)
+	if !sourceValue.IsValid() {
+		return errors.New("cannot assign an untyped nil value")
+	}
+
+	value := reflect.New(declaredLeaf).Elem()
+	if sourceValue.Type().AssignableTo(declaredLeaf) {
+		value.Set(sourceValue)
+	} else if sourceValue.Type().ConvertibleTo(declaredLeaf) {
+		value.Set(sourceValue.Convert(declaredLeaf))
+	} else {
+		return fmt.Errorf("cannot assign %s to %s", sourceValue.Type(), declaredLeaf)
+	}
 
 	for range ptrDepth {
-		newPtr := reflect.New(value.Type())
-		newPtr.Elem().Set(value)
-		value = newPtr
+		pointer := reflect.New(value.Type())
+		pointer.Elem().Set(value)
+		value = pointer
 	}
+	field.Set(value)
+	return nil
+}
 
-	if value.Type().AssignableTo(field.Type()) {
-		field.Set(value)
-		return
+func unsupportedFieldTypeError(field reflect.StructField, optionName string, cause error) error {
+	if cause == nil {
+		return fmt.Errorf(
+			"%w: field %s (option %q) has type %s",
+			ErrUnsupportedFieldType,
+			field.Name,
+			optionName,
+			field.Type,
+		)
 	}
-
-	if value.Type().ConvertibleTo(field.Type()) {
-		field.Set(value.Convert(field.Type()))
-		return
-	}
+	return fmt.Errorf(
+		"%w: field %s (option %q) has type %s: %v",
+		ErrUnsupportedFieldType,
+		field.Name,
+		optionName,
+		field.Type,
+		cause,
+	)
 }
 
 func numericConversionError(field reflect.StructField, optionName string, err error) error {

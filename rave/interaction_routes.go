@@ -1,7 +1,6 @@
 package rave
 
 import (
-	"encoding"
 	"fmt"
 	"reflect"
 	"unicode/utf8"
@@ -136,8 +135,7 @@ func typedPlaceholderMinimumRunes[T any]() map[string]int {
 func encodedTypeMinimumRunes(typeOfValue reflect.Type) int {
 	// encodeCustomIDValue checks these interfaces on the original value before
 	// dereferencing pointers, so the schema check must use the same dispatch order.
-	if typeOfValue.Implements(reflect.TypeFor[encoding.TextMarshaler]()) ||
-		typeOfValue.Implements(reflect.TypeFor[fmt.Stringer]()) {
+	if !isCustomIDTypeEncodable(typeOfValue) || customIDTypeUsesCustomEncoder(typeOfValue) {
 		return 1
 	}
 	for typeOfValue.Kind() == reflect.Pointer {
@@ -178,11 +176,25 @@ func (r *ComponentRouteBuilder[T]) register(router handler.Router) (command disc
 		panic(err)
 	}
 	if r.buttonHandler != nil {
-		router.ButtonComponent(r.pattern, r.buttonHandler)
+		router.Route(r.pattern, func(exact handler.Router) {
+			exact.ButtonComponent("/", func(e discord.ButtonInteractionData, event *handler.ComponentEvent) error {
+				if !pattern.matchesExactly(event.Data.CustomID()) {
+					return nil
+				}
+				return r.buttonHandler(e, event)
+			})
+		})
 		return
 	}
 	if r.handler != nil {
-		router.Component(r.pattern, r.handler)
+		router.Route(r.pattern, func(exact handler.Router) {
+			exact.Component("/", func(event *handler.ComponentEvent) error {
+				if !pattern.matchesExactly(event.Data.CustomID()) {
+					return nil
+				}
+				return r.handler(event)
+			})
+		})
 		return
 	}
 	panic("component route is missing a handler: " + r.pattern)
@@ -206,7 +218,14 @@ func (r *ModalRouteBuilder[T]) register(router handler.Router) (command discord.
 	if r.handler == nil {
 		panic("modal route is missing a handler: " + r.pattern)
 	}
-	router.Modal(r.pattern, r.handler)
+	router.Route(r.pattern, func(exact handler.Router) {
+		exact.Modal("/", func(event *handler.ModalEvent) error {
+			if !pattern.matchesExactly(event.Data.CustomID) {
+				return nil
+			}
+			return r.handler(event)
+		})
+	})
 	return nil, false
 }
 

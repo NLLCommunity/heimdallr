@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -135,6 +136,30 @@ func emptyBundle(handler.Router) []discord.ApplicationCommandCreate {
 	return nil
 }
 
+//go:noinline
+func bundledCommand(name string) rave.BundledInteractions {
+	return rave.Bundle(rave.Slash(name, "Command").Handle(noopCommandHandler))
+}
+
+//go:noinline
+func capturedCommandBundle(name string) rave.BundledInteractions {
+	return func(router handler.Router) []discord.ApplicationCommandCreate {
+		return rave.Bundle(rave.Slash(name, "Command").Handle(noopCommandHandler))(router)
+	}
+}
+
+type bundleLifetimeMarker struct{ _ byte }
+
+//go:noinline
+func finalizableCapturingBundle(name string, finalized chan<- struct{}) rave.BundledInteractions {
+	marker := &bundleLifetimeMarker{}
+	runtime.SetFinalizer(marker, func(*bundleLifetimeMarker) { close(finalized) })
+	return func(router handler.Router) []discord.ApplicationCommandCreate {
+		runtime.KeepAlive(marker)
+		return rave.Bundle(rave.Slash(name, "Command").Handle(noopCommandHandler))(router)
+	}
+}
+
 func bundledCommandInteraction(t *testing.T) discord.Interaction {
 	t.Helper()
 
@@ -187,7 +212,6 @@ func TestRegisterAndSyncBundlesRetryInstallsRoutesOnce(t *testing.T) {
 	recorder := &recordingRESTClient{queuedErrors: []error{syncErr, nil}}
 	client := newSyncTestClient(recorder)
 	var installs atomic.Int32
-	var replacementInstalls atomic.Int32
 	var handlerCalls atomic.Int32
 	bundle := func(router handler.Router) []discord.ApplicationCommandCreate {
 		installs.Add(1)
@@ -199,17 +223,10 @@ func TestRegisterAndSyncBundlesRetryInstallsRoutesOnce(t *testing.T) {
 				}),
 		)(router)
 	}
-	replacementBundle := func(router handler.Router) []discord.ApplicationCommandCreate {
-		replacementInstalls.Add(1)
-		return rave.Bundle(
-			rave.Slash("replacement", "Replacement command").
-				Handle(func(*handler.CommandEvent) error { return nil }),
-		)(router)
-	}
 
 	err := client.RegisterAndSyncBundlesGlobal(bundle)
 	require.ErrorIs(t, err, syncErr)
-	require.NoError(t, client.RegisterAndSyncBundlesGlobal(replacementBundle))
+	require.NoError(t, client.RegisterAndSyncBundlesGlobal(bundle))
 
 	client.Router.OnEvent(&events.InteractionCreate{
 		GenericEvent: events.NewGenericEvent(client.Client, 0, 0),
@@ -217,7 +234,6 @@ func TestRegisterAndSyncBundlesRetryInstallsRoutesOnce(t *testing.T) {
 	})
 
 	require.Equal(t, int32(1), installs.Load())
-	require.Zero(t, replacementInstalls.Load())
 	require.Equal(t, int32(1), handlerCalls.Load())
 	require.Len(t, recorder.requests, 2)
 	require.Len(t, recorder.requests[0].commands, 1)
@@ -226,6 +242,124 @@ func TestRegisterAndSyncBundlesRetryInstallsRoutesOnce(t *testing.T) {
 	require.Equal(t, "bundled", command.Name)
 	require.Equal(t, "Bundled command", command.Description)
 	require.Equal(t, recorder.requests[0].commands, recorder.requests[1].commands)
+}
+
+func TestRegisterAndSyncBundlesRejectsDifferentSameCountBundles(t *testing.T) {
+	recorder := &recordingRESTClient{}
+	client := newSyncTestClient(recorder)
+	var firstInstalls atomic.Int32
+	var replacementInstalls atomic.Int32
+	first := func(handler.Router) []discord.ApplicationCommandCreate {
+		firstInstalls.Add(1)
+		return nil
+	}
+	replacement := func(handler.Router) []discord.ApplicationCommandCreate {
+		replacementInstalls.Add(1)
+		return nil
+	}
+
+	require.NoError(t, client.RegisterAndSyncBundlesGlobal(first))
+	err := client.RegisterAndSyncBundlesGlobal(replacement)
+
+	require.ErrorContains(t, err, "different bundles")
+	require.Equal(t, int32(1), firstInstalls.Load())
+	require.Zero(t, replacementInstalls.Load())
+	require.Len(t, recorder.requests, 1)
+}
+
+func TestRegisterAndSyncBundlesRejectsDifferentBundleClosures(t *testing.T) {
+	recorder := &recordingRESTClient{}
+	client := newSyncTestClient(recorder)
+	first := bundledCommand("first")
+	replacement := bundledCommand("replacement")
+
+	require.NoError(t, client.RegisterAndSyncBundlesGlobal(first))
+	err := client.RegisterAndSyncBundlesGlobal(replacement)
+
+	require.ErrorContains(t, err, "different bundles")
+	require.False(t, client.Router.Match("/replacement", discord.InteractionTypeApplicationCommand, int(discord.ApplicationCommandTypeSlash)))
+	require.Len(t, recorder.requests, 1)
+}
+
+func TestRegisterAndSyncBundlesRejectsDifferentCapturingClosures(t *testing.T) {
+	recorder := &recordingRESTClient{}
+	client := newSyncTestClient(recorder)
+	first := capturedCommandBundle("first")
+	replacement := capturedCommandBundle("replacement")
+
+	require.NoError(t, client.RegisterAndSyncBundlesGlobal(first))
+	err := client.RegisterAndSyncBundlesGlobal(replacement)
+
+	require.ErrorContains(t, err, "different bundles")
+	require.False(t, client.Router.Match("/replacement", discord.InteractionTypeApplicationCommand, int(discord.ApplicationCommandTypeSlash)))
+	require.Len(t, recorder.requests, 1)
+}
+
+func TestRegisterAndSyncBundlesRetryReusesStoredCapturingBundle(t *testing.T) {
+	recorder := &recordingRESTClient{}
+	client := newSyncTestClient(recorder)
+	bundle := capturedCommandBundle("stored")
+
+	require.NoError(t, client.RegisterAndSyncBundlesGlobal(bundle))
+	require.NoError(t, client.RegisterAndSyncBundlesGlobal(bundle))
+	require.Len(t, recorder.requests, 2)
+}
+
+func TestRegisterAndSyncBundlesRetainsTemporaryCapturingBundle(t *testing.T) {
+	recorder := &recordingRESTClient{}
+	client := newSyncTestClient(recorder)
+	finalized := make(chan struct{})
+	installTemporaryCapturingBundle(t, client, finalized)
+
+	for range 4 {
+		pressure := make([][]byte, 256)
+		for i := range pressure {
+			pressure[i] = make([]byte, 64<<10)
+		}
+		runtime.KeepAlive(pressure)
+		runtime.GC()
+	}
+	select {
+	case <-finalized:
+		t.Fatal("installed bundle closure was collected")
+	case <-time.After(50 * time.Millisecond):
+	}
+
+	err := client.RegisterAndSyncBundlesGlobal(finalizableCapturingBundle("replacement", make(chan struct{})))
+
+	require.ErrorContains(t, err, "different bundles")
+	require.False(t, client.Router.Match("/replacement", discord.InteractionTypeApplicationCommand, int(discord.ApplicationCommandTypeSlash)))
+	require.Len(t, recorder.requests, 1)
+}
+
+func installTemporaryCapturingBundle(t *testing.T, client *rave.RaveClient, finalized chan<- struct{}) {
+	t.Helper()
+	require.NoError(t, client.RegisterAndSyncBundlesGlobal(finalizableCapturingBundle("first", finalized)))
+}
+
+func TestRegisterAndSyncBundlesCopiesBundleSlice(t *testing.T) {
+	recorder := &recordingRESTClient{}
+	client := newSyncTestClient(recorder)
+	bundles := []rave.BundledInteractions{capturedCommandBundle("first")}
+	stored := bundles[0]
+
+	require.NoError(t, client.RegisterAndSyncBundlesGlobal(bundles...))
+	bundles[0] = capturedCommandBundle("replacement")
+	require.NoError(t, client.RegisterAndSyncBundlesGlobal(stored))
+	require.Len(t, recorder.requests, 2)
+}
+
+func TestRegisterAndSyncBundlesRejectsReorderedBundles(t *testing.T) {
+	recorder := &recordingRESTClient{}
+	client := newSyncTestClient(recorder)
+	first := func(handler.Router) []discord.ApplicationCommandCreate { return nil }
+	second := func(handler.Router) []discord.ApplicationCommandCreate { return nil }
+
+	require.NoError(t, client.RegisterAndSyncBundlesGlobal(first, second))
+	err := client.RegisterAndSyncBundlesGlobal(second, first)
+
+	require.ErrorContains(t, err, "different bundles")
+	require.Len(t, recorder.requests, 1)
 }
 
 func TestRegisterAndSyncBundlesConcurrentRetriesReuseInstallation(t *testing.T) {
