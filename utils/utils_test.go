@@ -262,6 +262,30 @@ func TestParseLongDuration(t *testing.T) {
 	}
 }
 
+func TestParseLongDurationRejectsOverflow(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+	}{
+		{
+			name:  "single unit multiplication",
+			input: "281474976710657d",
+		},
+		{
+			name:  "multiple unit addition",
+			input: "106751d24h",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := ParseLongDuration(tt.input)
+			require.Error(t, err)
+			require.ErrorContains(t, err, "duration overflow")
+		})
+	}
+}
+
 func TestSplitStringToLengthByLine(t *testing.T) {
 	t.Run("short input returns single part", func(t *testing.T) {
 		parts := SplitStringToLengthByLine("hello\nworld", 2000)

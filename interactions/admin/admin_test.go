@@ -58,6 +58,42 @@ func TestGatekeepMessageCommandExposesOnlyResetAndRetainsModalWorkflow(t *testin
 	require.True(t, router.Match("/admin/gatekeep-message/modal", discord.InteractionTypeModalSubmit, 0))
 }
 
+func TestAuditRetentionOptionsAllowZeroAndExplainItsMeaning(t *testing.T) {
+	command := Admin.Build().(discord.SlashCommandCreate)
+
+	var auditLog discord.ApplicationCommandOptionSubCommand
+	for _, option := range command.Options {
+		subcommand, ok := option.(discord.ApplicationCommandOptionSubCommand)
+		if ok && subcommand.Name == "audit-log" {
+			auditLog = subcommand
+			break
+		}
+	}
+	require.NotEmpty(t, auditLog.Name)
+
+	wantDescriptions := map[string]string{
+		"message-retention": "Override message-event retention in days. 0 = forever (only if bot ceiling is 0).",
+		"member-retention":  "Override member-event retention in days. 0 = forever (only if bot ceiling is 0).",
+		"guild-retention":   "Override guild-event retention in days. 0 = forever (only if bot ceiling is 0).",
+	}
+	found := make(map[string]bool, len(wantDescriptions))
+	for _, option := range auditLog.Options {
+		integer, ok := option.(discord.ApplicationCommandOptionInt)
+		if !ok {
+			continue
+		}
+		wantDescription, tracked := wantDescriptions[integer.Name]
+		if !tracked {
+			continue
+		}
+		require.NotNil(t, integer.MinValue, integer.Name)
+		require.Equal(t, 0, *integer.MinValue, integer.Name)
+		require.Equal(t, wantDescription, integer.Description, integer.Name)
+		found[integer.Name] = true
+	}
+	require.Len(t, found, len(wantDescriptions))
+}
+
 func TestSectionEmbed_StripsLeadingHeading(t *testing.T) {
 	// Six of the seven *Info helpers begin with "## Title\n…". The
 	// section heading must be removed so it isn't rendered twice — once

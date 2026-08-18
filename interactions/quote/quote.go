@@ -44,7 +44,6 @@ var Quote = rave.Slash("quote", "Quote a message from a channel, using a message
 	AddDescriptionLocalization(discord.LocaleNorwegian, "Lag et sitat av ei melding.").
 	WithDefaultMemberPermissions(discord.PermissionSendMessages).
 	AddContexts(discord.InteractionContextTypeGuild).
-	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
 	AddOptions(
 		rave.OptionString("link", "Link to the message you want to quote.").
 			AddNameLocalization(discord.LocaleNorwegian, "lenke").

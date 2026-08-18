@@ -2,6 +2,8 @@ package rave
 
 import (
 	"errors"
+	"fmt"
+	"sync"
 
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
@@ -31,6 +33,11 @@ func Bundle(items ...registerMaybe) BundledInteractions {
 type RaveClient struct {
 	*bot.Client
 	Router handler.Router
+
+	bundleMu             sync.Mutex
+	bundlesInstalled     bool
+	installedBundleCount int
+	installedCommands    []discord.ApplicationCommandCreate
 }
 
 func NewClient(token string, opts ...bot.ConfigOpt) (*RaveClient, error) {
@@ -56,10 +63,22 @@ func (c *RaveClient) RegisterAndSyncBundlesGlobal(interactions ...BundledInterac
 }
 
 func (c *RaveClient) RegisterAndSyncBundles(guilds []snowflake.ID, interactions ...BundledInteractions) error {
-	var commandCreates []discord.ApplicationCommandCreate
-	for _, register := range interactions {
-		commandCreates = append(commandCreates, register(c.Router)...)
+	c.bundleMu.Lock()
+	defer c.bundleMu.Unlock()
+
+	if !c.bundlesInstalled {
+		for _, register := range interactions {
+			c.installedCommands = append(c.installedCommands, register(c.Router)...)
+		}
+		c.installedBundleCount = len(interactions)
+		c.bundlesInstalled = true
+	} else if len(interactions) != c.installedBundleCount {
+		return fmt.Errorf(
+			"bundle installation already initialized with %d bundles; got %d",
+			c.installedBundleCount,
+			len(interactions),
+		)
 	}
 
-	return handler.SyncCommands(c.Client, commandCreates, guilds)
+	return handler.SyncCommands(c.Client, c.installedCommands, guilds)
 }

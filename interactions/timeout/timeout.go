@@ -1,7 +1,9 @@
 package timeout
 
 import (
+	"errors"
 	"time"
+	"unicode/utf8"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/rave"
@@ -10,6 +12,7 @@ import (
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/disgo/rest"
 	"github.com/disgoorg/omit"
+	"github.com/disgoorg/snowflake/v2"
 )
 
 var Interactions = rave.Bundle(Timeout)
@@ -28,6 +31,7 @@ var Timeout = rave.Slash("timeout", "Timeout a user from the server").
 			AddNameLocalization(discord.LocaleNorwegian, "varighet").
 			AddDescriptionLocalization(discord.LocaleNorwegian, "Varigheten for timeouten (format: 3w2d1h4m28s)"),
 		rave.OptionString("reason", "Reason for timing out the user. Not sent to the user.").WithRequired(false).
+			WithMaxLength(512).
 			AddNameLocalization(discord.LocaleNorwegian, "årsak").
 			AddDescriptionLocalization(discord.LocaleNorwegian, "Årsaken til timeouten. Ikke sendt til brukeren."),
 	).Handle(TimeoutHandler)
@@ -42,6 +46,18 @@ func TimeoutHandler(e *handler.CommandEvent) error {
 	user := data.Member("user")
 	durationStr := data.String("duration")
 	reason, hasReason := data.OptString("reason")
+
+	invoker := e.Member()
+	var roles []discord.Role
+	for role := range e.Client().Caches.Roles(guild.ID) {
+		roles = append(roles, role)
+	}
+	if invoker == nil || !canTimeout(*invoker, user, guild, roles) {
+		return e.CreateMessage(interactions.EphemeralMessageContent("You cannot timeout this user."))
+	}
+	if utf8.RuneCountInString(reason) > 512 {
+		return e.CreateMessage(interactions.EphemeralMessageContent("Reason must be 512 characters or fewer."))
+	}
 
 	duration, err := utils.ParseLongDuration(durationStr)
 	if err != nil {
@@ -62,7 +78,8 @@ func TimeoutHandler(e *handler.CommandEvent) error {
 	)
 
 	if err != nil {
-		return e.CreateMessage(interactions.EphemeralMessageContent("Failed to timeout user: " + err.Error()))
+		responseErr := e.CreateMessage(interactions.EphemeralMessageContent("Failed to timeout user."))
+		return errors.Join(err, responseErr)
 	}
 
 	return e.CreateMessage(interactions.EphemeralMessageContentf(
@@ -70,4 +87,39 @@ func TimeoutHandler(e *handler.CommandEvent) error {
 		user.User.Username,
 		utils.DurationToHumanReadable(duration),
 	))
+}
+
+func canTimeout(invoker, target discord.ResolvedMember, guild discord.Guild, roles []discord.Role) bool {
+	if !invoker.Permissions.Has(discord.PermissionModerateMembers) ||
+		invoker.User.ID == target.User.ID ||
+		guild.OwnerID == target.User.ID ||
+		target.Permissions.Has(discord.PermissionAdministrator) {
+		return false
+	}
+
+	roleByID := make(map[snowflake.ID]discord.Role, len(roles))
+	for _, role := range roles {
+		roleByID[role.ID] = role
+	}
+	for _, roleID := range target.RoleIDs {
+		if role, ok := roleByID[roleID]; ok && role.Permissions.Has(discord.PermissionAdministrator) {
+			return false
+		}
+	}
+
+	highestPosition := func(member discord.ResolvedMember) int {
+		highest := 0
+		for _, roleID := range member.RoleIDs {
+			role, ok := roleByID[roleID]
+			if !ok {
+				continue
+			}
+			if role.Position > highest {
+				highest = role.Position
+			}
+		}
+		return highest
+	}
+
+	return guild.OwnerID == invoker.User.ID || highestPosition(invoker) > highestPosition(target)
 }

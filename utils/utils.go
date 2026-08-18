@@ -79,26 +79,41 @@ func ParseLongDuration(s string) (time.Duration, error) {
 	duration := time.Duration(0)
 
 	for i, match := range matches {
-		num, err := strconv.Atoi(match)
-		if err != nil {
+		if names[i] == "" || match == "" {
 			continue
 		}
+
+		count, err := strconv.ParseUint(match, 10, 64)
+		if err != nil {
+			return 0, fmt.Errorf("duration overflow: %w", err)
+		}
+
+		var unit time.Duration
 		switch names[i] {
 		case "years":
-			duration += time.Duration(num) * time.Hour * 24 * 365
+			unit = time.Hour * 24 * 365
 		case "months":
-			duration += time.Duration(num) * time.Hour * 24 * 30
+			unit = time.Hour * 24 * 30
 		case "weeks":
-			duration += time.Duration(num) * time.Hour * 24 * 7
+			unit = time.Hour * 24 * 7
 		case "days":
-			duration += time.Duration(num) * time.Hour * 24
+			unit = time.Hour * 24
 		case "hours":
-			duration += time.Duration(num) * time.Hour
+			unit = time.Hour
 		case "minutes":
-			duration += time.Duration(num) * time.Minute
+			unit = time.Minute
 		case "seconds":
-			duration += time.Duration(num) * time.Second
+			unit = time.Second
 		}
+
+		if count > uint64(math.MaxInt64)/uint64(unit) {
+			return 0, errors.New("duration overflow")
+		}
+		term := time.Duration(count) * unit
+		if duration > time.Duration(math.MaxInt64)-term {
+			return 0, errors.New("duration overflow")
+		}
+		duration += term
 	}
 
 	return duration, nil

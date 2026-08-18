@@ -150,9 +150,12 @@ var Admin = rave.Slash("admin", "admin commands").
 		rave.SubCommand("audit-log", "View or set audit log settings").
 			AddOptions(
 				rave.OptionBool("enabled", "Whether to record audit log events for this guild."),
-				rave.OptionInt("message-retention", "Override message-event retention in days."),
-				rave.OptionInt("member-retention", "Override member-event retention in days."),
-				rave.OptionInt("guild-retention", "Override guild-event retention in days."),
+				rave.OptionInt("message-retention", "Override message-event retention in days. 0 = forever (only if bot ceiling is 0).").
+					WithMinValue(0),
+				rave.OptionInt("member-retention", "Override member-event retention in days. 0 = forever (only if bot ceiling is 0).").
+					WithMinValue(0),
+				rave.OptionInt("guild-retention", "Override guild-event retention in days. 0 = forever (only if bot ceiling is 0).").
+					WithMinValue(0),
 				rave.OptionString("reset", "Reset a setting to use the bot-operator default.").
 					AddChoice("Enabled", "enabled").
 					AddChoice("Message retention", "message-retention").
