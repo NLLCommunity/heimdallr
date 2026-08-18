@@ -1,6 +1,8 @@
 package rave
 
 import (
+	"errors"
+
 	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
@@ -32,12 +34,19 @@ type RaveClient struct {
 }
 
 func NewClient(token string, opts ...bot.ConfigOpt) (*RaveClient, error) {
+	return NewClientWithRouter(token, handler.New(), opts...)
+}
+
+func NewClientWithRouter(token string, router handler.Router, opts ...bot.ConfigOpt) (*RaveClient, error) {
+	if router == nil {
+		return nil, errors.New("router must not be nil")
+	}
+
 	disgoClient, err := disgo.New(token, opts...)
 	if err != nil {
 		return nil, err
 	}
 
-	router := handler.New()
 	disgoClient.AddEventListeners(router)
 	return new(RaveClient{Client: disgoClient, Router: router}), nil
 }
@@ -52,5 +61,5 @@ func (c *RaveClient) RegisterAndSyncBundles(guilds []snowflake.ID, interactions 
 		commandCreates = append(commandCreates, register(c.Router)...)
 	}
 
-	return handler.SyncCommands(c.Client, commandCreates, nil)
+	return handler.SyncCommands(c.Client, commandCreates, guilds)
 }

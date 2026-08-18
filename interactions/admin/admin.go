@@ -84,7 +84,6 @@ var Admin = rave.Slash("admin", "admin commands").
 
 		rave.SubCommand("gatekeep-message", "View or set the gatekeep message").
 			AddOptions(
-				rave.OptionString("message", "The message to send to users when they join and are pending approval"),
 				rave.OptionString("reset", "Reset the gatekeep message to its default value").
 					AddChoice("Reset", "reset"),
 			).Handle(AdminGatekeepMessageHandler),

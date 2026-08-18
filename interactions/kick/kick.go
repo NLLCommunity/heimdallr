@@ -27,10 +27,12 @@ var KickWithMessage = rave.Slash("kick", "Kick a user from the server").
 			AddOptions(
 				rave.OptionUser("user", "The user to kick.").
 					AddNameLocalization(discord.LocaleNorwegian, "bruker").
-					AddDescriptionLocalization(discord.LocaleNorwegian, "Brukeren du vil sparke ut."),
+					AddDescriptionLocalization(discord.LocaleNorwegian, "Brukeren du vil sparke ut.").
+					WithRequired(true),
 				rave.OptionString("message", "The message to give the user before kicking them.").
 					AddNameLocalization(discord.LocaleNorwegian, "melding").
-					AddDescriptionLocalization(discord.LocaleNorwegian, "Meldingen som skal sendes til brukeren før sparkingen."),
+					AddDescriptionLocalization(discord.LocaleNorwegian, "Meldingen som skal sendes til brukeren før sparkingen.").
+					WithRequired(true),
 			).Handle(KickWithMessageHandler),
 	)
 

@@ -278,6 +278,75 @@ func TestSlashCommandBuildRejectsInvalidRootDefinition(t *testing.T) {
 	}
 }
 
+func TestSlashCommandNameLengthCountsUnicodeCharacters(t *testing.T) {
+	require.NotPanics(t, func() {
+		rave.Slash(strings.Repeat("å", 32), "Description").Build()
+	})
+	require.Panics(t, func() {
+		rave.Slash(strings.Repeat("å", 33), "Description").Build()
+	})
+}
+
+func TestSlashCommandDescriptionLengthCountsUnicodeCharacters(t *testing.T) {
+	require.NotPanics(t, func() {
+		rave.Slash("valid", strings.Repeat("å", 100)).Build()
+	})
+	require.Panics(t, func() {
+		rave.Slash("valid", strings.Repeat("å", 101)).Build()
+	})
+}
+
+func TestSlashCommandLocalizationLengthsCountUnicodeCharacters(t *testing.T) {
+	require.NotPanics(t, func() {
+		rave.Slash("valid", "Description").
+			AddNameLocalization(discord.LocaleNorwegian, strings.Repeat("å", 32)).
+			AddDescriptionLocalization(discord.LocaleNorwegian, strings.Repeat("å", 100)).
+			Build()
+	})
+	require.Panics(t, func() {
+		rave.Slash("valid", "Description").
+			AddNameLocalization(discord.LocaleNorwegian, strings.Repeat("å", 33)).
+			Build()
+	})
+	require.Panics(t, func() {
+		rave.Slash("valid", "Description").
+			AddDescriptionLocalization(discord.LocaleNorwegian, strings.Repeat("å", 101)).
+			Build()
+	})
+}
+
+func TestSlashCommandOptionLengthsCountUnicodeCharacters(t *testing.T) {
+	require.NotPanics(t, func() {
+		rave.Slash("valid", "Description").AddOptions(
+			rave.OptionString(strings.Repeat("å", 32), strings.Repeat("å", 100)).
+				AddNameLocalization(discord.LocaleNorwegian, strings.Repeat("å", 32)).
+				AddDescriptionLocalization(discord.LocaleNorwegian, strings.Repeat("å", 100)),
+		).Build()
+	})
+	require.Panics(t, func() {
+		rave.Slash("valid", "Description").AddOptions(
+			rave.OptionString(strings.Repeat("å", 33), "Description"),
+		).Build()
+	})
+	require.Panics(t, func() {
+		rave.Slash("valid", "Description").AddOptions(
+			rave.OptionString("valid", "Description").
+				AddNameLocalization(discord.LocaleNorwegian, strings.Repeat("å", 33)),
+		).Build()
+	})
+	require.Panics(t, func() {
+		rave.Slash("valid", "Description").AddOptions(
+			rave.OptionString("valid", strings.Repeat("å", 101)),
+		).Build()
+	})
+	require.Panics(t, func() {
+		rave.Slash("valid", "Description").AddOptions(
+			rave.OptionString("valid", "Description").
+				AddDescriptionLocalization(discord.LocaleNorwegian, strings.Repeat("å", 101)),
+		).Build()
+	})
+}
+
 func TestSubcommandsDoNotExposeRequiredOptionMethod(t *testing.T) {
 	_, subCommandHasRequired := reflect.TypeOf(
 		rave.SubCommand("child", "Child command"),

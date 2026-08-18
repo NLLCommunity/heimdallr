@@ -75,6 +75,9 @@ func customIDFromVars(pattern customIDPattern, values Vars) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("%w: %s: %v", ErrInvalidCustomIDValues, name, err)
 		}
+		if encoded == "" {
+			return "", fmt.Errorf("%w: %s is empty", ErrInvalidCustomIDValues, name)
+		}
 		if strings.Contains(encoded, "/") {
 			return "", fmt.Errorf("%w: %s contains route separator", ErrInvalidCustomIDValues, name)
 		}

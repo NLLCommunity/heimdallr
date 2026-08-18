@@ -3,6 +3,7 @@ package rave
 import (
 	"strconv"
 	"unicode"
+	"unicode/utf8"
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
@@ -750,7 +751,11 @@ func validateCommandDefinition(
 // - No capital letters
 // - Only lowercase letters, digits, hyphens, and underscores
 func validDiscordName(name string) bool {
-	if len(name) < 1 || len(name) > 32 {
+	if !utf8.ValidString(name) {
+		return false
+	}
+	length := utf8.RuneCountInString(name)
+	if length < 1 || length > 32 {
 		return false
 	}
 
@@ -768,7 +773,11 @@ func validDiscordName(name string) bool {
 }
 
 func validDiscordDescription(description string) bool {
-	if len(description) < 1 || len(description) > 100 {
+	if !utf8.ValidString(description) {
+		return false
+	}
+	length := utf8.RuneCountInString(description)
+	if length < 1 || length > 100 {
 		return false
 	}
 

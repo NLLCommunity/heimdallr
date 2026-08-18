@@ -17,7 +17,6 @@ var Interactions = rave.Bundle(Dashboard)
 var Dashboard = rave.Slash("dashboard", "Get a link to the web dashboard").
 	AddContexts(discord.InteractionContextTypeGuild).
 	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
-	WithDefaultMemberPermissions(discord.PermissionManageChannels).
 	Handle(Handler)
 
 func Handler(e *handler.CommandEvent) error {

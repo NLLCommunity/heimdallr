@@ -105,8 +105,9 @@ func main() {
 	r := handler.New()
 	r.Use(interactions.RecoverGo)
 
-	client, err := rave.NewClient(
+	client, err := rave.NewClientWithRouter(
 		token,
+		r,
 		bot.WithLogger(
 			slog.New(
 				slog.NewTextHandler(
@@ -117,7 +118,6 @@ func main() {
 			),
 		),
 		bot.WithDefaultGateway(),
-		bot.WithEventListeners(r),
 		bot.WithEventListenerFunc(
 			func(e *events.Ready) {
 				fmt.Println("Bot is ready!")

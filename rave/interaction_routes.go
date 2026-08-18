@@ -1,6 +1,7 @@
 package rave
 
 import (
+	"encoding"
 	"fmt"
 	"reflect"
 	"unicode/utf8"
@@ -76,17 +77,76 @@ func (r customIDRoute[T]) StaticCustomID() string {
 	if len(pattern.placeholders) != 0 {
 		panic(fmt.Errorf("%w: static custom ID cannot contain placeholders", ErrInvalidCustomIDPattern))
 	}
-	if err := validateLiteralCustomIDLength(pattern); err != nil {
+	if err := validateCustomIDPatternLength[T](pattern); err != nil {
 		panic(err)
 	}
 	return r.pattern
 }
 
-func validateLiteralCustomIDLength(pattern customIDPattern) error {
-	if len(pattern.placeholders) == 0 && utf8.RuneCountInString(pattern.raw) > maxCustomIDRunes {
+func validateCustomIDPatternLength[T any](pattern customIDPattern) error {
+	placeholderMinimums := typedPlaceholderMinimumRunes[T]()
+	minimumRunes := 1 // leading slash
+	for index, segment := range pattern.segments {
+		if index > 0 {
+			minimumRunes++ // segment separator
+		}
+		if name, placeholder := pattern.placeholders[index]; placeholder {
+			minimum := placeholderMinimums[name]
+			if minimum == 0 {
+				minimum = 1
+			}
+			minimumRunes += minimum
+		} else {
+			minimumRunes += utf8.RuneCountInString(segment)
+		}
+	}
+	if minimumRunes > maxCustomIDRunes {
 		return ErrCustomIDTooLong
 	}
 	return nil
+}
+
+func typedPlaceholderMinimumRunes[T any]() map[string]int {
+	typeOfValue := reflect.TypeFor[T]()
+	if typeOfValue == reflect.TypeFor[Vars]() {
+		return nil
+	}
+	for typeOfValue.Kind() == reflect.Pointer {
+		typeOfValue = typeOfValue.Elem()
+	}
+	if typeOfValue.Kind() != reflect.Struct {
+		return nil
+	}
+
+	minimums := make(map[string]int)
+	for index := range typeOfValue.NumField() {
+		field := typeOfValue.Field(index)
+		if field.PkgPath != "" {
+			continue
+		}
+		name, ok := optionName(field)
+		if !ok {
+			continue
+		}
+		minimums[name] = encodedTypeMinimumRunes(field.Type)
+	}
+	return minimums
+}
+
+func encodedTypeMinimumRunes(typeOfValue reflect.Type) int {
+	// encodeCustomIDValue checks these interfaces on the original value before
+	// dereferencing pointers, so the schema check must use the same dispatch order.
+	if typeOfValue.Implements(reflect.TypeFor[encoding.TextMarshaler]()) ||
+		typeOfValue.Implements(reflect.TypeFor[fmt.Stringer]()) {
+		return 1
+	}
+	for typeOfValue.Kind() == reflect.Pointer {
+		typeOfValue = typeOfValue.Elem()
+	}
+	if typeOfValue.Kind() == reflect.Bool {
+		return len("true")
+	}
+	return 1
 }
 
 func (r *ComponentRouteBuilder[T]) Handle(h handler.ComponentHandler) *ComponentRouteBuilder[T] {
@@ -114,7 +174,7 @@ func (r *ComponentRouteBuilder[T]) register(router handler.Router) (command disc
 	if err := validateCustomIDSchema[T](pattern); err != nil {
 		panic(err)
 	}
-	if err := validateLiteralCustomIDLength(pattern); err != nil {
+	if err := validateCustomIDPatternLength[T](pattern); err != nil {
 		panic(err)
 	}
 	if r.buttonHandler != nil {
@@ -140,7 +200,7 @@ func (r *ModalRouteBuilder[T]) register(router handler.Router) (command discord.
 	if err := validateCustomIDSchema[T](pattern); err != nil {
 		panic(err)
 	}
-	if err := validateLiteralCustomIDLength(pattern); err != nil {
+	if err := validateCustomIDPatternLength[T](pattern); err != nil {
 		panic(err)
 	}
 	if r.handler == nil {

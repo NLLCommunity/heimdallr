@@ -21,7 +21,7 @@ import (
 var Interactions = rave.Bundle(Ban)
 
 var Ban = rave.Slash("ban", "Ban a user from the server").
-	WithDefaultMemberPermissions(discord.PermissionKickMembers).
+	WithDefaultMemberPermissions(discord.PermissionBanMembers).
 	AddContexts(discord.InteractionContextTypeGuild).
 	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
 	AddOptions(
@@ -50,6 +50,15 @@ func BanHandler(e *handler.CommandEvent) error {
 	guild, isGuild := e.Guild()
 	if !isGuild {
 		return interactions.ErrEventNoGuildID
+	}
+
+	member := e.Member()
+	if member == nil || !member.Permissions.Has(discord.PermissionBanMembers) {
+		return e.CreateMessage(
+			interactions.EphemeralMessageContent(
+				"You need the Ban Members permission to ban a user.",
+			),
+		)
 	}
 
 	data := e.SlashCommandInteractionData()

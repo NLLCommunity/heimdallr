@@ -21,6 +21,36 @@ func TestRegisterInstallsModmailRoutes(t *testing.T) {
 	require.True(t, router.Match("/modmail/report-message/1/2", discord.InteractionTypeModalSubmit, 0))
 }
 
+func TestCreateButtonLabelRequiresAtLeastThreeCharacters(t *testing.T) {
+	command := ModmailAdmin.Build().(discord.SlashCommandCreate)
+
+	var createButton discord.ApplicationCommandOptionSubCommand
+	foundCreateButton := false
+	for _, option := range command.Options {
+		subcommand, ok := option.(discord.ApplicationCommandOptionSubCommand)
+		if ok && subcommand.Name == "create-button" {
+			createButton = subcommand
+			foundCreateButton = true
+			break
+		}
+	}
+	require.True(t, foundCreateButton)
+
+	var label discord.ApplicationCommandOptionString
+	foundLabel := false
+	for _, option := range createButton.Options {
+		stringOption, ok := option.(discord.ApplicationCommandOptionString)
+		if ok && stringOption.Name == "label" {
+			label = stringOption
+			foundLabel = true
+			break
+		}
+	}
+	require.True(t, foundLabel)
+	require.NotNil(t, label.MinLength)
+	require.Equal(t, 3, *label.MinLength)
+}
+
 func TestModmailRouteIDsRemainCompatible(t *testing.T) {
 	id, err := modmailReportButtonRoute.CustomID(modmailReportVars{
 		Role: snowflake.ID(1), Channel: snowflake.ID(2), MaxActive: 3, SlowMode: "4",

@@ -62,7 +62,8 @@ var createSubCommand = rave.SubCommand("create-button", "Create a Modmail report
 		rave.OptionString("label", "The label to display on the button.").
 			AddNameLocalization(discord.LocaleNorwegian, "tekst").
 			AddDescriptionLocalization(discord.LocaleNorwegian, "Teksten som skal vises på knappen.").
-			WithRequired(true),
+			WithRequired(true).
+			WithMinLength(3),
 		rave.OptionString("button-color", "The color of the button.").
 			AddNameLocalization(discord.LocaleNorwegian, "knapp-farge").
 			AddDescriptionLocalization(discord.LocaleNorwegian, "Fargen på knappen.").

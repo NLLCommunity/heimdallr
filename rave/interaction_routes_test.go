@@ -6,6 +6,7 @@ import (
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/NLLCommunity/heimdallr/rave"
@@ -45,6 +46,38 @@ func TestModalRouteRegistersHandler(t *testing.T) {
 type typedRouteVars struct {
 	ChannelID uint64 `rave:"channelID"`
 	MessageID uint64 `rave:"messageID"`
+}
+
+type typedBoolRouteVars struct {
+	Enabled bool `rave:"enabled"`
+}
+
+type textEncodedBool bool
+
+func (textEncodedBool) MarshalText() ([]byte, error) { return []byte("t"), nil }
+
+type textEncodedBoolRouteVars struct {
+	Enabled textEncodedBool `rave:"enabled"`
+}
+
+type pointerStringEncodedBool bool
+
+func (*pointerStringEncodedBool) String() string { return "s" }
+
+type pointerStringEncodedBoolRouteVars struct {
+	Enabled *pointerStringEncodedBool `rave:"enabled"`
+}
+
+type scalarPointerStringerBool bool
+
+func (*scalarPointerStringerBool) String() string { return "s" }
+
+type scalarPointerStringerBoolRouteVars struct {
+	Enabled scalarPointerStringerBool `rave:"enabled"`
+}
+
+type nestedTextEncodedBoolRouteVars struct {
+	Enabled **textEncodedBool `rave:"enabled"`
 }
 
 func TestRouteCustomIDVariants(t *testing.T) {
@@ -104,14 +137,82 @@ func TestModalRouteRegistrationRejectsOverlongStaticCustomID(t *testing.T) {
 	})
 }
 
-func TestRouteRegistrationAllowsOverlongDynamicPatterns(t *testing.T) {
-	pattern := "/" + strings.Repeat("å", 100) + "/{id}"
+func TestRouteRegistrationAllowsDynamicPatternAtMinimumCapacityLimit(t *testing.T) {
+	// 1 leading slash + 95 fixed runes + 2 separators + 2 one-rune values = 100.
+	pattern := "/" + strings.Repeat("å", 95) + "/{first}/{second}"
 
 	require.NotPanics(t, func() {
 		rave.Component(pattern).Handle(noopComponentHandler).Register(handler.New())
 	})
 	require.NotPanics(t, func() {
 		rave.Modal(pattern).Handle(noopModalHandler).Register(handler.New())
+	})
+}
+
+func TestRouteRegistrationRejectsDynamicPatternWithoutMinimumValueCapacity(t *testing.T) {
+	// 1 leading slash + 96 fixed runes + 2 separators + 2 one-rune values = 101.
+	pattern := "/" + strings.Repeat("å", 96) + "/{first}/{second}"
+
+	assert.Panics(t, func() {
+		rave.Component(pattern).Handle(noopComponentHandler).Register(handler.New())
+	})
+	assert.Panics(t, func() {
+		rave.Modal(pattern).Handle(noopModalHandler).Register(handler.New())
+	})
+}
+
+func TestTypedRouteRegistrationRejectsPatternWithoutPlainBoolCapacity(t *testing.T) {
+	// A one-rune value would total 100, but the shortest plain bool is "true" (4), totaling 103.
+	pattern := "/" + strings.Repeat("å", 97) + "/{enabled}"
+
+	assert.Panics(t, func() {
+		rave.ComponentOf[typedBoolRouteVars](pattern).
+			Handle(noopComponentHandler).
+			Register(handler.New())
+	})
+	assert.Panics(t, func() {
+		rave.ModalOf[typedBoolRouteVars](pattern).
+			Handle(noopModalHandler).
+			Register(handler.New())
+	})
+}
+
+func TestTypedRouteRegistrationUsesCustomBoolEncodingCapacity(t *testing.T) {
+	// Both custom encoders emit one rune, so the rendered IDs fit exactly at 100.
+	pattern := "/" + strings.Repeat("å", 97) + "/{enabled}"
+
+	component := rave.ComponentOf[textEncodedBoolRouteVars](pattern).Handle(noopComponentHandler)
+	require.NotPanics(t, func() {
+		component.Register(handler.New())
+	})
+	id, err := component.CustomID(textEncodedBoolRouteVars{Enabled: true})
+	require.NoError(t, err)
+	require.Equal(t, "/"+strings.Repeat("å", 97)+"/t", id)
+
+	encoded := pointerStringEncodedBool(true)
+	modal := rave.ModalOf[pointerStringEncodedBoolRouteVars](pattern).Handle(noopModalHandler)
+	require.NotPanics(t, func() {
+		modal.Register(handler.New())
+	})
+	id, err = modal.CustomID(pointerStringEncodedBoolRouteVars{Enabled: &encoded})
+	require.NoError(t, err)
+	require.Equal(t, "/"+strings.Repeat("å", 97)+"/s", id)
+}
+
+func TestTypedRouteRegistrationMatchesEncoderPointerDispatchForBoolAliases(t *testing.T) {
+	// encodeCustomIDValue checks interfaces before dereferencing. Neither a scalar with
+	// pointer-only methods nor **T implements the inner type's custom encoder.
+	pattern := "/" + strings.Repeat("å", 97) + "/{enabled}"
+
+	assert.Panics(t, func() {
+		rave.ComponentOf[scalarPointerStringerBoolRouteVars](pattern).
+			Handle(noopComponentHandler).
+			Register(handler.New())
+	})
+	assert.Panics(t, func() {
+		rave.ModalOf[nestedTextEncodedBoolRouteVars](pattern).
+			Handle(noopModalHandler).
+			Register(handler.New())
 	})
 }
 

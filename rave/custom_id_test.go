@@ -127,6 +127,35 @@ type customStringValue string
 
 func (v customStringValue) String() string { return "string:" + string(v) }
 
+type emptyCustomTextValue struct{}
+
+func (emptyCustomTextValue) MarshalText() ([]byte, error) { return nil, nil }
+
+type emptyCustomStringValue struct{}
+
+func (emptyCustomStringValue) String() string { return "" }
+
+func TestCustomIDFromVarsRejectsEmptyEncodedValues(t *testing.T) {
+	pattern, err := compileCustomIDPattern("/id/{value}")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name  string
+		value any
+	}{
+		{name: "string", value: ""},
+		{name: "text marshaler", value: emptyCustomTextValue{}},
+		{name: "stringer", value: emptyCustomStringValue{}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			_, err := customIDFromVars(pattern, Vars{"value": test.value})
+			require.ErrorIs(t, err, ErrInvalidCustomIDValues)
+		})
+	}
+}
+
 func TestEncodeCustomIDValueSupportsDocumentedTypes(t *testing.T) {
 	pointer := "pointer"
 	tests := []struct {

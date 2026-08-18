@@ -35,6 +35,29 @@ func TestRegisterInstallsAdminComponentAndModalRoutes(t *testing.T) {
 	}
 }
 
+func TestGatekeepMessageCommandExposesOnlyResetAndRetainsModalWorkflow(t *testing.T) {
+	command := Admin.Build().(discord.SlashCommandCreate)
+
+	var gatekeepMessage discord.ApplicationCommandOptionSubCommand
+	found := false
+	for _, option := range command.Options {
+		subcommand, ok := option.(discord.ApplicationCommandOptionSubCommand)
+		if ok && subcommand.Name == "gatekeep-message" {
+			gatekeepMessage = subcommand
+			found = true
+			break
+		}
+	}
+	require.True(t, found)
+	require.Len(t, gatekeepMessage.Options, 1)
+	require.Equal(t, "reset", gatekeepMessage.Options[0].OptionName())
+
+	router := handler.New()
+	Interactions(router)
+	require.True(t, router.Match("/admin/gatekeep-message/button", discord.InteractionTypeComponent, int(discord.ComponentTypeButton)))
+	require.True(t, router.Match("/admin/gatekeep-message/modal", discord.InteractionTypeModalSubmit, 0))
+}
+
 func TestSectionEmbed_StripsLeadingHeading(t *testing.T) {
 	// Six of the seven *Info helpers begin with "## Title\n…". The
 	// section heading must be removed so it isn't rendered twice — once

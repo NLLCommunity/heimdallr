@@ -45,6 +45,7 @@ var parserTypeGetters = map[reflect.Type]getter{
 var (
 	ErrUnsupportedParseType = errors.New("type parameter must be a struct")
 	ErrUnsupportedFieldType = errors.New("unsupported slash command argument field type")
+	ErrNumericConversion    = errors.New("slash command argument numeric conversion failed")
 )
 
 func ParseSlashCommandArgs[T any](e *handler.CommandEvent) (data *T, err error) {
@@ -88,15 +89,21 @@ func ParseSlashCommandArgs[T any](e *handler.CommandEvent) (data *T, err error) 
 			}
 		case reflect.Float32, reflect.Float64:
 			if v, ok := scid.OptFloat(name); ok {
-				setFloat(targetFieldValue, v, ptrDepth)
+				if err := setFloat(targetFieldValue, v, ptrDepth); err != nil {
+					return data, numericConversionError(targetField, name, err)
+				}
 			}
 		case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 			if v, ok := scid.OptInt(name); ok {
-				setInt(targetFieldValue, int64(v), ptrDepth)
+				if err := setInt(targetFieldValue, int64(v), ptrDepth); err != nil {
+					return data, numericConversionError(targetField, name, err)
+				}
 			}
 		case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 			if v, ok := scid.OptInt(name); ok {
-				setUint(targetFieldValue, uint64(v), ptrDepth)
+				if err := setUint(targetFieldValue, int64(v), ptrDepth); err != nil {
+					return data, numericConversionError(targetField, name, err)
+				}
 			}
 		case reflect.String:
 			if v, ok := scid.OptString(name); ok {
@@ -192,51 +199,74 @@ func setValue(field reflect.Value, v any, ptrDepth int) {
 	}
 }
 
-func setInt(field reflect.Value, vi int64, ptrDepth int) {
+func numericConversionError(field reflect.StructField, optionName string, err error) error {
+	return fmt.Errorf(
+		"%w: field %s (option %q) with type %s: %v",
+		ErrNumericConversion,
+		field.Name,
+		optionName,
+		field.Type,
+		err,
+	)
+}
+
+func setInt(field reflect.Value, vi int64, ptrDepth int) error {
+	if ptrDepth > 1 {
+		return errors.New("nested numeric pointers are unsupported")
+	}
+
 	target := field
-	if ptrDepth > 0 {
-		// Build pointer chain to the base kind
-		base := field.Type()
-		for range ptrDepth {
-			base = base.Elem()
-		}
-		p := reflect.New(base)
-		target = p.Elem()
-		defer field.Set(p)
+	if ptrDepth == 1 {
+		target = reflect.New(field.Type().Elem()).Elem()
 	}
 	if target.OverflowInt(vi) {
-		return
+		return fmt.Errorf("%d overflows %s", vi, target.Type())
 	}
 	target.SetInt(vi)
+	if ptrDepth == 1 {
+		pointer := reflect.New(target.Type())
+		pointer.Elem().Set(target)
+		field.Set(pointer)
+	}
+	return nil
 }
 
-func setUint(field reflect.Value, vu uint64, ptrDepth int) {
-	target := field
-	if ptrDepth > 0 {
-		base := field.Type()
-		for range ptrDepth {
-			base = base.Elem()
-		}
-		p := reflect.New(base)
-		target = p.Elem()
-		defer field.Set(p)
+func setUint(field reflect.Value, vi int64, ptrDepth int) error {
+	if ptrDepth > 1 {
+		return errors.New("nested numeric pointers are unsupported")
 	}
+	if vi < 0 {
+		return fmt.Errorf("%d cannot be assigned to an unsigned integer", vi)
+	}
+
+	target := field
+	if ptrDepth == 1 {
+		target = reflect.New(field.Type().Elem()).Elem()
+	}
+	vu := uint64(vi)
 	if target.OverflowUint(vu) {
-		return
+		return fmt.Errorf("%d overflows %s", vu, target.Type())
 	}
 	target.SetUint(vu)
+	if ptrDepth == 1 {
+		pointer := reflect.New(target.Type())
+		pointer.Elem().Set(target)
+		field.Set(pointer)
+	}
+	return nil
 }
 
-func setFloat(field reflect.Value, vf float64, ptrDepth int) {
+func setFloat(field reflect.Value, vf float64, ptrDepth int) error {
+	if ptrDepth > 1 {
+		return errors.New("nested numeric pointers are unsupported")
+	}
+
 	target := field
-	if ptrDepth > 0 {
-		base := field.Type()
-		for range ptrDepth {
-			base = base.Elem()
-		}
-		p := reflect.New(base)
-		target = p.Elem()
-		defer field.Set(p)
+	if ptrDepth == 1 {
+		target = reflect.New(field.Type().Elem()).Elem()
+	}
+	if target.OverflowFloat(vf) {
+		return fmt.Errorf("%g overflows %s", vf, target.Type())
 	}
 
 	switch target.Kind() {
@@ -245,4 +275,10 @@ func setFloat(field reflect.Value, vf float64, ptrDepth int) {
 	case reflect.Float64:
 		target.SetFloat(vf)
 	}
+	if ptrDepth == 1 {
+		pointer := reflect.New(target.Type())
+		pointer.Elem().Set(target)
+		field.Set(pointer)
+	}
+	return nil
 }
