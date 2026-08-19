@@ -63,6 +63,14 @@ func BanHandler(e *handler.CommandEvent) error {
 
 	data := e.SlashCommandInteractionData()
 	user := data.User("user")
+	target, targetResolved := data.OptMember("user")
+	var roles []discord.Role
+	for role := range e.Client().Caches.Roles(guild.ID) {
+		roles = append(roles, role)
+	}
+	if !targetResolved || !canBan(*member, target, guild, roles) {
+		return e.CreateMessage(interactions.EphemeralMessageContent("You cannot ban this user."))
+	}
 	banningUser := e.User()
 
 	duration := data.String("duration")
@@ -124,6 +132,41 @@ func BanHandler(e *handler.CommandEvent) error {
 	}
 
 	return nil
+}
+
+func canBan(invoker, target discord.ResolvedMember, guild discord.Guild, roles []discord.Role) bool {
+	if !invoker.Permissions.Has(discord.PermissionBanMembers) ||
+		invoker.User.ID == target.User.ID ||
+		guild.OwnerID == target.User.ID ||
+		target.Permissions.Has(discord.PermissionAdministrator) {
+		return false
+	}
+
+	roleByID := make(map[snowflake.ID]discord.Role, len(roles))
+	for _, role := range roles {
+		roleByID[role.ID] = role
+	}
+	for _, roleID := range target.RoleIDs {
+		if role, ok := roleByID[roleID]; ok && role.Permissions.Has(discord.PermissionAdministrator) {
+			return false
+		}
+	}
+
+	highestPosition := func(member discord.ResolvedMember) int {
+		highest := 0
+		for _, roleID := range member.RoleIDs {
+			role, ok := roleByID[roleID]
+			if !ok {
+				continue
+			}
+			if role.Position > highest {
+				highest = role.Position
+			}
+		}
+		return highest
+	}
+
+	return guild.OwnerID == invoker.User.ID || highestPosition(invoker) > highestPosition(target)
 }
 
 type BanHandlerData struct {
