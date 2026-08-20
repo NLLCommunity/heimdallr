@@ -10,12 +10,12 @@ import (
 )
 
 type AppCommandRegisterer interface {
-	Register(r *handler.Mux) []discord.ApplicationCommandCreate
+	Register(r handler.Router) []discord.ApplicationCommandCreate
 }
 
-type ApplicationCommandRegisterFunc func(r *handler.Mux) []discord.ApplicationCommandCreate
+type ApplicationCommandRegisterFunc func(r handler.Router) []discord.ApplicationCommandCreate
 
-func (f ApplicationCommandRegisterFunc) Register(r *handler.Mux) []discord.ApplicationCommandCreate {
+func (f ApplicationCommandRegisterFunc) Register(r handler.Router) []discord.ApplicationCommandCreate {
 	return f(r)
 }
 

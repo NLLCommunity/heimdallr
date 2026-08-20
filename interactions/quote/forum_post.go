@@ -9,10 +9,10 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
@@ -24,12 +24,11 @@ const (
 	maxForumPostEmbedDescriptionRunes = 4096
 )
 
-var CreateForumPostCommand = discord.MessageCommandCreate{
-	Name:                     "Copy to New Forum Thread",
-	Contexts:                 []discord.InteractionContextType{discord.InteractionContextTypeGuild},
-	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
-	DefaultMemberPermissions: omit.NewPtr(discord.PermissionSendMessages),
-}
+var CreateForumPostCommand = rave.MessageCommand("Copy to New Forum Thread").
+	AddContexts(discord.InteractionContextTypeGuild).
+	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
+	WithDefaultMemberPermissions(discord.PermissionSendMessages).
+	Handle(CreateForumPostHandler)
 
 // CreateForumPostHandler starts a modal from the message context menu. The
 // source message IDs travel in the modal custom ID; the message itself is
@@ -46,7 +45,13 @@ func CreateForumPostHandler(e *handler.CommandEvent) error {
 		return e.CreateMessage(interactions.EphemeralMessageContent("You don't have permission to read this message."))
 	}
 
-	customID := fmt.Sprintf("/quote/forum-post/%s/%s", message.ChannelID, message.ID)
+	customID, err := forumPostModalRoute.CustomID(forumPostModalVars{
+		ChannelID: message.ChannelID,
+		MessageID: message.ID,
+	})
+	if err != nil {
+		return err
+	}
 	return e.Modal(createForumPostModal(customID, &message, e.User().ID))
 }
 

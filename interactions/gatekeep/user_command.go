@@ -5,19 +5,16 @@ import (
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/omit"
 
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-var ApproveUserCommand = discord.UserCommandCreate{
-	Name:                     "Approve",
-	DefaultMemberPermissions: omit.NewPtr(discord.PermissionKickMembers),
-	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
-	Contexts: []discord.InteractionContextType{
-		discord.InteractionContextTypeGuild,
-	},
-}
+var ApproveUserCommand = rave.UserCommand("Approve").
+	WithDefaultMemberPermissions(discord.PermissionKickMembers).
+	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
+	AddContexts(discord.InteractionContextTypeGuild).
+	Handle(ApproveUserCommandHandler)
 
 func ApproveUserCommandHandler(e *handler.CommandEvent) error {
 	utils.LogInteractionContext("gatekeep", e, e.Ctx)

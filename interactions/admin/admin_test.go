@@ -3,8 +3,96 @@ package admin
 import (
 	"testing"
 
+	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/handler"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
+
+func TestRegisterInstallsAdminComponentAndModalRoutes(t *testing.T) {
+	router := handler.New()
+	Interactions(router)
+
+	componentPaths := []string{
+		"/admin/show-all-button",
+		"/admin/gatekeep-message/button",
+		"/admin/join-message/button",
+		"/admin/leave-message/button",
+		"/admin/ban-footer/button",
+	}
+	for _, path := range componentPaths {
+		require.True(t, router.Match(path, discord.InteractionTypeComponent, int(discord.ComponentTypeButton)), path)
+	}
+
+	modalPaths := []string{
+		"/admin/gatekeep-message/modal",
+		"/admin/join-message/modal",
+		"/admin/leave-message/modal",
+		"/admin/ban-footer/modal",
+	}
+	for _, path := range modalPaths {
+		require.True(t, router.Match(path, discord.InteractionTypeModalSubmit, 0), path)
+	}
+}
+
+func TestGatekeepMessageCommandExposesOnlyResetAndRetainsModalWorkflow(t *testing.T) {
+	command := Admin.Build().(discord.SlashCommandCreate)
+
+	var gatekeepMessage discord.ApplicationCommandOptionSubCommand
+	found := false
+	for _, option := range command.Options {
+		subcommand, ok := option.(discord.ApplicationCommandOptionSubCommand)
+		if ok && subcommand.Name == "gatekeep-message" {
+			gatekeepMessage = subcommand
+			found = true
+			break
+		}
+	}
+	require.True(t, found)
+	require.Len(t, gatekeepMessage.Options, 1)
+	require.Equal(t, "reset", gatekeepMessage.Options[0].OptionName())
+
+	router := handler.New()
+	Interactions(router)
+	require.True(t, router.Match("/admin/gatekeep-message/button", discord.InteractionTypeComponent, int(discord.ComponentTypeButton)))
+	require.True(t, router.Match("/admin/gatekeep-message/modal", discord.InteractionTypeModalSubmit, 0))
+}
+
+func TestAuditRetentionOptionsAllowZeroAndExplainItsMeaning(t *testing.T) {
+	command := Admin.Build().(discord.SlashCommandCreate)
+
+	var auditLog discord.ApplicationCommandOptionSubCommand
+	for _, option := range command.Options {
+		subcommand, ok := option.(discord.ApplicationCommandOptionSubCommand)
+		if ok && subcommand.Name == "audit-log" {
+			auditLog = subcommand
+			break
+		}
+	}
+	require.NotEmpty(t, auditLog.Name)
+
+	wantDescriptions := map[string]string{
+		"message-retention": "Override message-event retention in days. 0 = forever (only if bot ceiling is 0).",
+		"member-retention":  "Override member-event retention in days. 0 = forever (only if bot ceiling is 0).",
+		"guild-retention":   "Override guild-event retention in days. 0 = forever (only if bot ceiling is 0).",
+	}
+	found := make(map[string]bool, len(wantDescriptions))
+	for _, option := range auditLog.Options {
+		integer, ok := option.(discord.ApplicationCommandOptionInt)
+		if !ok {
+			continue
+		}
+		wantDescription, tracked := wantDescriptions[integer.Name]
+		if !tracked {
+			continue
+		}
+		require.NotNil(t, integer.MinValue, integer.Name)
+		require.Equal(t, 0, *integer.MinValue, integer.Name)
+		require.Equal(t, wantDescription, integer.Description, integer.Name)
+		found[integer.Name] = true
+	}
+	require.Len(t, found, len(wantDescriptions))
+}
 
 func TestSectionEmbed_StripsLeadingHeading(t *testing.T) {
 	// Six of the seven *Info helpers begin with "## Title\n…". The

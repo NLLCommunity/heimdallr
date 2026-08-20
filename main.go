@@ -10,10 +10,8 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/disgoorg/disgo"
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/cache"
-	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/disgo/gateway"
 	"github.com/disgoorg/disgo/handler"
@@ -37,6 +35,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/interactions/timeout"
 	"github.com/NLLCommunity/heimdallr/listeners"
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/scheduled_tasks"
 	"github.com/NLLCommunity/heimdallr/web"
 )
@@ -106,29 +105,9 @@ func main() {
 	r := handler.New()
 	r.Use(interactions.RecoverGo)
 
-	commandInteractions := []interactions.ApplicationCommandRegisterFunc{
-		admin.Register,
-		ban.Register,
-		dashboard.Register,
-		gatekeep.Register,
-		infractions.Register,
-		kick.Register,
-		ping.Register,
-		prune.Register,
-		quote.Register,
-		role_button.Register,
-		modmail.Register,
-		timeout.Register,
-	}
-
-	var commandCreates []discord.ApplicationCommandCreate
-
-	for _, register := range commandInteractions {
-		commandCreates = append(commandCreates, register(r)...)
-	}
-
-	client, err := disgo.New(
+	client, err := rave.NewClientWithRouter(
 		token,
+		r,
 		bot.WithLogger(
 			slog.New(
 				slog.NewTextHandler(
@@ -139,7 +118,6 @@ func main() {
 			),
 		),
 		bot.WithDefaultGateway(),
-		bot.WithEventListeners(r),
 		bot.WithEventListenerFunc(
 			func(e *events.Ready) {
 				fmt.Println("Bot is ready!")
@@ -174,11 +152,21 @@ func main() {
 		devGuilds = append(devGuilds, snowflake.ID(viper.GetUint64("dev_mode.guild_id")))
 	}
 
-	err = handler.SyncCommands(
-		client,
-		commandCreates,
-		devGuilds,
+	err = client.RegisterAndSyncBundles(devGuilds,
+		admin.Interactions,
+		ban.Interactions,
+		dashboard.Interactions,
+		gatekeep.Interactions,
+		infractions.Interactions,
+		kick.Interactions,
+		ping.Interactions,
+		prune.Interactions,
+		quote.Interactions,
+		role_button.Interactions,
+		modmail.Interactions,
+		timeout.Interactions,
 	)
+
 	if err != nil {
 		panic(fmt.Errorf("failed to sync commands: %w", err))
 	}
@@ -188,7 +176,7 @@ func main() {
 		panic(fmt.Errorf("failed to open gateway: %w", err))
 	}
 
-	removeTempBansTask := scheduled_tasks.RemoveTempBansScheduledTask(client)
+	removeTempBansTask := scheduled_tasks.RemoveTempBansScheduledTask(client.Client)
 	removeStalePrunesTask := scheduled_tasks.RemoveStalePendingPrunes()
 	pruneAuditLogTask := scheduled_tasks.PruneAuditLogScheduledTask()
 	removeExpiredMessagesTask := scheduled_tasks.RemoveExpiredMessagesInTTLCache()
@@ -198,7 +186,7 @@ func main() {
 	webDone := make(chan struct{})
 	go func() {
 		defer close(webDone)
-		if err := web.StartServer(webCtx, viper.GetString("web.address"), client); err != nil {
+		if err := web.StartServer(webCtx, viper.GetString("web.address"), client.Client); err != nil {
 			slog.Error("Web server stopped with error", "error", err)
 		}
 	}()

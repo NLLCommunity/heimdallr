@@ -3,52 +3,12 @@ package admin
 import (
 	"fmt"
 
-	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
-
-var gatekeepSubcommand = discord.ApplicationCommandOptionSubCommand{
-	Name:        "gatekeep",
-	Description: "View or set gatekeep-related settings",
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionBool{
-			Name:        "enabled",
-			Description: "Whether to enable the gatekeep system",
-			Required:    false,
-		},
-		discord.ApplicationCommandOptionRole{
-			Name:        "pending-role",
-			Description: "The role to give to users pending approval",
-			Required:    false,
-		},
-		discord.ApplicationCommandOptionRole{
-			Name:        "approved-role",
-			Description: "The role to give to approved users",
-			Required:    false,
-		},
-		discord.ApplicationCommandOptionBool{
-			Name:        "use-pending-role",
-			Description: "Whether to give the pending role to users when they join",
-			Required:    false,
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "reset",
-			Description: "Reset a setting to its default value",
-			Required:    false,
-			Choices: []discord.ApplicationCommandOptionChoiceString{
-				{Name: "Enabled", Value: "enabled"},
-				{Name: "Pending role", Value: "pending-role"},
-				{Name: "Approved role", Value: "approved-role"},
-				{Name: "Use pending role", Value: "use-pending-role"},
-				{Name: "All", Value: "all"},
-			},
-		},
-	},
-}
 
 func AdminGatekeepHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("admin", e)

@@ -1,7 +1,6 @@
 package modmail
 
 import (
-	"fmt"
 	"log/slog"
 	"strconv"
 	"time"
@@ -10,57 +9,9 @@ import (
 	"github.com/disgoorg/disgo/handler"
 
 	ix "github.com/NLLCommunity/heimdallr/interactions"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
-
-var createSubcommand = discord.ApplicationCommandOptionSubCommand{
-	Name:        "create-button",
-	Description: "Create a button for creating Modmail threads in the current channel.",
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionString{
-			Name:        "label",
-			Description: "The label to display on the button.",
-			Required:    true,
-			MinLength:   new(3),
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "button-color",
-			Description: "The color of the button.",
-			Required:    false,
-			Choices: []discord.ApplicationCommandOptionChoiceString{
-				{Name: "Red", Value: "red"},
-				{Name: "Green", Value: "green"},
-				{Name: "Blue", Value: "blue"},
-				{Name: "Gray", Value: "gray"},
-			},
-		},
-		discord.ApplicationCommandOptionRole{
-			Name:        "role",
-			Description: "Role that should be mentioned/notified when a new thread is created.",
-			Required:    false,
-		},
-		discord.ApplicationCommandOptionChannel{
-			Name:        "channel",
-			Description: "Channel that notifications should be sent to.",
-			Required:    false,
-			ChannelTypes: []discord.ChannelType{
-				discord.ChannelTypeGuildText,
-			},
-		},
-		discord.ApplicationCommandOptionInt{
-			Name:        "max-active-reports",
-			Description: "The maximum number of active reports that a user can have in the channel.",
-			Required:    false,
-			MinValue:    new(0),
-			MaxValue:    new(100),
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "slow-mode-time",
-			Description: "Enable slow mode for the report thread in the format '1h5m30s1' ('0s' = disabled)",
-			Required:    false,
-		},
-	},
-}
 
 var stringToButtonStyle = map[string]discord.ButtonStyle{
 	"red":   discord.ButtonStyleDanger,
@@ -103,20 +54,31 @@ func ModmailAdminCreateButtonHandler(e *handler.CommandEvent) error {
 		)
 	}
 
+	customID, err := modmailReportButtonRoute.CustomID(modmailReportVars{
+		Role:      role.ID,
+		Channel:   channel.ID,
+		MaxActive: maxActive,
+		SlowMode:  slowModeCustomIDValue(slowMode),
+	})
+	if err != nil {
+		return err
+	}
+
 	return e.CreateMessage(
 		discord.NewMessageCreate().
 			AddActionRow(
 				discord.NewButton(
 					stringToButtonStyle[color],
 					label,
-					fmt.Sprintf(
-						"/modmail/report-button/%s/%s/%d/%.0f",
-						role.ID, channel.ID, maxActive, slowMode.Seconds(),
-					),
+					customID,
 					"", 0,
 				),
 			),
 	)
+}
+
+func slowModeCustomIDValue(slowMode time.Duration) string {
+	return strconv.FormatFloat(slowMode.Seconds(), 'f', 0, 64)
 }
 
 func ModmailReportButtonHandler(e *handler.ComponentEvent) error {
@@ -147,7 +109,12 @@ func ModmailReportButtonHandler(e *handler.ComponentEvent) error {
 		)
 	}
 
-	customID := fmt.Sprintf("/modmail/report-modal/%s/%s/%s/%s", role, channel, maxActiveStr, slowModeStr)
+	customID, err := modmailReportModalRoute.CustomIDVars(rave.Vars{
+		"role": role, "channel": channel, "max-active": maxActiveStr, "slow-mode": slowModeStr,
+	})
+	if err != nil {
+		return err
+	}
 
 	slog.Info("Sending modal", "custom_id", customID)
 

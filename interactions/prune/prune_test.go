@@ -6,11 +6,19 @@ import (
 	"testing"
 
 	"github.com/disgoorg/disgo/discord"
+	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func TestRegisterInstallsPruneRoutes(t *testing.T) {
+	router := handler.New()
+	Interactions(router)
+	require.True(t, router.Match("/button/prune-members/confirm/id", discord.InteractionTypeComponent, int(discord.ComponentTypeButton)))
+	require.True(t, router.Match("/button/prune-members/cancel/id", discord.InteractionTypeComponent, int(discord.ComponentTypeButton)))
+}
 
 func makeMembers(n int) []discord.Member {
 	members := make([]discord.Member, 0, n)
@@ -29,12 +37,14 @@ func TestBuildPruneConfirmMessages(t *testing.T) {
 	pruneID := uuid.New()
 
 	t.Run("few members fit in a single list message plus prompt", func(t *testing.T) {
-		messages := buildPruneConfirmMessages(pruneID, makeMembers(3))
+		messages, err := buildPruneConfirmMessages(pruneID, makeMembers(3))
+		require.NoError(t, err)
 		require.Len(t, messages, 2)
 	})
 
 	t.Run("no message content exceeds the Discord limit", func(t *testing.T) {
-		messages := buildPruneConfirmMessages(pruneID, makeMembers(500))
+		messages, err := buildPruneConfirmMessages(pruneID, makeMembers(500))
+		require.NoError(t, err)
 		require.Greater(t, len(messages), 1)
 		for i, msg := range messages {
 			assert.LessOrEqual(t, len(msg.Content), 2000, "message %d exceeds 2000 chars", i)
@@ -43,7 +53,8 @@ func TestBuildPruneConfirmMessages(t *testing.T) {
 
 	t.Run("every member is listed across the messages", func(t *testing.T) {
 		members := makeMembers(500)
-		messages := buildPruneConfirmMessages(pruneID, members)
+		messages, err := buildPruneConfirmMessages(pruneID, members)
+		require.NoError(t, err)
 
 		var all strings.Builder
 		for _, msg := range messages {
@@ -57,7 +68,8 @@ func TestBuildPruneConfirmMessages(t *testing.T) {
 	})
 
 	t.Run("only the last message has the confirm and cancel buttons", func(t *testing.T) {
-		messages := buildPruneConfirmMessages(pruneID, makeMembers(500))
+		messages, err := buildPruneConfirmMessages(pruneID, makeMembers(500))
+		require.NoError(t, err)
 
 		for i, msg := range messages[:len(messages)-1] {
 			assert.Empty(t, msg.Components, "message %d should not have components", i)
@@ -65,12 +77,13 @@ func TestBuildPruneConfirmMessages(t *testing.T) {
 
 		last := messages[len(messages)-1]
 		require.NotEmpty(t, last.Components)
-		assert.Contains(t, componentCustomIDs(t, last), fmt.Sprintf("/button/prune-members/confirm/%s", pruneID))
-		assert.Contains(t, componentCustomIDs(t, last), fmt.Sprintf("/button/prune-members/cancel/%s", pruneID))
+		assert.Contains(t, componentCustomIDs(t, last), "/button/prune-members/confirm/"+pruneID.String())
+		assert.Contains(t, componentCustomIDs(t, last), "/button/prune-members/cancel/"+pruneID.String())
 	})
 
 	t.Run("button message stays short enough to append to later", func(t *testing.T) {
-		messages := buildPruneConfirmMessages(pruneID, makeMembers(500))
+		messages, err := buildPruneConfirmMessages(pruneID, makeMembers(500))
+		require.NoError(t, err)
 		last := messages[len(messages)-1]
 		// PruneCancelHandler appends to this message on cancel; it must have
 		// plenty of headroom below the 2000 char limit.
@@ -78,7 +91,8 @@ func TestBuildPruneConfirmMessages(t *testing.T) {
 	})
 
 	t.Run("all messages are ephemeral", func(t *testing.T) {
-		messages := buildPruneConfirmMessages(pruneID, makeMembers(500))
+		messages, err := buildPruneConfirmMessages(pruneID, makeMembers(500))
+		require.NoError(t, err)
 		for i, msg := range messages {
 			assert.NotZero(t, msg.Flags&discord.MessageFlagEphemeral, "message %d is not ephemeral", i)
 		}

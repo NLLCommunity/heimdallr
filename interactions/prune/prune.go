@@ -11,59 +11,48 @@ import (
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 	"github.com/google/uuid"
 
 	ix "github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
-	r.Command("/prune-pending-members", PruneHandler)
-	r.Component("/button/prune-members/confirm/{pruneID}", PruneConfirmHandler)
-	r.Component("/button/prune-members/cancel/{pruneID}", PruneCancelHandler)
+var Interactions = rave.Bundle(
+	Prune,
+	pruneCancelRoute,
+	pruneConfirmRoute,
+)
 
-	return []discord.ApplicationCommandCreate{PruneCommand}
+type pruneRouteVars struct {
+	PruneID uuid.UUID `rave:"pruneID"`
 }
 
-var PruneCommand = discord.SlashCommandCreate{
-	Name: "prune-pending-members",
-	NameLocalizations: map[discord.Locale]string{
-		discord.LocaleNorwegian: "fjern-ventende-medlemmer",
-	},
-	Description: "Prune members.",
-	DescriptionLocalizations: map[discord.Locale]string{
-		discord.LocaleNorwegian: "Fjern medlemmer.",
-	},
+var pruneConfirmRoute = rave.ComponentOf[pruneRouteVars](
+	"/button/prune-members/confirm/{pruneID}",
+).Handle(PruneConfirmHandler)
 
-	Contexts: []discord.InteractionContextType{
-		discord.InteractionContextTypeGuild,
-	},
-	IntegrationTypes: []discord.ApplicationIntegrationType{
-		discord.ApplicationIntegrationTypeGuildInstall,
-	},
+var pruneCancelRoute = rave.ComponentOf[pruneRouteVars](
+	"/button/prune-members/cancel/{pruneID}",
+).Handle(PruneCancelHandler)
 
-	DefaultMemberPermissions: omit.NewPtr(discord.PermissionManageGuild),
-
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionInt{
-			Name: "days",
-			NameLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "dager",
-			},
-			Description: "The number of days to prune members for.",
-			DescriptionLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "Antall dager å fjerne medlemmer for.",
-			},
-			Required: true,
-
-			MinValue: new(0),
-			MaxValue: new(90),
-		},
-	},
-}
+var Prune = rave.Slash("prune-pending-members", "Prune members.").
+	AddNameLocalization(discord.LocaleNorwegian, "fjern-ventende-medlemmer").
+	AddDescriptionLocalization(discord.LocaleNorwegian, "Fjern medlemmer.").
+	AddContexts(discord.InteractionContextTypeGuild).
+	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
+	WithDefaultMemberPermissions(discord.PermissionManageGuild).
+	AddOptions(
+		rave.OptionInt("days", "The number of days a member has been pending.").
+			AddNameLocalization(discord.LocaleNorwegian, "dager").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Antall dager en bruker har vært i serveren og ikke blitt godkjent.").
+			WithRequired(true).
+			WithMinValue(0).
+			WithMaxValue(90),
+	).
+	Handle(PruneHandler)
 
 func PruneConfirmHandler(e *handler.ComponentEvent) error {
 	if e.GuildID() == nil {
@@ -349,7 +338,7 @@ func preparePruneMembers(pruneID uuid.UUID, members []discord.Member) (
 		return nil, err
 	}
 
-	return buildPruneConfirmMessages(pruneID, members), nil
+	return buildPruneConfirmMessages(pruneID, members)
 }
 
 // buildPruneConfirmMessages builds the confirmation messages for a prune. The
@@ -357,7 +346,16 @@ func preparePruneMembers(pruneID uuid.UUID, members []discord.Member) (
 // split across as many messages as needed. The confirm/cancel buttons go on a
 // separate short final message, which also leaves room for PruneCancelHandler
 // to append to it on cancellation.
-func buildPruneConfirmMessages(pruneID uuid.UUID, members []discord.Member) []discord.MessageCreate {
+func buildPruneConfirmMessages(pruneID uuid.UUID, members []discord.Member) ([]discord.MessageCreate, error) {
+	confirmID, err := pruneConfirmRoute.CustomID(pruneRouteVars{PruneID: pruneID})
+	if err != nil {
+		return nil, err
+	}
+	cancelID, err := pruneCancelRoute.CustomID(pruneRouteVars{PruneID: pruneID})
+	if err != nil {
+		return nil, err
+	}
+
 	var content strings.Builder
 	fmt.Fprintf(&content, "## The following %d members will be pruned and kicked from the server\n", len(members))
 	for _, member := range members {
@@ -371,11 +369,11 @@ func buildPruneConfirmMessages(pruneID uuid.UUID, members []discord.Member) []di
 
 	prompt := ix.EphemeralMessageContentf("Prune the %d members listed above?", len(members)).
 		AddActionRow(
-			discord.NewDangerButton("Prune members", fmt.Sprintf("/button/prune-members/confirm/%s", pruneID)),
-			discord.NewSecondaryButton("Cancel", fmt.Sprintf("/button/prune-members/cancel/%s", pruneID)),
+			discord.NewDangerButton("Prune members", confirmID),
+			discord.NewSecondaryButton("Cancel", cancelID),
 		)
 
-	return append(messages, prompt)
+	return append(messages, prompt), nil
 }
 
 func getPrunableMembers(
