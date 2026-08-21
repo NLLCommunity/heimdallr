@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -33,6 +34,8 @@ type recordingRESTClient struct {
 	requests     []recordedRESTRequest
 	queuedErrors []error
 	delay        time.Duration
+	entered      chan<- struct{}
+	release      <-chan struct{}
 	inFlight     atomic.Int32
 	maxInFlight  atomic.Int32
 }
@@ -102,6 +105,12 @@ func (c *recordingRESTClient) Do(
 	}
 	if c.delay > 0 {
 		time.Sleep(c.delay)
+	}
+	if c.entered != nil {
+		c.entered <- struct{}{}
+	}
+	if c.release != nil {
+		<-c.release
 	}
 
 	commands, _ := input.([]discord.ApplicationCommandCreate)
@@ -188,6 +197,7 @@ func TestRegisterAndSyncBundlesRetryInstallsRoutesOnce(t *testing.T) {
 	client := newSyncTestClient(recorder)
 	var installs atomic.Int32
 	var handlerCalls atomic.Int32
+	var replacementInstalls atomic.Int32
 	bundle := func(router handler.Router) []discord.ApplicationCommandCreate {
 		installs.Add(1)
 		return rave.Bundle(
@@ -201,6 +211,15 @@ func TestRegisterAndSyncBundlesRetryInstallsRoutesOnce(t *testing.T) {
 
 	err := client.RegisterAndSyncBundlesGlobal(bundle)
 	require.ErrorIs(t, err, syncErr)
+	replacement := func(handler.Router) []discord.ApplicationCommandCreate {
+		replacementInstalls.Add(1)
+		return nil
+	}
+	err = client.RegisterAndSyncBundlesGlobal(replacement)
+	require.ErrorIs(t, err, rave.ErrBundlesAlreadyRegistered)
+	require.Equal(t, int32(1), installs.Load())
+	require.Zero(t, replacementInstalls.Load())
+	require.Len(t, recorder.requests, 1)
 	require.NoError(t, client.RetrySyncBundles())
 
 	client.Router.OnEvent(&events.InteractionCreate{
@@ -233,23 +252,58 @@ func TestRetrySyncBundlesRejectsMissingInstallation(t *testing.T) {
 
 func TestRegisterAndSyncBundlesRejectsRepeatedRegistration(t *testing.T) {
 	tests := []struct {
-		name  string
-		retry []rave.BundledInteractions
+		name      string
+		makeRetry func(rave.BundledInteractions, *atomic.Int32) []rave.BundledInteractions
 	}{
-		{name: "same bundles", retry: []rave.BundledInteractions{emptyBundle}},
-		{name: "different bundles", retry: []rave.BundledInteractions{func(handler.Router) []discord.ApplicationCommandCreate { return nil }}},
-		{name: "different count", retry: []rave.BundledInteractions{emptyBundle, emptyBundle}},
+		{
+			name: "same bundles",
+			makeRetry: func(initial rave.BundledInteractions, _ *atomic.Int32) []rave.BundledInteractions {
+				return []rave.BundledInteractions{initial}
+			},
+		},
+		{
+			name: "different bundles",
+			makeRetry: func(_ rave.BundledInteractions, rejectedCalls *atomic.Int32) []rave.BundledInteractions {
+				return []rave.BundledInteractions{func(handler.Router) []discord.ApplicationCommandCreate {
+					rejectedCalls.Add(1)
+					return nil
+				}}
+			},
+		},
+		{
+			name: "different count",
+			makeRetry: func(_ rave.BundledInteractions, rejectedCalls *atomic.Int32) []rave.BundledInteractions {
+				return []rave.BundledInteractions{
+					func(handler.Router) []discord.ApplicationCommandCreate {
+						rejectedCalls.Add(1)
+						return nil
+					},
+					func(handler.Router) []discord.ApplicationCommandCreate {
+						rejectedCalls.Add(1)
+						return nil
+					},
+				}
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			recorder := &recordingRESTClient{}
 			client := newSyncTestClient(recorder)
-			require.NoError(t, client.RegisterAndSyncBundlesGlobal(emptyBundle))
+			var initialCalls atomic.Int32
+			var rejectedCalls atomic.Int32
+			initial := func(handler.Router) []discord.ApplicationCommandCreate {
+				initialCalls.Add(1)
+				return nil
+			}
+			require.NoError(t, client.RegisterAndSyncBundlesGlobal(initial))
 
-			err := client.RegisterAndSyncBundlesGlobal(test.retry...)
+			err := client.RegisterAndSyncBundlesGlobal(test.makeRetry(initial, &rejectedCalls)...)
 
 			require.ErrorIs(t, err, rave.ErrBundlesAlreadyRegistered)
+			require.Equal(t, int32(1), initialCalls.Load())
+			require.Zero(t, rejectedCalls.Load())
 			require.Len(t, recorder.requests, 1)
 		})
 	}
@@ -320,6 +374,41 @@ func TestRegisterAndSyncBundlesConcurrentRetriesReuseInstallation(t *testing.T) 
 	require.Equal(t, int32(1), installs.Load())
 	require.Equal(t, int32(1), handlerCalls.Load())
 	require.Len(t, recorder.requests, retries+1)
+	require.Equal(t, int32(1), recorder.maxInFlight.Load())
+}
+
+func TestRetrySyncBundlesWaitsForRegistrationSynchronization(t *testing.T) {
+	previousMaxProcs := runtime.GOMAXPROCS(1)
+	defer runtime.GOMAXPROCS(previousMaxProcs)
+
+	entered := make(chan struct{}, 2)
+	release := make(chan struct{})
+	recorder := &recordingRESTClient{entered: entered, release: release}
+	client := newSyncTestClient(recorder)
+	registrationErr := make(chan error, 1)
+	go func() {
+		registrationErr <- client.RegisterAndSyncBundlesGlobal(emptyBundle)
+	}()
+	<-entered
+
+	retryStarted := make(chan struct{})
+	retryErr := make(chan error, 1)
+	go func() {
+		close(retryStarted)
+		retryErr <- client.RetrySyncBundles()
+	}()
+	<-retryStarted
+
+	select {
+	case <-entered:
+		t.Fatal("retry entered REST before registration synchronization completed")
+	default:
+	}
+
+	close(release)
+	require.NoError(t, <-registrationErr)
+	require.NoError(t, <-retryErr)
+	require.Len(t, recorder.requests, 2)
 	require.Equal(t, int32(1), recorder.maxInFlight.Load())
 }
 
