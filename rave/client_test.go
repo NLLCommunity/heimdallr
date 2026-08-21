@@ -398,6 +398,7 @@ func TestRetrySyncBundlesWaitsForRegistrationSynchronization(t *testing.T) {
 		retryErr <- client.RetrySyncBundles()
 	}()
 	<-retryStarted
+	runtime.Gosched()
 
 	select {
 	case <-entered:
