@@ -343,7 +343,7 @@ func handleSandboxEdit(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 			// Edits replace AllowedMentions; without setting it explicitly,
 			// Discord re-evaluates mentions from the new content and pings
 			// anyone @-mentioned in the edited markdown.
-			update = discord.NewMessageUpdateV2(discordComponents).WithAllowedMentions(&discord.AllowedMentions{})
+			update = discord.NewMessageUpdateV2(discordComponents...).WithAllowedMentions(&discord.AllowedMentions{})
 		} else {
 			content := r.FormValue("content")
 			if utf8.RuneCountInString(content) > maxSandboxContentChars {

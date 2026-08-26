@@ -21,6 +21,17 @@ func TestRegisterInstallsModmailRoutes(t *testing.T) {
 	require.True(t, router.Match("/modmail/report-message/1/2", discord.InteractionTypeModalSubmit, 0))
 }
 
+func TestReportModalsContainOnlyTheirLabels(t *testing.T) {
+	messageModal := reportMessageModal("/modmail/report-message/1/2")
+	require.Len(t, messageModal.Components, 1)
+	require.Equal(t, discord.ComponentTypeLabel, messageModal.Components[0].Type())
+
+	modal := reportModal("/modmail/report-modal/1/2/3/4")
+	require.Len(t, modal.Components, 2)
+	require.Equal(t, discord.ComponentTypeLabel, modal.Components[0].Type())
+	require.Equal(t, discord.ComponentTypeLabel, modal.Components[1].Type())
+}
+
 func TestCreateButtonLabelRequiresAtLeastThreeCharacters(t *testing.T) {
 	command := ModmailAdmin.Build().(discord.SlashCommandCreate)
 

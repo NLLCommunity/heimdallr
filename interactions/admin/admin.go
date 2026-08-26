@@ -239,6 +239,6 @@ func AdminShowAllButtonHandler(e *handler.ComponentEvent) error {
 }
 
 func messageModal(customID, title, contents string) discord.ModalCreate {
-	return discord.NewModalCreate(customID, title, nil).
+	return discord.NewModalCreate(customID, title).
 		AddLabel(title, discord.NewParagraphTextInput("message").WithValue(contents))
 }

@@ -146,11 +146,11 @@ func createInfractionEmbeds(infractions []model.Infraction, guildSettings *model
 			inf.Weight,
 		)
 
-		embed := discord.NewEmbedBuilder().
-			SetTitlef("Infraction `%s`", inf.Sqid()).
-			SetDescription(inf.Reason).
-			SetColor(severityToColor(inf.Weight)).
-			SetTimestamp(inf.Timestamp).
+		embed := discord.NewEmbed().
+			WithTitlef("Infraction `%s`", inf.Sqid()).
+			WithDescription(inf.Reason).
+			WithColor(severityToColor(inf.Weight)).
+			WithTimestamp(inf.Timestamp).
 			AddField(
 				"Strikes",
 				fmt.Sprintf(
@@ -161,7 +161,7 @@ func createInfractionEmbeds(infractions []model.Infraction, guildSettings *model
 				), true,
 			)
 
-		embeds = append(embeds, embed.Build())
+		embeds = append(embeds, embed)
 	}
 	return embeds
 }

@@ -30,13 +30,15 @@ func ModmailReportMessageHandler(e *handler.CommandEvent) error {
 		return err
 	}
 
-	modal := discord.NewModalCreate(customID, "Report message", nil).
+	return e.Modal(reportMessageModal(customID))
+}
+
+func reportMessageModal(customID string) discord.ModalCreate {
+	return discord.NewModalCreate(customID, "Report message").
 		AddLabel(
 			"Report reason", discord.NewParagraphTextInput("reason").
 				WithPlaceholder("The reason for reporting the message."),
 		)
-
-	return e.Modal(modal)
 }
 
 func ModmailReportMessageModalHandler(e *handler.ModalEvent) error {
@@ -163,11 +165,10 @@ func createReportThreadAndMessage(data *reportData) error {
 		return err
 	}
 
-	reasonEmbed := discord.NewEmbedBuilder().
-		SetAuthor(user.Username, "", getUserAvatarURL(&user)).
-		SetTitle("Message Report").
-		SetDescription(data.reason).
-		Build()
+	reasonEmbed := discord.NewEmbed().
+		WithAuthor(user.Username, "", getUserAvatarURL(&user)).
+		WithTitle("Message Report").
+		WithDescription(data.reason)
 
 	messageText := user.Mention()
 	if data.modmailSettings.ReportPingRole != 0 {

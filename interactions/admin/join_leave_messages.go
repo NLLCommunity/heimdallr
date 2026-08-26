@@ -47,15 +47,13 @@ func AdminJoinMessageHandler(e *handler.CommandEvent) error {
 		)
 	}
 
-	embed := discord.NewEmbedBuilder().
-		SetTitle("Join message").
-		SetDescription(settings.JoinMessage).
-		Build()
+	embed := discord.NewEmbed().
+		WithTitle("Join message").
+		WithDescription(settings.JoinMessage)
 
-	templateInfoEmbed := discord.NewEmbedBuilder().
-		SetTitle("Placeholder values").
-		SetDescription(utils.MessageTemplateInfo()).
-		Build()
+	templateInfoEmbed := discord.NewEmbed().
+		WithTitle("Placeholder values").
+		WithDescription(utils.MessageTemplateInfo())
 
 	return e.CreateMessage(
 		interactions.EphemeralMessageContent("").
@@ -170,15 +168,13 @@ func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
 		)
 	}
 
-	embed := discord.NewEmbedBuilder().
-		SetTitle("Leave message").
-		SetDescription(settings.LeaveMessage).
-		Build()
+	embed := discord.NewEmbed().
+		WithTitle("Leave message").
+		WithDescription(settings.LeaveMessage)
 
-	templateInfoEmbed := discord.NewEmbedBuilder().
-		SetTitle("Placeholder values").
-		SetDescription(utils.MessageTemplateInfo()).
-		Build()
+	templateInfoEmbed := discord.NewEmbed().
+		WithTitle("Placeholder values").
+		WithDescription(utils.MessageTemplateInfo())
 
 	return e.CreateMessage(
 		interactions.EphemeralMessageContent("").

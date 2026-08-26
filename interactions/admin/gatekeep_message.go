@@ -48,15 +48,13 @@ func AdminGatekeepMessageHandler(e *handler.CommandEvent) error {
 		)
 	}
 
-	embed := discord.NewEmbedBuilder().
-		SetTitle("Gatekeep approved message").
-		SetDescription(settings.GatekeepApprovedMessage).
-		Build()
+	embed := discord.NewEmbed().
+		WithTitle("Gatekeep approved message").
+		WithDescription(settings.GatekeepApprovedMessage)
 
-	templateInfoEmbed := discord.NewEmbedBuilder().
-		SetTitle("Placeholder values").
-		SetDescription(utils.MessageTemplateInfo()).
-		Build()
+	templateInfoEmbed := discord.NewEmbed().
+		WithTitle("Placeholder values").
+		WithDescription(utils.MessageTemplateInfo())
 
 	return e.CreateMessage(
 		interactions.EphemeralMessageContent("").

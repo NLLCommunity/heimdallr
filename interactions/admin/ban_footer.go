@@ -52,10 +52,9 @@ func AdminBanFooterHandler(e *handler.CommandEvent) error {
 		return e.CreateMessage(ix.EphemeralMessageContent("Ban footer has been reset."))
 	}
 
-	embed := discord.NewEmbedBuilder().
-		SetTitle("Ban footer").
-		SetDescription(utils.Iif(settings.BanFooter == "", "*no footer set*", settings.BanFooter)).
-		Build()
+	embed := discord.NewEmbed().
+		WithTitle("Ban footer").
+		WithDescription(utils.Iif(settings.BanFooter == "", "*no footer set*", settings.BanFooter))
 
 	return e.CreateMessage(
 		ix.EphemeralMessageContentf(
