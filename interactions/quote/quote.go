@@ -125,21 +125,21 @@ func CreateMessageQuoteEmbed(client *bot.Client, message *discord.Message, showR
 		)
 	}
 
-	embed := discord.NewEmbedBuilder().
-		SetDescription(message.Content).
-		SetAuthor(message.Author.EffectiveName(), "", message.Author.EffectiveAvatarURL()).
-		SetTimestamp(message.CreatedAt).
-		SetFooter(channelName, "")
+	embed := discord.NewEmbed().
+		WithDescription(message.Content).
+		WithAuthor(message.Author.EffectiveName(), "", message.Author.EffectiveAvatarURL()).
+		WithTimestamp(message.CreatedAt).
+		WithFooter(channelName, "")
 
 	if len(message.Attachments) == 1 {
 		att := message.Attachments[0]
-		embed.SetImage(att.URL)
+		embed = embed.WithImage(att.URL)
 	} else if len(message.Attachments) > 1 {
 		var lines []string
 		for _, att := range message.Attachments {
 			lines = append(lines, fmt.Sprintf("- [%s](%s)", att.Filename, att.URL))
 		}
-		embed.AddField("Attachments", strings.Join(lines, "\n"), false)
+		embed = embed.AddField("Attachments", strings.Join(lines, "\n"), false)
 	}
 	if message.ReferencedMessage != nil && showReferenced {
 		ref := message.ReferencedMessage
@@ -155,10 +155,10 @@ func CreateMessageQuoteEmbed(client *bot.Client, message *discord.Message, showR
 		}
 		msg += fmt.Sprintf("\n%s", ref.JumpURL())
 
-		embed.AddField("Reply to", msg, false)
+		embed = embed.AddField("Reply to", msg, false)
 	}
 
-	return embed.Build()
+	return embed
 
 }
 

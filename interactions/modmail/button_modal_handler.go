@@ -91,12 +91,11 @@ func ModmailReportModalHandler(e *handler.ModalEvent) error {
 	user := e.User()
 	avatarURL := getUserAvatarURL(&user)
 
-	embed := discord.NewEmbedBuilder().
-		SetTitle(title).
-		SetDescription(description).
-		SetColor(0x4848FF).
-		SetAuthor(user.Username, "", avatarURL).
-		Build()
+	embed := discord.NewEmbed().
+		WithTitle(title).
+		WithDescription(description).
+		WithColor(0x4848FF).
+		WithAuthor(user.Username, "", avatarURL)
 
 	message, err := e.Client().Rest.CreateMessage(
 		thread.ID(),

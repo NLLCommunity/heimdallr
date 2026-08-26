@@ -109,11 +109,11 @@ func WarnHandler(e *handler.CommandEvent) error {
 		},
 	})
 
-	embed := discord.NewEmbedBuilder().
-		SetTitlef(`Warning in "%s"`, guild.Name).
-		SetDescription(inf.Reason).
-		SetColor(severityToColor(inf.Weight)).
-		SetTimestamp(inf.Timestamp)
+	embed := discord.NewEmbed().
+		WithTitlef(`Warning in "%s"`, guild.Name).
+		WithDescription(inf.Reason).
+		WithColor(severityToColor(inf.Weight)).
+		WithTimestamp(inf.Timestamp)
 
 	slog.DebugContext(ctx, "Created embed.")
 
@@ -126,7 +126,7 @@ func WarnHandler(e *handler.CommandEvent) error {
 
 			_, err = e.Client().Rest.CreateMessage(
 				channel.ID(), discord.NewMessageCreate().
-					WithEmbeds(embed.Build()),
+					WithEmbeds(embed),
 			)
 			if err != nil {
 				failedToSend = true
@@ -143,7 +143,7 @@ func WarnHandler(e *handler.CommandEvent) error {
 			),
 			user.Mention(),
 		).
-		WithEmbeds(embed.Build())
+		WithEmbeds(embed)
 
 	guildSettings, err := model.GetGuildSettings(guild.ID)
 	if err == nil && guildSettings.ModeratorChannel != 0 {

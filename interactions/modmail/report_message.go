@@ -163,11 +163,10 @@ func createReportThreadAndMessage(data *reportData) error {
 		return err
 	}
 
-	reasonEmbed := discord.NewEmbedBuilder().
-		SetAuthor(user.Username, "", getUserAvatarURL(&user)).
-		SetTitle("Message Report").
-		SetDescription(data.reason).
-		Build()
+	reasonEmbed := discord.NewEmbed().
+		WithAuthor(user.Username, "", getUserAvatarURL(&user)).
+		WithTitle("Message Report").
+		WithDescription(data.reason)
 
 	messageText := user.Mention()
 	if data.modmailSettings.ReportPingRole != 0 {
