@@ -118,7 +118,20 @@ func ModmailReportButtonHandler(e *handler.ComponentEvent) error {
 
 	slog.Info("Sending modal", "custom_id", customID)
 
-	modal := discord.NewModalCreate(customID, "Report", nil).
+	modal := reportModal(customID)
+
+	err = e.Modal(modal)
+	if err != nil {
+		slog.Error("Failed to send modal", "err", err)
+		return err
+	}
+
+	slog.Info("Sent modal")
+	return nil
+}
+
+func reportModal(customID string) discord.ModalCreate {
+	return discord.NewModalCreate(customID, "Report").
 		AddLabel(
 			"Subject", discord.NewShortTextInput("title").
 				WithPlaceholder("Subject or topic of the report").
@@ -136,13 +149,4 @@ func ModmailReportButtonHandler(e *handler.ComponentEvent) error {
 				WithRequired(true).
 				WithMinLength(10),
 		)
-
-	err = e.Modal(modal)
-	if err != nil {
-		slog.Error("Failed to send modal", "err", err)
-		return err
-	}
-
-	slog.Info("Sent modal")
-	return nil
 }

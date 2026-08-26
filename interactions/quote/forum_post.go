@@ -56,7 +56,7 @@ func CreateForumPostHandler(e *handler.CommandEvent) error {
 }
 
 func createForumPostModal(customID string, message *discord.Message, userID snowflake.ID) discord.ModalCreate {
-	modal := discord.NewModalCreate(customID, "Create Forum Post", nil).
+	modal := discord.NewModalCreate(customID, "Create Forum Post").
 		AddLabel(
 			"Forum", discord.NewChannelSelectMenu(forumPostForumInput, "Select a forum").
 				WithChannelTypes(discord.ChannelTypeGuildForum).

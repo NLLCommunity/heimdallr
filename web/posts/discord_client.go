@@ -63,7 +63,7 @@ func (d *liveDiscord) EditV2(channelID, messageID snowflake.ID, chunk []any) err
 	if err != nil {
 		return err
 	}
-	_, err = d.client.Rest.UpdateMessage(channelID, messageID, discord.NewMessageUpdateV2(comps).WithAllowedMentions(suppressMentions))
+	_, err = d.client.Rest.UpdateMessage(channelID, messageID, discord.NewMessageUpdateV2(comps...).WithAllowedMentions(suppressMentions))
 	return err
 }
 

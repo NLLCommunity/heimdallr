@@ -58,6 +58,13 @@ func TestGatekeepMessageCommandExposesOnlyResetAndRetainsModalWorkflow(t *testin
 	require.True(t, router.Match("/admin/gatekeep-message/modal", discord.InteractionTypeModalSubmit, 0))
 }
 
+func TestMessageModalContainsOnlyItsLabel(t *testing.T) {
+	modal := messageModal("/admin/message/modal", "Message", "contents")
+
+	require.Len(t, modal.Components, 1)
+	assert.Equal(t, discord.ComponentTypeLabel, modal.Components[0].Type())
+}
+
 func TestAuditRetentionOptionsAllowZeroAndExplainItsMeaning(t *testing.T) {
 	command := Admin.Build().(discord.SlashCommandCreate)
 
