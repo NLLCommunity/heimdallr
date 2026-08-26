@@ -9,25 +9,6 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-var banFooterSubcommand = discord.ApplicationCommandOptionSubCommand{
-	Name:        "ban-footer",
-	Description: "View or set the ban footer, shown at the end of DM sent when user is banned.",
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionBool{
-			Name:        "always-send",
-			Description: "Whether to always send the footer, even if there is no ban message",
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "reset",
-			Description: "Reset the message to its default value",
-			Required:    false,
-			Choices: []discord.ApplicationCommandOptionChoiceString{
-				{Name: "Reset", Value: "reset"},
-			},
-		},
-	},
-}
-
 func AdminBanFooterHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("admin", e)
 	guild, isGuild := e.Guild()
@@ -82,7 +63,7 @@ func AdminBanFooterHandler(e *handler.CommandEvent) error {
 			utils.Iif(settings.AlwaysSendBanFooter, "yes", "no"),
 		).
 			WithEmbeds(embed).
-			AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/ban-footer/button")),
+			AddActionRow(discord.NewPrimaryButton("Edit message", adminBanFooterButtonRoute.StaticCustomID())),
 	)
 }
 
@@ -101,7 +82,7 @@ func AdminBanFooterButtonHandler(e *handler.ComponentEvent) error {
 
 	return e.Modal(
 		messageModal(
-			"/admin/ban-footer/modal",
+			adminBanFooterModalRoute.StaticCustomID(),
 			"Ban footer",
 			settings.BanFooter,
 		),

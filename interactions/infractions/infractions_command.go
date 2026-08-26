@@ -7,78 +7,44 @@ import (
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/omit"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-// InfractionsCommand is a set of subcommands to manage infractions.
-var InfractionsCommand = discord.SlashCommandCreate{
-	Name: "infractions",
-	NameLocalizations: map[discord.Locale]string{
-		discord.LocaleNorwegian: "advarsler",
-	},
-	Description: "View a user's warnings.",
-	DescriptionLocalizations: map[discord.Locale]string{
-		discord.LocaleNorwegian: "Se en brukers advarsler.",
-	},
+var Infractions = rave.Slash("infractions", "View a user's infractions").
+	AddNameLocalization(discord.LocaleNorwegian, "advarsler").
+	AddDescriptionLocalization(discord.LocaleNorwegian, "Se en brukers advarsler.").
+	AddContexts(discord.InteractionContextTypeGuild).
+	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
+	WithDefaultMemberPermissions(discord.PermissionKickMembers).
+	AddOptions(
 
-	Contexts:                 []discord.InteractionContextType{discord.InteractionContextTypeGuild},
-	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
-	DefaultMemberPermissions: omit.NewPtr(discord.PermissionKickMembers),
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionSubCommand{
-			Name: "list",
-			NameLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "liste",
-			},
-			Description: "View a user's warnings. (NB: Response visible to all)",
-			DescriptionLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "Se en brukers advarsler.",
-			},
-			Options: []discord.ApplicationCommandOption{
-				discord.ApplicationCommandOptionUser{
-					Name: "user",
-					NameLocalizations: map[discord.Locale]string{
-						discord.LocaleNorwegian: "bruker",
-					},
-					Description: "The user to view warnings for.",
-					DescriptionLocalizations: map[discord.Locale]string{
-						discord.LocaleNorwegian: "Brukeren du vil se advarsler for.",
-					},
-					Required: false,
-				},
-			},
-		},
+		rave.SubCommand("list", "View a user's warnings. (NB: Response visible to all)").
+			Handle(InfractionsListHandler).
+			AddNameLocalization(discord.LocaleNorwegian, "liste").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Se en brukers advarsler.").
+			AddOptions(
 
-		discord.ApplicationCommandOptionSubCommand{
-			Name: "remove",
-			NameLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "fjern",
-			},
-			Description: "Remove a user's warning.",
-			DescriptionLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "Fjern en brukers advarsel.",
-			},
-			Options: []discord.ApplicationCommandOption{
-				discord.ApplicationCommandOptionString{
-					Name: "infraction-id",
-					NameLocalizations: map[discord.Locale]string{
-						discord.LocaleNorwegian: "advarsels-id",
-					},
-					Description: "The id of the infraction to remove.",
-					DescriptionLocalizations: map[discord.Locale]string{
-						discord.LocaleNorwegian: "ID-en til advarselen du vil fjerne.",
-					},
-					Required: true,
-				},
-			},
-		},
-	},
-}
+				rave.OptionUser("user", "The user to view warnings for.").
+					AddNameLocalization(discord.LocaleNorwegian, "bruker").
+					AddDescriptionLocalization(discord.LocaleNorwegian, "Brukeren du vil se advarsler for.").
+					WithRequired(true)),
+
+		rave.SubCommand("remove", "Remove a user's warning.").
+			Handle(InfractionsRemoveHandler).
+			AddNameLocalization(discord.LocaleNorwegian, "fjern").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Fjern en brukers advarsel.").
+			AddOptions(
+
+				rave.OptionString("infraction-id", "The id of the infraction to remove.").
+					AddNameLocalization(discord.LocaleNorwegian, "advarsels-id").
+					AddDescriptionLocalization(discord.LocaleNorwegian, "ID-en til advarselen du vil fjerne.").
+					WithRequired(true)),
+	)
 
 // InfractionsListHandler handles the `/infractions list` command.
 func InfractionsListHandler(e *handler.CommandEvent) error {

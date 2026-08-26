@@ -8,6 +8,7 @@
 !interactions/
 !listeners/
 !model/
+!rave/
 !scheduled_tasks/
 !task/
 !utils/

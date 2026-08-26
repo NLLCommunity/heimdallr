@@ -4,57 +4,12 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
-
-var antiSpamSubcommand = discord.ApplicationCommandOptionSubCommand{
-	Name:        "anti-spam",
-	Description: "View or set anti-spam settings",
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionBool{
-			Name:        "enabled",
-			Description: "Whether to enable the anti-spam system",
-			Required:    false,
-		},
-		discord.ApplicationCommandOptionInt{
-			Name:        "count",
-			Description: "The number of messages allowed before Heimdallr takes action (within the cooldown period)",
-			Required:    false,
-			MinValue:    new(1),
-			MaxValue:    new(15),
-		},
-		discord.ApplicationCommandOptionInt{
-			Name:        "cooldown",
-			Description: "The time in seconds to wait before resetting the message count",
-			Required:    false,
-			MinValue:    new(1),
-			MaxValue:    new(60),
-		},
-		discord.ApplicationCommandOptionInt{
-			Name:        "timeout",
-			Description: "The time in minutes to timeout a user who has exceeded the message count",
-			Required:    false,
-			MinValue:    new(1),
-			MaxValue:    new(10080), // 7 days
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "reset",
-			Description: "Reset a setting to its default value",
-			Required:    false,
-			Choices: []discord.ApplicationCommandOptionChoiceString{
-				{Name: "Enabled", Value: "enabled"},
-				{Name: "Count", Value: "count"},
-				{Name: "Cooldown", Value: "cooldown"},
-				{Name: "All", Value: "all"},
-			},
-		},
-	},
-}
 
 func antiSpamInfo(settings *model.GuildSettings) string {
 	antispamEnabledInfo := "> This determines whether to enable the anti-spam system."

@@ -10,36 +10,6 @@ import (
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-var joinMessageSubcommand = discord.ApplicationCommandOptionSubCommand{
-	Name:        "join-message",
-	Description: "Set the message to send when a user joins",
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionString{
-			Name:        "reset",
-			Description: "Reset the message to its default value",
-			Required:    false,
-			Choices: []discord.ApplicationCommandOptionChoiceString{
-				{Name: "Reset", Value: "reset"},
-			},
-		},
-	},
-}
-
-var leaveMessageSubcommand = discord.ApplicationCommandOptionSubCommand{
-	Name:        "leave-message",
-	Description: "Set the message to send when a user leaves",
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionString{
-			Name:        "reset",
-			Description: "Reset the message to its default value",
-			Required:    false,
-			Choices: []discord.ApplicationCommandOptionChoiceString{
-				{Name: "Reset", Value: "reset"},
-			},
-		},
-	},
-}
-
 func AdminJoinMessageHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("admin", e)
 	guild, isGuild := e.Guild()
@@ -90,7 +60,7 @@ func AdminJoinMessageHandler(e *handler.CommandEvent) error {
 	return e.CreateMessage(
 		interactions.EphemeralMessageContent("").
 			WithEmbeds(embed, templateInfoEmbed).
-			AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/join-message/button")),
+			AddActionRow(discord.NewPrimaryButton("Edit message", adminJoinMessageButtonRoute.StaticCustomID())),
 	)
 }
 
@@ -117,7 +87,7 @@ func AdminJoinMessageButtonHandler(e *handler.ComponentEvent) error {
 
 	return e.Modal(
 		messageModal(
-			"/admin/join-message/modal",
+			adminJoinMessageModalRoute.StaticCustomID(),
 			"Join message",
 			settings.JoinMessage,
 		),
@@ -213,7 +183,7 @@ func AdminLeaveMessageHandler(e *handler.CommandEvent) error {
 	return e.CreateMessage(
 		interactions.EphemeralMessageContent("").
 			WithEmbeds(embed, templateInfoEmbed).
-			AddActionRow(discord.NewPrimaryButton("Edit message", "/admin/leave-message/button")),
+			AddActionRow(discord.NewPrimaryButton("Edit message", adminLeaveMessageButtonRoute.StaticCustomID())),
 	)
 }
 
@@ -240,7 +210,7 @@ func AdminLeaveMessageButtonHandler(e *handler.ComponentEvent) error {
 
 	return e.Modal(
 		messageModal(
-			"/admin/leave-message/modal",
+			adminLeaveMessageModalRoute.StaticCustomID(),
 			"Leave message",
 			settings.LeaveMessage,
 		),

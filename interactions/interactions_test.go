@@ -121,7 +121,7 @@ func TestApplicationCommandRegisterFunc(t *testing.T) {
 	}
 
 	registerFunc := ApplicationCommandRegisterFunc(
-		func(r *handler.Mux) []discord.ApplicationCommandCreate {
+		func(r handler.Router) []discord.ApplicationCommandCreate {
 			return expectedCommands
 		},
 	)

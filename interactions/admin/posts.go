@@ -3,34 +3,12 @@ package admin
 import (
 	"fmt"
 
-	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
-
-var postsSubcommand = discord.ApplicationCommandOptionSubCommand{
-	Name:        "posts",
-	Description: "View or set posts dashboard settings",
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionRole{
-			Name:        "mod-role",
-			Description: "Role allowed to manage posts in the dashboard (admins always have access)",
-			Required:    false,
-		},
-		discord.ApplicationCommandOptionString{
-			Name:        "reset",
-			Description: "Reset a setting to its default value",
-			Required:    false,
-			Choices: []discord.ApplicationCommandOptionChoiceString{
-				{Name: "Mod role", Value: "mod-role"},
-				{Name: "All", Value: "all"},
-			},
-		},
-	},
-}
 
 func AdminPostsHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("admin", e)

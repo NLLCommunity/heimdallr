@@ -8,32 +8,38 @@ import (
 	"time"
 
 	"github.com/disgoorg/disgo/discord"
-	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/snowflake/v2"
 
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-func Register(r *handler.Mux) []discord.ApplicationCommandCreate {
-	r.Command("/warn", WarnHandler)
-	r.Command("/warnings", UserInfractionsHandler)
-	r.Route(
-		"/infractions", func(r handler.Router) {
-			r.Command("/list", InfractionsListHandler)
-			r.Command("/remove", InfractionsRemoveHandler)
-		},
-	)
-	r.Component("/infractions-user/{offset}", UserInfractionButtonHandler)
-	r.Component("/infractions-mod/{userID}/{offset}", InfractionsListComponentHandler)
+var Interactions = rave.Bundle(
+	Infractions,
+	Warn,
+	UserInfractions,
+	userInfractionRoute.Handle(UserInfractionButtonHandler),
+	moderatorInfractionRoute.Handle(InfractionsListComponentHandler),
+)
 
-	return []discord.ApplicationCommandCreate{
-		InfractionsCommand,
-		UserInfractionsCommand,
-		WarnCommand,
-	}
+type userInfractionRouteVars struct {
+	Offset int64 `rave:"offset"`
 }
+
+type moderatorInfractionRouteVars struct {
+	UserID snowflake.ID `rave:"userID"`
+	Offset int64        `rave:"offset"`
+}
+
+var userInfractionRoute = rave.ComponentOf[userInfractionRouteVars](
+	"/infractions-user/{offset}",
+)
+
+var moderatorInfractionRoute = rave.ComponentOf[moderatorInfractionRouteVars](
+	"/infractions-mod/{userID}/{offset}",
+)
 
 // pageSize is the size of one page of infractions
 const pageSize = 5
@@ -74,14 +80,17 @@ func getUserInfractions(guildID, userID snowflake.ID, limit, offset int) (userIn
 	if count > pageSize {
 		slog.Debug("Adding action row buttons.")
 		if offset > 0 {
+			customID, err := moderatorInfractionRoute.CustomID(moderatorInfractionRouteVars{
+				UserID: userID,
+				Offset: int64(max(0, offset-pageSize)),
+			})
+			if err != nil {
+				return userInfractions{}, fmt.Errorf("failed to create previous infraction button ID: %w", err)
+			}
 			components = append(
 				components, discord.NewPrimaryButton(
 					"Previous",
-					fmt.Sprintf(
-						"/infractions-mod/%s/%d",
-						userID,
-						max(0, offset-pageSize),
-					),
+					customID,
 				),
 			)
 		} else {
@@ -91,14 +100,17 @@ func getUserInfractions(guildID, userID snowflake.ID, limit, offset int) (userIn
 			)
 		}
 		if count > int64(offset+pageSize) {
+			customID, err := moderatorInfractionRoute.CustomID(moderatorInfractionRouteVars{
+				UserID: userID,
+				Offset: min(count-1, int64(offset+pageSize)),
+			})
+			if err != nil {
+				return userInfractions{}, fmt.Errorf("failed to create next infraction button ID: %w", err)
+			}
 			components = append(
 				components, discord.NewPrimaryButton(
 					"Next",
-					fmt.Sprintf(
-						"/infractions-mod/%s/%d",
-						userID,
-						min(count-1, int64(offset+pageSize)),
-					),
+					customID,
 				),
 			)
 		} else {
@@ -227,7 +239,7 @@ func getUserInfractionsAndMakeMessage(
 	).WithEmbeds(infrData.Embeds...)
 
 	if infrData.Components != nil {
-		message.AddActionRow(infrData.Components...)
+		message = message.AddActionRow(infrData.Components...)
 	}
 
 	return message, nil

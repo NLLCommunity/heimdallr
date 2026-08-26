@@ -7,80 +7,44 @@ import (
 
 	"github.com/disgoorg/disgo/discord"
 	"github.com/disgoorg/disgo/handler"
-	"github.com/disgoorg/omit"
 
 	"github.com/NLLCommunity/heimdallr/audit"
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/model"
+	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/utils"
 )
 
-// WarnCommand lets moderators issue warnings to users.
-var WarnCommand = discord.SlashCommandCreate{
-	Name: "warn",
-	NameLocalizations: map[discord.Locale]string{
-		discord.LocaleNorwegian: "advar",
-	},
-	Description: "Warn a user.",
-	DescriptionLocalizations: map[discord.Locale]string{
-		discord.LocaleNorwegian: "Advar en bruker.",
-	},
+var Warn = rave.Slash("warn", "Warn a user").
+	AddNameLocalization(discord.LocaleNorwegian, "advar").
+	AddDescriptionLocalization(discord.LocaleNorwegian, "Advar en bruker.").
+	AddContexts(discord.InteractionContextTypeGuild).
+	AddIntegrationTypes(discord.ApplicationIntegrationTypeGuildInstall).
+	WithDefaultMemberPermissions(discord.PermissionKickMembers).
+	AddOptions(
+		rave.OptionUser("user", "The user to warn").
+			AddNameLocalization(discord.LocaleNorwegian, "bruker").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Brukeren du vil advare.").
+			WithRequired(true),
 
-	Contexts:                 []discord.InteractionContextType{discord.InteractionContextTypeGuild},
-	IntegrationTypes:         []discord.ApplicationIntegrationType{discord.ApplicationIntegrationTypeGuildInstall},
-	DefaultMemberPermissions: omit.NewPtr(discord.PermissionKickMembers),
-	Options: []discord.ApplicationCommandOption{
-		discord.ApplicationCommandOptionUser{
-			Name: "user",
-			NameLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "bruker",
-			},
-			Description: "The user to warn.",
-			DescriptionLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "Brukeren du vil advare.",
-			},
-			Required: true,
-		},
+		rave.OptionString("reason", "The reason for the warning").
+			AddNameLocalization(discord.LocaleNorwegian, "aarsak").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Årsaken til advarselen.").
+			WithRequired(true),
 
-		discord.ApplicationCommandOptionString{
-			Name: "reason",
-			NameLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "aarsak",
-			},
-			Description: "The reason for the warning.",
-			DescriptionLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "Årsaken til advarselen.",
-			},
-			Required: true,
-		},
+		rave.OptionFloat("severity", "The severity of the warning").
+			AddNameLocalization(discord.LocaleNorwegian, "alvorlighet").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Alvorlighetsgraden til advarselen.").
+			WithRequired(false).
+			WithMinValue(0.0).
+			WithMaxValue(10.0),
 
-		discord.ApplicationCommandOptionFloat{
-			Name: "severity",
-			NameLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "alvorlighet",
-			},
-			Description: "The severity of the warning.",
-			DescriptionLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "Alvorlighetsgraden til advarselen.",
-			},
-			Required: false,
-			MinValue: new(0.0),
-			MaxValue: new(10.0),
-		},
-
-		discord.ApplicationCommandOptionBool{
-			Name: "silent",
-			NameLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "stille",
-			},
-			Description: "Whether the warning should be silent / logged without messaging the user",
-			DescriptionLocalizations: map[discord.Locale]string{
-				discord.LocaleNorwegian: "Om advarselen skal være stille / lagres uten å varsle brukeren",
-			},
-			Required: false,
-		},
-	},
-}
+		rave.OptionBool("silent", "Whether the warning should be silent / logged without messaging the user").
+			AddNameLocalization(discord.LocaleNorwegian, "stille").
+			AddDescriptionLocalization(discord.LocaleNorwegian, "Om advarselen skal være stille / lagres uten å varsle brukeren").
+			WithRequired(false),
+	).
+	Handle(WarnHandler)
 
 func WarnHandler(e *handler.CommandEvent) error {
 	utils.LogInteraction("infractions", e)
