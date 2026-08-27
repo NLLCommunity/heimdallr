@@ -23,6 +23,7 @@ import (
 	"github.com/NLLCommunity/heimdallr/interactions"
 	"github.com/NLLCommunity/heimdallr/interactions/admin"
 	"github.com/NLLCommunity/heimdallr/interactions/ban"
+	"github.com/NLLCommunity/heimdallr/interactions/birthday"
 	"github.com/NLLCommunity/heimdallr/interactions/dashboard"
 	"github.com/NLLCommunity/heimdallr/interactions/gatekeep"
 	"github.com/NLLCommunity/heimdallr/interactions/infractions"
@@ -127,6 +128,7 @@ func main() {
 		bot.WithEventListenerFunc(listeners.OnGatekeepUserJoin),
 		bot.WithEventListenerFunc(listeners.OnUserJoin),
 		bot.WithEventListenerFunc(listeners.OnUserLeave),
+		bot.WithEventListenerFunc(listeners.OnBirthdayMemberLeave),
 		bot.WithEventListenerFunc(listeners.OnMemberBan),
 		bot.WithEventListenerFunc(listeners.OnAuditLogKick),
 		bot.WithEventListenerFunc(listeners.OnAntispamMessageCreate),
@@ -155,6 +157,7 @@ func main() {
 	err = client.RegisterAndSyncBundles(devGuilds,
 		admin.Interactions,
 		ban.Interactions,
+		birthday.Interactions,
 		dashboard.Interactions,
 		gatekeep.Interactions,
 		infractions.Interactions,
@@ -180,6 +183,7 @@ func main() {
 	removeStalePrunesTask := scheduled_tasks.RemoveStalePendingPrunes()
 	pruneAuditLogTask := scheduled_tasks.PruneAuditLogScheduledTask()
 	removeExpiredMessagesTask := scheduled_tasks.RemoveExpiredMessagesInTTLCache()
+	birthdayAnnouncementsTask := scheduled_tasks.BirthdayAnnouncementsScheduledTask(client.Client)
 
 	webCtx, cancelWeb := context.WithCancel(context.Background())
 	defer cancelWeb()
@@ -213,6 +217,7 @@ func main() {
 	removeStalePrunesTask.Stop()
 	pruneAuditLogTask.Stop()
 	removeExpiredMessagesTask.Stop()
+	birthdayAnnouncementsTask.Stop()
 	// Close ONLY the gateway first so listeners stop firing and can't
 	// refill the audit buffer after the flush below. We deliberately keep
 	// the REST client and caches alive: in-flight web requests still need

@@ -39,6 +39,15 @@ type GuildSettings struct {
 	LeaveMessageV2Json  string
 	JoinLeaveChannel    snowflake.ID
 
+	BirthdayEnabled       bool
+	BirthdayChannel       snowflake.ID
+	BirthdayTimezone      string `gorm:"default:UTC"`
+	BirthdayHour          int    `gorm:"default:10"`
+	BirthdayMinute        int
+	BirthdayMessage       string `gorm:"default:Happy birthday, {{User.Mention}}! 🎉"`
+	BirthdayMessageV2     bool
+	BirthdayMessageV2Json string
+
 	AntiSpamEnabled         bool
 	AntiSpamCount           int `gorm:"default:5"`
 	AntiSpamCooldownSeconds int `gorm:"default:20"`
