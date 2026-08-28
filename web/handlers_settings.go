@@ -271,6 +271,9 @@ func allSettingsSections(guildID string, settings *model.GuildSettings, ms *mode
 		}).Render(ctx, w); err != nil {
 			return err
 		}
+		if err := partials.SettingsBirthday(birthdaySettingsData(guildID, settings, channels)).Render(ctx, w); err != nil {
+			return err
+		}
 		if err := partials.SettingsAntiSpam(partials.AntiSpamData{
 			GuildID:         guildID,
 			Enabled:         settings.AntiSpamEnabled,

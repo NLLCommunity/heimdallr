@@ -11,6 +11,8 @@ import (
 type MessageTemplateData struct {
 	User   TemplateUserData
 	Server TemplateGuildData
+	Age    string
+	HasAge bool
 }
 
 type TemplateUserData struct {
@@ -78,5 +80,14 @@ func MessageTemplateInfo() string {
 	for _, p := range MessageTemplatePlaceholders {
 		fmt.Fprintf(&b, "`%s` — %s\n", p.Placeholder, p.Description)
 	}
+	return b.String()
+}
+
+func BirthdayMessageTemplateInfo() string {
+	var b strings.Builder
+	b.WriteString(MessageTemplateInfo())
+	b.WriteString("\nBirthday messages also support:\n\n")
+	b.WriteString("`{{Age}}` — Age as a decimal string when a birth year exists, otherwise an empty string\n")
+	b.WriteString("`{{#HasAge}}...{{/HasAge}}` — Includes the enclosed content only when an age is available\n")
 	return b.String()
 }

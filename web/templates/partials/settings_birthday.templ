@@ -1,0 +1,68 @@
+package partials
+
+import (
+	"github.com/NLLCommunity/heimdallr/utils"
+	"github.com/NLLCommunity/heimdallr/web/templates/components"
+)
+
+type BirthdayData struct {
+	GuildID      string
+	Enabled      bool
+	Channel      string
+	Channels     []components.ChannelGroup
+	Time         string
+	Times        []string
+	Timezone     string
+	Timezones    []string
+	Message      string
+	MessageV2    bool
+	MessageV2Json string
+	Placeholders []utils.MessageTemplatePlaceholder
+	SaveSuccess  bool
+	SaveError    string
+}
+
+templ SettingsBirthday(data BirthdayData) {
+	<section id="birthday">
+		<h3>Birthday Announcements</h3>
+		<form
+			method="POST"
+			action={ templ.SafeURL("/guild/" + data.GuildID + "/settings/birthday") }
+			hx-post={ "/guild/" + data.GuildID + "/settings/birthday" }
+			hx-target="#birthday"
+			hx-swap="outerHTML"
+			x-data="formTracker()" @input="checkDirty()" @change="checkDirty()"
+		>
+			if data.SaveSuccess {
+				@components.SaveSuccessMarker()
+			}
+			if data.SaveError != "" {
+				@components.AlertError(data.SaveError)
+			}
+			@components.ToggleField("enabled", "Enable birthday announcements", "Announce birthdays that members choose to save.", data.Enabled)
+			@components.ChannelSelect("channel", "Announcement channel", data.Channels, data.Channel)
+			<fieldset>
+				<legend>Delivery window</legend>
+				<label for="time">Announcement time</label>
+				<select id="time" name="time">
+					for _, value := range data.Times {
+						<option value={ value } selected?={ value == data.Time }>{ value }</option>
+					}
+				</select>
+				<label for="timezone">Timezone</label>
+				<input id="timezone" name="timezone" type="text" list="birthday-timezones" value={ data.Timezone } autocomplete="off"/>
+				<datalist id="birthday-timezones">
+					for _, value := range data.Timezones {
+						<option value={ value }></option>
+					}
+				</datalist>
+				<small>The announcement is delivered at this local time. Times are available in 15-minute increments.</small>
+			</fieldset>
+			<hr/>
+			<h4>Announcement Message</h4>
+			@PlaceholderHelp(data.Placeholders)
+			@V2MessageToggle("birthday_message", data.Message, data.MessageV2, data.MessageV2Json)
+			@components.SaveButton()
+		</form>
+	</section>
+}

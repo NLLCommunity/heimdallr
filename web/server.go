@@ -94,6 +94,7 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	mux.HandleFunc("POST /guild/{id}/settings/modmail", handleSaveModmail(client))
 	mux.HandleFunc("POST /guild/{id}/settings/gatekeep", handleSaveGatekeep(client))
 	mux.HandleFunc("POST /guild/{id}/settings/join-leave", handleSaveJoinLeave(client))
+	mux.HandleFunc("POST /guild/{id}/settings/birthday", handleSaveBirthday(client))
 	mux.HandleFunc("POST /guild/{id}/settings/posts", handleSavePosts(client))
 
 	mux.HandleFunc("GET /guild/{id}/auditlog", handleAuditLog(client))

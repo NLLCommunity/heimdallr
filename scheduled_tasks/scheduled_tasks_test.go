@@ -47,6 +47,8 @@ func (suite *ScheduledTasksTestSuite) TearDownSuite() {
 func (suite *ScheduledTasksTestSuite) SetupTest() {
 	// Clean all tables before each test.
 	model.DB.Exec("DELETE FROM temp_bans")
+	model.DB.Exec("DELETE FROM birthdays")
+	model.DB.Exec("DELETE FROM guild_settings")
 }
 
 func TestScheduledTasksSuite(t *testing.T) {

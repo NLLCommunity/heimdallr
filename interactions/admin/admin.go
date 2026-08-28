@@ -19,6 +19,8 @@ var Interactions = rave.Bundle(
 	adminJoinMessageModalRoute,
 	adminLeaveMessageButtonRoute,
 	adminLeaveMessageModalRoute,
+	adminBirthdayMessageButtonRoute,
+	adminBirthdayMessageModalRoute,
 	adminBanFooterButtonRoute,
 	adminBanFooterModalRoute,
 	Admin,
@@ -32,6 +34,8 @@ var (
 	adminJoinMessageModalRoute      = rave.Modal("/admin/join-message/modal").Handle(AdminJoinMessageModalHandler)
 	adminLeaveMessageButtonRoute    = rave.Component("/admin/leave-message/button").Handle(AdminLeaveMessageButtonHandler)
 	adminLeaveMessageModalRoute     = rave.Modal("/admin/leave-message/modal").Handle(AdminLeaveMessageModalHandler)
+	adminBirthdayMessageButtonRoute = rave.Component("/admin/birthday-message/button").Handle(AdminBirthdayMessageButtonHandler)
+	adminBirthdayMessageModalRoute  = rave.Modal("/admin/birthday-message/modal").Handle(AdminBirthdayMessageModalHandler)
 	adminBanFooterButtonRoute       = rave.Component("/admin/ban-footer/button").Handle(AdminBanFooterButtonHandler)
 	adminBanFooterModalRoute        = rave.Modal("/admin/ban-footer/modal").Handle(AdminBanFooterModalHandler)
 )
@@ -111,6 +115,29 @@ var Admin = rave.Slash("admin", "admin commands").
 				rave.OptionString("reset", "Reset the message to its default value.").
 					AddChoice("Reset", "reset"),
 			).Handle(AdminLeaveMessageHandler),
+
+		rave.SubCommand("birthday", "View or set birthday announcement settings").
+			AddOptions(
+				rave.OptionBool("enabled", "Whether to enable birthday announcements"),
+				rave.OptionChannel("channel", "The channel for birthday announcements").
+					AddChannelTypes(discord.ChannelTypeGuildText),
+				rave.OptionString("time", "Announcement time in the configured timezone").
+					Autocomplete(BirthdayTimeAutocomplete),
+				rave.OptionString("timezone", "Canonical IANA timezone").
+					Autocomplete(BirthdayTimezoneAutocomplete),
+				rave.OptionString("reset", "Reset a birthday setting to its default").
+					AddChoice("Enabled", "enabled").
+					AddChoice("Channel", "channel").
+					AddChoice("Time", "time").
+					AddChoice("Timezone", "timezone").
+					AddChoice("All", "all"),
+			).Handle(AdminBirthdayHandler),
+
+		rave.SubCommand("birthday-message", "View or set the birthday announcement message").
+			AddOptions(
+				rave.OptionString("reset", "Reset the message to its default value").
+					AddChoice("Reset", "reset"),
+			).Handle(AdminBirthdayMessageHandler),
 
 		rave.SubCommand("anti-spam", "View or set anti-spam settings").
 			AddOptions(
@@ -196,6 +223,7 @@ func AdminInfoHandler(e *handler.CommandEvent) error {
 		sectionEmbed("Infractions", infractionInfo(settings)),
 		sectionEmbed("Gatekeep", gatekeepInfo(settings)),
 		sectionEmbed("Join/Leave", joinLeaveInfo(settings)),
+		sectionEmbed("Birthday", birthdayInfo(settings)),
 		sectionEmbed("Anti-spam", antiSpamInfo(settings)),
 		sectionEmbed("Posts", postsInfo(settings)),
 		sectionEmbed("Audit log", auditLogInfo(settings)),

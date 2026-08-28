@@ -20,7 +20,10 @@ require (
 	gorm.io/gorm v1.31.2
 )
 
-require golang.org/x/sync v0.22.0
+require (
+	github.com/robfig/cron/v3 v3.0.1
+	golang.org/x/sync v0.22.0
+)
 
 require (
 	github.com/disgoorg/godave v0.1.0 // indirect
