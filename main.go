@@ -12,7 +12,6 @@ import (
 
 	"github.com/disgoorg/disgo/bot"
 	"github.com/disgoorg/disgo/cache"
-	"github.com/disgoorg/disgo/events"
 	"github.com/disgoorg/disgo/gateway"
 	"github.com/disgoorg/disgo/handler"
 	"github.com/disgoorg/snowflake/v2"
@@ -119,11 +118,7 @@ func main() {
 			),
 		),
 		bot.WithDefaultGateway(),
-		bot.WithEventListenerFunc(
-			func(e *events.Ready) {
-				fmt.Println("Bot is ready!")
-			},
-		),
+		bot.WithEventListenerFunc(listeners.OnReady),
 		bot.WithEventListenerFunc(listeners.OnWarnedUserJoin),
 		bot.WithEventListenerFunc(listeners.OnGatekeepUserJoin),
 		bot.WithEventListenerFunc(listeners.OnUserJoin),
