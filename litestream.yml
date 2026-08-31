@@ -1,13 +1,16 @@
 access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
 secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
 
+logging:
+  level: warn
+
 snapshot:
   interval: 12h
   retention: 168h
 
 validation:
   interval: 5m
-  
+
 verify-compaction: true
 shutdown-sync-timeout: 30s
 
