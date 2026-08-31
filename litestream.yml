@@ -1,8 +1,17 @@
 access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
 secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
-region: ${LITESTREAM_REGION}
+
+snapshot:
+  interval: 12h
+  retention: 168h
+
+validation:
+  interval: 5m
+  
+verify-compaction: true
+shutdown-sync-timeout: 30s
+
 dbs:
   - path: ${DB_PATH}
-    replicas:
-      - url: ${DB_REPLICA_URL}
-        region: ${LITESTREAM_REGION}
+    replica:
+      url: ${DB_REPLICA_URL}
