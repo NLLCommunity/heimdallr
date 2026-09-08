@@ -16,13 +16,14 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/sqids/sqids-go v0.4.1
 	github.com/stretchr/testify v1.12.1
-	golang.org/x/time v0.15.0
+	golang.org/x/time v0.16.0
 	gorm.io/gorm v1.31.2
 )
 
 require (
 	github.com/robfig/cron/v3 v3.0.1
 	golang.org/x/sync v0.22.0
+	golang.org/x/term v0.45.0
 )
 
 require (
@@ -53,7 +54,6 @@ require (
 	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/exp v0.0.0-20260212183809-81e46e3db34a // indirect
 	golang.org/x/sys v0.47.0 // indirect
-	golang.org/x/term v0.45.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	modernc.org/libc v1.67.7 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
