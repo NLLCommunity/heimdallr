@@ -1,0 +1,11 @@
+{
+  "package": "@myrkvi/components",
+  "version": "0.1.2",
+  "license": "MIT",
+  "source": "https://esm.sh/jsr/@myrkvi/components@0.1.2?standalone&target=es2022",
+  "resolved": "https://esm.sh/@jsr/myrkvi__components@0.1.2/es2022/myrkvi__components.bundle.mjs",
+  "metadataSource": "https://jsr.io/@myrkvi/components/0.1.2/deno.json",
+  "target": "es2022",
+  "bytes": 128091,
+  "sha256": "00719f7725289b36d1bff5c15243f7861dcf9bfc48060a671b6229bbd6c33948"
+}

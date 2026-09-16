@@ -230,7 +230,7 @@ func V2MessageToggle(prefix string, plainText string, v2Enabled bool, v2Json str
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\"><label><input type=\"checkbox\" role=\"switch\" x-model=\"v2\" name=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\" x-bind:data-editor-enabled=\"v2 ? 'true' : 'false'\"><label><input type=\"checkbox\" role=\"switch\" x-model=\"v2\" name=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -281,7 +281,7 @@ func V2MessageToggle(prefix string, plainText string, v2Enabled bool, v2Json str
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = components.MessageEditor().Render(ctx, templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = components.MessageEditor("components").Render(ctx, templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

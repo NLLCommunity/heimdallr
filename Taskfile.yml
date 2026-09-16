@@ -9,6 +9,25 @@ vars:
   extraBuildFlags: '-a -installsuffix cgo -ldflags "-s -w"'
 
 tasks:
+  test:editors:
+    desc: Test explicit-message editor state (requires Node.js)
+    cmds:
+      - node web/tests/post-editor.test.cjs
+  test:editors:browser:
+    desc: Test the Lit integration in Chromium (see web/tests/README.md for setup)
+    cmds:
+      - node web/tests/browser.test.cjs
+  components:update:
+    desc: Vendor a pinned standalone editor bundle (VERSION=x.y.z; defaults to the recorded version)
+    env:
+      COMPONENTS_VERSION: '{{.VERSION | default ""}}'
+    preconditions:
+      - sh: command -v node
+        msg: "Node.js 22+ is required to update the editor bundle"
+      - sh: command -v curl
+        msg: "curl is required to download the editor bundle"
+    cmds:
+      - node --experimental-vm-modules scripts/update-components.mjs
   default:
     desc: Build and run heimdallr
     cmds:

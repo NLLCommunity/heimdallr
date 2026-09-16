@@ -51,35 +51,35 @@ func Sandbox(nav layouts.NavData, data SandboxData) templ.Component {
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<h2>Message Sandbox</h2><div x-data=\"messageBuilder()\" data-initial=\"[]\" data-load-url=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<h2>Message Sandbox</h2><div x-data=\"messageBuilder()\" data-editor-scope data-initial=\"[]\" data-load-url=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs("/guild/" + data.GuildID + "/sandbox/load")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 19, Col: 61}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 20, Col: 61}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"><article style=\"margin-bottom: 1rem;\"><header><strong>Load existing message</strong></header><form @submit.prevent=\"loadMessage()\"><fieldset role=\"group\"><input type=\"text\" x-model=\"loadLink\" placeholder=\"https://discord.com/channels/.../.../...\"><!-- @submit.prevent on the form already runs loadMessage(); a second @click handler here would fire it twice (and could diverge silently if either is later changed). --><button type=\"submit\" :disabled=\"loading\">Load</button></fieldset><div x-show=\"loadError\" x-text=\"loadError\" class=\"alert alert-error\" role=\"alert\" style=\"margin-top: 0.5rem;\"></div><div x-show=\"mode !== 'create'\" style=\"margin-top: 0.5rem;\"><small>Editing <span x-text=\"mode === 'edit-v1' ? 'V1 (content only)' : 'V2 (components)'\"></span> message <code x-text=\"loadedMessageId\"></code> <button type=\"button\" class=\"outline\" @click=\"resetToCreate()\" style=\"margin-left: 0.5rem;\">New message</button></small></div></form></article><div class=\"grid\" style=\"grid-template-columns: 1fr 1fr;\"><div><h3>Editor</h3><div x-show=\"mode === 'edit-v1'\"><textarea x-model=\"v1Content\" rows=\"12\" placeholder=\"Message content\"></textarea></div><div x-show=\"mode !== 'edit-v1'\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, "\"><article style=\"margin-bottom: 1rem;\"><header><strong>Load existing message</strong></header><form @submit.prevent=\"loadMessage()\"><fieldset role=\"group\"><input type=\"text\" x-model=\"loadLink\" placeholder=\"https://discord.com/channels/.../.../...\"><!-- @submit.prevent on the form already runs loadMessage(); a second @click handler here would fire it twice (and could diverge silently if either is later changed). --><button type=\"submit\" :disabled=\"loading\">Load</button></fieldset><div x-show=\"loadError\" x-text=\"loadError\" class=\"alert alert-error\" role=\"alert\" style=\"margin-top: 0.5rem;\"></div><div x-show=\"mode !== 'create'\" style=\"margin-top: 0.5rem;\"><small>Editing <span x-text=\"mode === 'edit-v1' ? 'V1 (content only)' : 'V2 (components)'\"></span> message <code x-text=\"loadedMessageId\"></code> <button type=\"button\" class=\"outline\" @click=\"resetToCreate()\" style=\"margin-left: 0.5rem;\">New message</button></small></div></form></article><div class=\"message-workspace\"><div><h3>Editor</h3><div x-show=\"mode === 'edit-v1'\"><textarea x-model=\"v1Content\" rows=\"12\" placeholder=\"Message content\"></textarea></div><div x-show=\"mode !== 'edit-v1'\" x-bind:data-editor-enabled=\"mode !== 'edit-v1' ? 'true' : 'false'\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = components.MessageEditor().Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = components.MessageEditor("components").Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div></div><div><h3 x-text=\"mode === 'create' ? 'Send to Channel' : 'Update Message'\"></h3><form x-show=\"mode === 'create'\" method=\"POST\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div></div><div><h3 x-text=\"mode === 'create' ? 'Send to Channel' : 'Update Message'\"></h3><form x-show=\"mode === 'create'\" data-editor-submit method=\"POST\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var4 templ.SafeURL
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/guild/" + data.GuildID + "/sandbox/send"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 60, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 62, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -92,7 +92,7 @@ func Sandbox(nav layouts.NavData, data SandboxData) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs("/guild/" + data.GuildID + "/sandbox/send")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 61, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 63, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -106,14 +106,14 @@ func Sandbox(nav layouts.NavData, data SandboxData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<input type=\"hidden\" name=\"components_json\" x-bind:value=\"JSON.stringify(serialize())\"> <button type=\"submit\">Send Message</button></form><form x-show=\"mode !== 'create'\" method=\"POST\" action=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<input type=\"hidden\" name=\"components_json\" x-bind:value=\"JSON.stringify(serialize())\"> <button type=\"submit\" :disabled=\"loading\">Send Message</button></form><form x-show=\"mode !== 'create'\" data-editor-submit method=\"POST\" action=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var6 templ.SafeURL
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/guild/" + data.GuildID + "/sandbox/edit"))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 72, Col: 72}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 75, Col: 72}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -126,13 +126,13 @@ func Sandbox(nav layouts.NavData, data SandboxData) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs("/guild/" + data.GuildID + "/sandbox/edit")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 73, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/sandbox.templ`, Line: 76, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" hx-target=\"#send-result\" hx-swap=\"innerHTML\"><input type=\"hidden\" name=\"channel_id\" x-bind:value=\"loadedChannelId\"> <input type=\"hidden\" name=\"message_id\" x-bind:value=\"loadedMessageId\"> <input type=\"hidden\" name=\"is_v2\" x-bind:value=\"mode === 'edit-v2' ? 'true' : 'false'\"> <input type=\"hidden\" name=\"components_json\" x-bind:value=\"JSON.stringify(serialize())\"> <input type=\"hidden\" name=\"content\" x-bind:value=\"v1Content\"> <button type=\"submit\">Update Message</button></form><div id=\"send-result\"></div></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 8, "\" hx-target=\"#send-result\" hx-swap=\"innerHTML\"><input type=\"hidden\" name=\"channel_id\" x-bind:value=\"loadedChannelId\"> <input type=\"hidden\" name=\"message_id\" x-bind:value=\"loadedMessageId\"> <input type=\"hidden\" name=\"is_v2\" x-bind:value=\"mode === 'edit-v2' ? 'true' : 'false'\"> <input type=\"hidden\" name=\"components_json\" x-bind:value=\"JSON.stringify(serialize())\"> <input type=\"hidden\" name=\"content\" x-bind:value=\"v1Content\"> <button type=\"submit\" :disabled=\"loading\">Update Message</button></form><div id=\"send-result\"></div></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

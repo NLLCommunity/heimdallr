@@ -1,28 +1,26 @@
-// post-editor.js — Alpine factory backing /posts/{id} editor pages.
-// Reuses serializeComponent / deserializeComponent / createDefaultNode
-// (defined globally in message-builder.js).
-
+// Post pages own an ordered document of explicitly bounded Discord messages.
 document.addEventListener("alpine:init", () => {
   Alpine.data("postEditor", () => ({
-    components: [],
+    messages: [],
     name: "",
     channelId: "",
     version: 0,
     busy: false,
     message: "",
+    initialError: false,
     saveUrl: "",
     publishUrl: "",
     unpublishUrl: "",
     deleteUrl: "",
     previewUrl: "",
     redirectUrlPrefix: "",
-    // Debounce/abort state for refreshPreview. The deep watch on `components`
-    // would otherwise fire one fetch per keystroke; this batches them and
-    // cancels superseded requests so the server isn't overwhelmed during
-    // active typing.
+    _nextKey: 0,
+    _savedSnapshot: "",
+    _root: null,
     _previewTimer: null,
     _previewAbort: null,
     init() {
+      this._root = this.$el;
       const ds = this.$el.dataset;
       this.name = ds.name || "";
       this.channelId = ds.channelId || "";
@@ -33,100 +31,69 @@ document.addEventListener("alpine:init", () => {
       this.deleteUrl = ds.deleteUrl || "";
       this.previewUrl = ds.previewUrl || "";
       this.redirectUrlPrefix = ds.redirectUrlPrefix || "";
-      const raw = ds.initial || "[]";
       try {
-        const parsed = JSON.parse(raw);
-        if (Array.isArray(parsed)) {
-          this.components = parsed.map(deserializeComponent).filter(Boolean);
+        const parsed = JSON.parse(ds.initial);
+        if (parsed.version !== 1 || !Array.isArray(parsed.messages) ||
+            !parsed.messages.every(entry => entry && Array.isArray(entry.components))) {
+          throw new Error("Invalid post document");
         }
+        this.messages = parsed.messages.map(entry => ({ key: this._nextKey++, components: entry.components }));
+        if (!this.messages.length) this.addMessage();
       } catch (e) {
-        /* empty */
+        this.initialError = true;
+        this.message = "Could not load this post. Reload the page before saving.";
+        return;
       }
-      this.$watch("components", () => this.schedulePreviewRefresh(), {
-        deep: true,
-      });
-      // Initial paint runs immediately — debouncing would leave the preview
-      // pane blank for the first half-second after page load.
-      this.refreshPreview();
-
-      // Flush any pending debounced refresh as soon as focus leaves a field,
-      // so tabbing/blurring shows the preview right away instead of waiting
-      // for the next typing pause.
-      this.$el.addEventListener("focusout", () => this.flushPreviewRefresh());
-
       const sel = this.$el.querySelector('select[name="channel_id"]');
       if (sel) {
         this.channelId = sel.value;
-        sel.addEventListener("change", () => {
-          this.channelId = sel.value;
-        });
+        sel.addEventListener("change", () => { this.channelId = sel.value; });
       }
+      this._savedSnapshot = this.snapshot();
+      this.$watch("messages", () => this.schedulePreviewRefresh());
+      this.refreshPreview();
+    },
+    destroy() {
+      clearTimeout(this._previewTimer);
+      this._previewAbort?.abort();
+    },
+    get dirty() {
+      return this.snapshot() !== this._savedSnapshot;
+    },
+    snapshot() {
+      return JSON.stringify({ name: this.name, channelId: this.channelId, document: this.serialize() });
+    },
+    serialize() {
+      return { version: 1, messages: this.messages.map(entry => ({ components: entry.components })) };
+    },
+    addMessage() {
+      this.messages.push({ key: this._nextKey++, components: [] });
+    },
+    removeMessage(index) {
+      if (this.messages.length > 1) this.messages.splice(index, 1);
+    },
+    moveMessage(index, direction) {
+      const target = index + direction;
+      if (target < 0 || target >= this.messages.length) return;
+      const [entry] = this.messages.splice(index, 1);
+      this.messages.splice(target, 0, entry);
     },
     schedulePreviewRefresh() {
-      if (this._previewTimer) clearTimeout(this._previewTimer);
+      clearTimeout(this._previewTimer);
+      // Abort now, rather than after the delay, to avoid displaying stale results.
+      this._previewAbort?.abort();
       this._previewTimer = setTimeout(() => {
         this._previewTimer = null;
         this.refreshPreview();
-      }, 2000);
-    },
-    flushPreviewRefresh() {
-      if (!this._previewTimer) return;
-      clearTimeout(this._previewTimer);
-      this._previewTimer = null;
-      this.refreshPreview();
-    },
-    addComponent(type) {
-      this.components.push(createDefaultNode(type));
-    },
-    removeComponent(i) {
-      this.components.splice(i, 1);
-    },
-    moveUp(i) {
-      if (i > 0)
-        [this.components[i - 1], this.components[i]] = [
-          this.components[i],
-          this.components[i - 1],
-        ];
-    },
-    moveDown(i) {
-      if (i < this.components.length - 1)
-        [this.components[i], this.components[i + 1]] = [
-          this.components[i + 1],
-          this.components[i],
-        ];
-    },
-    addSectionText(c) {
-      if (c.texts.length < 3) c.texts.push("");
-    },
-    removeSectionText(c, i) {
-      if (c.texts.length > 1) c.texts.splice(i, 1);
-    },
-    setAccessoryType(c, kind) {
-      if (kind === "") c.accessory = null;
-      else if (kind === "thumbnail")
-        c.accessory = { kind: "thumbnail", url: "" };
-      else if (kind === "button")
-        c.accessory = { kind: "button", label: "", url: "", emoji: "" };
-    },
-    addChild(ci, type) {
-      if (type !== "container")
-        this.components[ci].children.push(createDefaultNode(type));
-    },
-    removeChild(ci, ki) {
-      this.components[ci].children.splice(ki, 1);
-    },
-    moveChildUp(ci, ki) {
-      const a = this.components[ci].children;
-      if (ki > 0) [a[ki - 1], a[ki]] = [a[ki], a[ki - 1]];
-    },
-    moveChildDown(ci, ki) {
-      const a = this.components[ci].children;
-      if (ki < a.length - 1) [a[ki], a[ki + 1]] = [a[ki + 1], a[ki]];
-    },
-    serialize() {
-      return this.components.map(serializeComponent).filter(Boolean);
+      }, 500);
     },
     async save() {
+      if (this.busy || this.initialError) return;
+      if (!HeimdallrEditors.ready(this._root)) {
+        this.message = "Wait for the message editors to load before saving. Reload if an editor failed.";
+        return;
+      }
+      const submittedSnapshot = this.snapshot();
       this.busy = true;
       this.message = "";
       try {
@@ -178,6 +145,7 @@ document.addEventListener("alpine:init", () => {
         if (data && typeof data.version === "number") {
           this.version = data.version;
         }
+        this._savedSnapshot = submittedSnapshot;
         this.message = "Saved.";
       } catch (e) {
         // fetch() rejects on network failures (offline, DNS, TLS, CORS); without
@@ -189,6 +157,11 @@ document.addEventListener("alpine:init", () => {
       }
     },
     async publish() {
+      if (this.busy || this.initialError) return;
+      if (this.dirty) {
+        this.message = "Save your changes before publishing.";
+        return;
+      }
       await this._postAction(this.publishUrl, "Published.");
     },
     async unpublish() {
@@ -222,6 +195,7 @@ document.addEventListener("alpine:init", () => {
       }
     },
     async _postAction(url, okMsg) {
+      if (this.busy) return;
       this.busy = true;
       this.message = "";
       try {
@@ -285,7 +259,8 @@ document.addEventListener("alpine:init", () => {
         const ct = resp.headers.get("content-type") || "";
         if (!ct.includes("text/html")) return;
         const html = await resp.text();
-        const target = document.getElementById("split-preview");
+        if (controller.signal.aborted) return;
+        const target = this._root.querySelector("[data-publish-preview]");
         if (target) target.innerHTML = html;
       } catch (e) {
         /* swallow */

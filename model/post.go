@@ -9,8 +9,10 @@ import (
 )
 
 // Post is the editable, versioned source-of-truth for a piece of long-form
-// bot content. ComponentsJSON holds a top-level array of V2 components, the
-// same shape the message-builder editor produces.
+// bot content. ComponentsJSON stores a versioned post document:
+// {"version":1,"messages":[{"components":[]}]}. Each messages entry maps
+// to one Discord message; legacy top-level component arrays are accepted by
+// the web layer and canonicalized when saved.
 type Post struct {
 	ID             uint         `gorm:"primaryKey"`
 	GuildID        snowflake.ID `gorm:"index;not null"`

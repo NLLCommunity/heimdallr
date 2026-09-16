@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "scripts": {
+    "test": "node post-editor.test.cjs",
+    "test:browser": "node browser.test.cjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

@@ -81,14 +81,14 @@ func PostEditor(nav layouts.NavData, data PostEditorData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\">← Back to posts</a></p><div x-data=\"postEditor()\" data-initial=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "\">← Back to posts</a></p><div x-data=\"postEditor()\" data-editor-scope data-initial=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(data.Post.ComponentsJSON)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 29, Col: 42}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 30, Col: 42}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -101,7 +101,7 @@ func PostEditor(nav layouts.NavData, data PostEditorData) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.FormatUint(uint64(data.Post.ID), 10))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 30, Col: 62}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 31, Col: 62}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
@@ -114,7 +114,7 @@ func PostEditor(nav layouts.NavData, data PostEditorData) templ.Component {
 			var templ_7745c5c3_Var6 string
 			templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(strconv.FormatUint(uint64(data.Post.Version), 10))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 31, Col: 67}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 32, Col: 67}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 			if templ_7745c5c3_Err != nil {
@@ -127,7 +127,7 @@ func PostEditor(nav layouts.NavData, data PostEditorData) templ.Component {
 			var templ_7745c5c3_Var7 string
 			templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs(data.Post.Name)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 32, Col: 29}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 33, Col: 29}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 			if templ_7745c5c3_Err != nil {
@@ -140,7 +140,7 @@ func PostEditor(nav layouts.NavData, data PostEditorData) templ.Component {
 			var templ_7745c5c3_Var8 string
 			templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(idStr(data.Post.ChannelID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 33, Col: 47}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 34, Col: 47}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 			if templ_7745c5c3_Err != nil {
@@ -153,7 +153,7 @@ func PostEditor(nav layouts.NavData, data PostEditorData) templ.Component {
 			var templ_7745c5c3_Var9 string
 			templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(postSaveURL(data.GuildID, data.Post.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 34, Col: 58}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 35, Col: 58}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 			if templ_7745c5c3_Err != nil {
@@ -166,7 +166,7 @@ func PostEditor(nav layouts.NavData, data PostEditorData) templ.Component {
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs("/guild/" + data.GuildID + "/posts/")
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 35, Col: 66}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 36, Col: 66}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
@@ -179,7 +179,7 @@ func PostEditor(nav layouts.NavData, data PostEditorData) templ.Component {
 			var templ_7745c5c3_Var11 string
 			templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(postPreviewURL(data.GuildID, data.Post.ID))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 36, Col: 64}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 37, Col: 64}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
 			if templ_7745c5c3_Err != nil {
@@ -197,7 +197,7 @@ func PostEditor(nav layouts.NavData, data PostEditorData) templ.Component {
 				var templ_7745c5c3_Var12 string
 				templ_7745c5c3_Var12, templ_7745c5c3_Err = templ.JoinStringErrs("/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) + "/publish")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 38, Col: 119}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 39, Col: 119}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var12))
 				if templ_7745c5c3_Err != nil {
@@ -210,7 +210,7 @@ func PostEditor(nav layouts.NavData, data PostEditorData) templ.Component {
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs("/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) + "/unpublish")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 39, Col: 123}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 40, Col: 123}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
@@ -223,7 +223,7 @@ func PostEditor(nav layouts.NavData, data PostEditorData) templ.Component {
 				var templ_7745c5c3_Var14 string
 				templ_7745c5c3_Var14, templ_7745c5c3_Err = templ.JoinStringErrs("/guild/" + data.GuildID + "/posts/" + strconv.FormatUint(uint64(data.Post.ID), 10) + "/delete")
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 40, Col: 117}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `web/templates/pages/post_editor.templ`, Line: 41, Col: 117}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var14))
 				if templ_7745c5c3_Err != nil {
@@ -234,7 +234,7 @@ func PostEditor(nav layouts.NavData, data PostEditorData) templ.Component {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "><div class=\"grid\" style=\"grid-template-columns: 1fr 1fr;\"><div><h3>Editor</h3><label>Name <input type=\"text\" x-model=\"name\"></label>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, "><div class=\"message-workspace\"><div><h3>Editor</h3><label>Name <input type=\"text\" x-model=\"name\" :disabled=\"busy || initialError\"></label>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -242,25 +242,25 @@ func PostEditor(nav layouts.NavData, data PostEditorData) templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<input type=\"hidden\" x-model=\"channelId\" name=\"channel_id_mirror\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, "<input type=\"hidden\" x-model=\"channelId\" name=\"channel_id_mirror\"><p><small>Each message below is published separately, in this order.</small></p><div x-bind:inert=\"busy || initialError\"><template x-for=\"(entry, index) in messages\" :key=\"entry.key\"><article class=\"post-message\"><header class=\"post-message-header\"><h3 x-text=\"'Message ' + (index + 1)\"></h3><div class=\"post-message-actions\"><button type=\"button\" class=\"outline\" aria-label=\"Move message up\" @click=\"moveMessage(index, -1)\" :disabled=\"index === 0\">↑</button> <button type=\"button\" class=\"outline\" aria-label=\"Move message down\" @click=\"moveMessage(index, 1)\" :disabled=\"index === messages.length - 1\">↓</button> <button type=\"button\" class=\"outline btn-danger\" @click=\"removeMessage(index)\" :disabled=\"messages.length === 1\">Remove</button></div></header>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = components.MessageEditor().Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = components.MessageEditor("entry.components").Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</div><div><h3>Actions</h3><form @submit.prevent=\"save()\"><button type=\"submit\" :disabled=\"busy\">Save</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "</article></template><button type=\"button\" class=\"outline\" @click=\"addMessage()\">Add message</button></div></div><div><h3>Actions</h3><form @submit.prevent=\"save()\"><button type=\"submit\" :disabled=\"busy || initialError\">Save</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if data.Post.ID != 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<form @submit.prevent=\"publish()\" style=\"margin-top: 0.5rem;\"><button type=\"submit\" :disabled=\"busy || !channelId\">Publish / Update on Discord</button></form><form @submit.prevent=\"unpublish()\" style=\"margin-top: 0.5rem;\"><button type=\"submit\" class=\"outline\" :disabled=\"busy\">Unpublish (delete from Discord)</button></form><form @submit.prevent=\"del()\" style=\"margin-top: 0.5rem;\"><button type=\"submit\" class=\"btn-danger\" :disabled=\"busy\">Delete post</button></form>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "<form @submit.prevent=\"publish()\" style=\"margin-top: 0.5rem;\"><button type=\"submit\" :disabled=\"busy || initialError || dirty || !channelId\">Publish / Update on Discord</button></form><form @submit.prevent=\"unpublish()\" style=\"margin-top: 0.5rem;\"><button type=\"submit\" class=\"outline\" :disabled=\"busy\">Unpublish (delete from Discord)</button></form><form @submit.prevent=\"del()\" style=\"margin-top: 0.5rem;\"><button type=\"submit\" class=\"btn-danger\" :disabled=\"busy\">Delete post</button></form>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<div x-show=\"message\" x-text=\"message\" class=\"alert\" style=\"margin-top: 1rem;\"></div><h3 style=\"margin-top: 1rem;\">Split preview</h3><div id=\"split-preview\"></div></div></div></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 21, "<p x-show=\"dirty\"><small>Unsaved changes. Save before publishing.</small></p><div x-show=\"message\" x-text=\"message\" class=\"alert\" role=\"status\" style=\"margin-top: 1rem;\"></div><h3 style=\"margin-top: 1rem;\">Publish check</h3><div data-publish-preview></div></div></div></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

@@ -7,6 +7,9 @@ document.addEventListener('alpine:init', () => {
 
     init() {
       this._snapshot = this._capture();
+      // Child Alpine bindings populate V2 hidden inputs after the parent init.
+      // Capture their initialized values so undoing an edit clears dirty state.
+      this.$nextTick(() => { this._snapshot = this._capture(); });
       this.$el.addEventListener('htmx:beforeRequest', () => { this.saving = true; });
 
       // Reset `saving` when the request completes. After a successful swap
