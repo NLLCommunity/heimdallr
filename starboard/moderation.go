@@ -88,10 +88,16 @@ func (s *Service) Moderate(guild snowflake.ID, board uint64, action string, chan
 			} else if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&x).Error; err != nil {
 				return err
 			}
-			// Clear threshold waiting, but preserve moderator suppression.
+			// Reset waiting only for the exclusion's targets, including threads
+			// beneath a targeted channel. Preserve moderator suppression.
 			entries := tx.Model(&model.StarboardEntry{}).Where("guild_id = ?", guild)
 			if board != 0 {
 				entries = entries.Where("board_id = ?", board)
+			}
+			if kind == "message" {
+				entries = entries.Where("message_id = ?", target)
+			} else {
+				entries = entries.Where("(channel_id = ? OR parent_channel_id = ?)", target, target)
 			}
 			if err := entries.Update("wait_fingerprint", "").Error; err != nil {
 				return err
