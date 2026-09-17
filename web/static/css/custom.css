@@ -125,6 +125,54 @@
   color: green;
 }
 
+/* Starboard management keeps each board's lifecycle and destructive actions
+   visible without turning the settings into a dense table. */
+.starboards-heading,
+.starboard-card-heading {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.starboards-heading p,
+.starboard-card-heading h4 {
+  margin-bottom: 0;
+}
+.starboard-list {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+.starboard-card {
+  margin-bottom: 0;
+}
+.starboard-state {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--pico-muted-border-color);
+  border-radius: var(--pico-border-radius);
+  color: var(--pico-muted-color);
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+.starboard-consequence {
+  padding: 0.75rem 1rem;
+  border-left: 0.2rem solid var(--pico-primary-border);
+  background: color-mix(in srgb, var(--pico-primary-background) 12%, transparent);
+  font-size: 0.9rem;
+}
+.starboard-delete-form {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--pico-muted-border-color);
+}
+.starboard-delete-form button {
+  width: auto;
+  margin-bottom: 0;
+}
+.starboards-empty {
+  color: var(--pico-muted-color);
+}
+
 /* Hidden marker elements */
 .hidden {
   display: none !important;

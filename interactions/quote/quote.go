@@ -147,19 +147,78 @@ func CreateMessageQuoteEmbed(client *bot.Client, message *discord.Message, showR
 		msg := fmt.Sprintf("message by %s", ref.Author.Mention())
 		if ref.Content != "" {
 			msg = fmt.Sprintf("%s:\n", ref.Author.Mention())
-			if len(ref.Content) > 140 {
-				msg += addQuoteToMessage(ref.Content[:137] + "...")
-			} else {
-				msg += addQuoteToMessage(ref.Content)
-			}
+			msg += addQuoteToMessage(truncateRunes(ref.Content, 140))
 		}
 		msg += fmt.Sprintf("\n%s", ref.JumpURL())
 
 		embed = embed.AddField("Reply to", msg, false)
 	}
 
-	return embed
+	return BoundMessageQuoteEmbed(embed)
 
+}
+
+func truncateRunes(value string, limit int) string {
+	runes := []rune(value)
+	if len(runes) <= limit {
+		return value
+	}
+	if limit <= 0 {
+		return ""
+	}
+	if limit == 1 {
+		return "…"
+	}
+	return string(runes[:limit-1]) + "…"
+}
+
+// BoundMessageQuoteEmbed applies Discord's per-field and aggregate embed limits.
+func BoundMessageQuoteEmbed(embed discord.Embed) discord.Embed {
+	embed.Title = truncateRunes(embed.Title, 256)
+	embed.Description = truncateRunes(embed.Description, 4096)
+	if embed.Author != nil {
+		embed.Author.Name = truncateRunes(embed.Author.Name, 256)
+	}
+	if embed.Footer != nil {
+		embed.Footer.Text = truncateRunes(embed.Footer.Text, 2048)
+	}
+	if len(embed.Fields) > 25 {
+		embed.Fields = embed.Fields[:25]
+	}
+	for i := range embed.Fields {
+		embed.Fields[i].Name = truncateRunes(embed.Fields[i].Name, 256)
+		embed.Fields[i].Value = truncateRunes(embed.Fields[i].Value, 1024)
+	}
+
+	excess := quoteEmbedCharacters(embed) - 6000
+	if excess <= 0 {
+		return embed
+	}
+	descriptionLength := len([]rune(embed.Description))
+	newDescriptionLength := max(0, descriptionLength-excess)
+	embed.Description = truncateRunes(embed.Description, newDescriptionLength)
+	excess = quoteEmbedCharacters(embed) - 6000
+	for i := len(embed.Fields) - 1; excess > 0 && i >= 0; i-- {
+		fieldLength := len([]rune(embed.Fields[i].Value))
+		newLength := max(1, fieldLength-excess)
+		embed.Fields[i].Value = truncateRunes(embed.Fields[i].Value, newLength)
+		excess = quoteEmbedCharacters(embed) - 6000
+	}
+	return embed
+}
+
+func quoteEmbedCharacters(embed discord.Embed) int {
+	total := len([]rune(embed.Title)) + len([]rune(embed.Description))
+	if embed.Author != nil {
+		total += len([]rune(embed.Author.Name))
+	}
+	if embed.Footer != nil {
+		total += len([]rune(embed.Footer.Text))
+	}
+	for _, field := range embed.Fields {
+		total += len([]rune(field.Name)) + len([]rune(field.Value))
+	}
+	return total
 }
 
 func getChannelTypePrefix(channel discord.Channel) string {

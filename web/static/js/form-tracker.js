@@ -4,22 +4,27 @@ document.addEventListener('alpine:init', () => {
     saving: false,
     saved: false,
     _snapshot: [],
+    _form: null,
 
     init() {
+      // Alpine's $el magic follows the element whose expression is running.
+      // Capture the x-data owner once so button @click handlers still operate
+      // on the form rather than treating the clicked button as the form.
+      this._form = this.$el;
       this._snapshot = this._capture();
-      this.$el.addEventListener('htmx:beforeRequest', () => { this.saving = true; });
+      this._form.addEventListener('htmx:beforeRequest', () => { this.saving = true; });
 
       // Reset `saving` when the request completes. After a successful swap
       // the form is replaced and its new Alpine instance starts with
       // saving=false, so these only matter when the existing form remains
       // (network errors, non-HTML 4xx/5xx, beforeSwap cancellations).
       const stopSaving = () => { this.saving = false; };
-      this.$el.addEventListener('htmx:afterRequest', stopSaving);
-      this.$el.addEventListener('htmx:responseError', stopSaving);
-      this.$el.addEventListener('htmx:sendError', stopSaving);
+      this._form.addEventListener('htmx:afterRequest', stopSaving);
+      this._form.addEventListener('htmx:responseError', stopSaving);
+      this._form.addEventListener('htmx:sendError', stopSaving);
 
       // Detect server-rendered save success marker
-      const marker = this.$el.querySelector('[data-save-success]');
+      const marker = this._form.querySelector('[data-save-success]');
       if (marker) {
         marker.remove();
         this.saved = true;
@@ -32,7 +37,7 @@ document.addEventListener('alpine:init', () => {
     // overwrite each other's state.
     _capture() {
       const entries = [];
-      for (const el of this.$el.elements) {
+      for (const el of this._form.elements) {
         if (!el.name) continue;
         const checkable = el.type === 'checkbox' || el.type === 'radio';
         entries.push({
@@ -75,10 +80,10 @@ document.addEventListener('alpine:init', () => {
       // V2 off the entire time restore locally without a network round-trip.
       const v2Checked = (el) =>
         el && el.type === 'checkbox' && el.name && el.name.endsWith('_v2') && el.checked;
-      const v2NowOn = Array.from(this.$el.elements).some(v2Checked);
+      const v2NowOn = Array.from(this._form.elements).some(v2Checked);
       const v2WasOn = this._snapshot.some(e => e.checkable && e.el.name.endsWith('_v2') && e.checked);
       if (v2NowOn || v2WasOn) {
-        const section = this.$el.closest('section');
+        const section = this._form.closest('section');
         if (section && section.id) {
           const sel = '#' + section.id;
           htmx.ajax('GET', window.location.pathname, { target: sel, swap: 'outerHTML', select: sel });

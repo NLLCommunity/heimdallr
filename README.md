@@ -98,3 +98,42 @@ and `app.json` for the full list of supported env vars.
 ## License
 
 [GPL-3.0](LICENSE)
+
+## Starboards
+
+Administrators can open **Starboards** from the server dashboard to create
+multiple boards. Each board has a name, its own text channel, a Unicode or
+server custom emoji, a positive minimum score, and an enabled switch. The
+server-wide starboard switch is off by default. Changing a board's emoji or
+destination removes its old copies and reevaluates tracked originals.
+
+Votes on the original and a board's copy are combined independently for that
+board. Each non-bot user counts once per sign, even if they react to both
+messages. The configured emoji adds one; ❌ subtracts one and cannot be chosen
+as the positive emoji. A user reacting with both signs contributes zero.
+Self-votes count. For example, six ⭐ and four ❌ yield a score of two.
+
+Qualifying messages use Heimdallr's quote presentation, with current scores
+and a link to the original. Source edits update every copy; source deletion
+removes them. Falling below the threshold removes that board's copy. Its
+reactions disappear with it, so a subsequent change to the original's votes
+is required before reposting. There is no server-history scan: reaction
+activity discovers messages, and tracked entries are periodically repaired.
+
+The `/starboard` commands let moderators remove/restore an entry and
+blacklist/unblacklist messages or channels for one board or the whole server.
+Board moderation requires **Manage Messages** in its destination; server-wide
+blacklists require server-level **Manage Messages**. Administrators always
+have access. Removing a copy directly in Discord suppresses it on that board
+until restored. Channel blacklists also cover their threads.
+
+Only sources visible to @everyone are eligible. Bot/webhook messages, private
+threads, and starboard destination channels are excluded. Age-restricted
+content cannot be copied into an unrestricted destination. The bot needs
+View Channel, Read Message History, Send Messages, Embed Links, and Add
+Reactions in each destination, plus access to source messages and reactions.
+
+Disabling stops automatic publication and score updates while retaining
+existing copies. Source edits/deletions and moderation cleanup still run.
+Transient errors are retried; ambiguous sends are recovered before another
+copy can be created, to avoid duplicate crossposts.

@@ -85,6 +85,11 @@ func StartServer(ctx context.Context, addr string, client *bot.Client) error {
 	// Guild routes.
 	mux.HandleFunc("GET /guilds", handleGuilds(client, oauthClientID, oauthClientSecret, tokenCrypto))
 	mux.HandleFunc("GET /guild/{id}", handleDashboard(client))
+	mux.HandleFunc("GET /guild/{id}/starboards", handleStarboards(client))
+	mux.HandleFunc("POST /guild/{id}/starboards", handleStarboardCreate(client))
+	mux.HandleFunc("POST /guild/{id}/starboards/master", handleStarboardMaster(client))
+	mux.HandleFunc("POST /guild/{id}/starboards/{boardID}", handleStarboardSave(client))
+	mux.HandleFunc("POST /guild/{id}/starboards/{boardID}/delete", handleStarboardDelete(client))
 
 	// Settings POST routes.
 	mux.HandleFunc("POST /guild/{id}/settings/mod-channel", handleSaveModChannel(client))

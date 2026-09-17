@@ -9,6 +9,8 @@ import (
 )
 
 type GuildSettings struct {
+	StarboardEnabled bool
+
 	GuildID   snowflake.ID `gorm:"primaryKey;autoIncrement:false"`
 	UpdatedAt time.Time    `gorm:"autoUpdateTime"`
 

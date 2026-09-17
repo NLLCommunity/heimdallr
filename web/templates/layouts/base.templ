@@ -69,6 +69,7 @@ templ Navbar(nav NavData) {
 				<li><a href="/guilds">← All guilds</a></li>
 				if nav.IsAdmin {
 					<li><a href={ templ.SafeURL("/guild/" + nav.GuildID) }>Settings</a></li>
+					<li><a href={ templ.SafeURL("/guild/" + nav.GuildID + "/starboards") }>Starboards</a></li>
 					<li><a href={ templ.SafeURL("/guild/" + nav.GuildID + "/auditlog") }>Audit Log</a></li>
 					<li><a href={ templ.SafeURL("/guild/" + nav.GuildID + "/sandbox") }>Sandbox</a></li>
 				}

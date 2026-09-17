@@ -32,11 +32,13 @@ import (
 	"github.com/NLLCommunity/heimdallr/interactions/prune"
 	"github.com/NLLCommunity/heimdallr/interactions/quote"
 	"github.com/NLLCommunity/heimdallr/interactions/role_button"
+	starboardCommands "github.com/NLLCommunity/heimdallr/interactions/starboard"
 	"github.com/NLLCommunity/heimdallr/interactions/timeout"
 	"github.com/NLLCommunity/heimdallr/listeners"
 	"github.com/NLLCommunity/heimdallr/model"
 	"github.com/NLLCommunity/heimdallr/rave"
 	"github.com/NLLCommunity/heimdallr/scheduled_tasks"
+	"github.com/NLLCommunity/heimdallr/starboard"
 	"github.com/NLLCommunity/heimdallr/web"
 )
 
@@ -127,6 +129,12 @@ func main() {
 		bot.WithEventListenerFunc(listeners.OnMemberBan),
 		bot.WithEventListenerFunc(listeners.OnAuditLogKick),
 		bot.WithEventListenerFunc(listeners.OnAntispamMessageCreate),
+		bot.WithEventListenerFunc(listeners.OnStarboardReactionAdd),
+		bot.WithEventListenerFunc(listeners.OnStarboardReactionRemove),
+		bot.WithEventListenerFunc(listeners.OnStarboardReactionRemoveEmoji),
+		bot.WithEventListenerFunc(listeners.OnStarboardReactionRemoveAll),
+		bot.WithEventListenerFunc(listeners.OnStarboardMessageUpdate),
+		bot.WithEventListenerFunc(listeners.OnStarboardMessageDelete),
 		bot.WithEventListenerFunc(listeners.OnAuditMemberUpdate),
 		bot.WithEventListenerFunc(listeners.OnAuditMessageUpdate),
 		bot.WithEventListenerFunc(listeners.OnAuditMessageDelete),
@@ -163,12 +171,14 @@ func main() {
 		role_button.Interactions,
 		modmail.Interactions,
 		timeout.Interactions,
+		starboardCommands.Interactions,
 	)
 
 	if err != nil {
 		panic(fmt.Errorf("failed to sync commands: %w", err))
 	}
 
+	starboard.Default = starboard.New(model.DB, starboard.NewDiscordTransport(client.Client))
 	err = client.OpenGateway(context.Background())
 	if err != nil {
 		panic(fmt.Errorf("failed to open gateway: %w", err))
@@ -179,6 +189,10 @@ func main() {
 	pruneAuditLogTask := scheduled_tasks.PruneAuditLogScheduledTask()
 	removeExpiredMessagesTask := scheduled_tasks.RemoveExpiredMessagesInTTLCache()
 	birthdayAnnouncementsTask := scheduled_tasks.BirthdayAnnouncementsScheduledTask(client.Client)
+
+	starboardCtx, cancelStarboard := context.WithCancel(context.Background())
+	starboardDone := make(chan struct{})
+	go func() { defer close(starboardDone); starboard.Default.Run(starboardCtx) }()
 
 	webCtx, cancelWeb := context.WithCancel(context.Background())
 	defer cancelWeb()
@@ -222,6 +236,8 @@ func main() {
 	// Commit any audit log entries still in the pending-enrichment buffer
 	// before the process exits. Best-effort: failures inside FlushPending
 	// are logged at warn but don't block shutdown.
+	cancelStarboard()
+	<-starboardDone
 	audit.FlushPending()
 	cancelWeb()
 	<-webDone
