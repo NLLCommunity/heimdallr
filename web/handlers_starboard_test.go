@@ -249,8 +249,8 @@ func (*starboardWebTransport) Votes(snowflake.ID, snowflake.ID, string) (starboa
 func (*starboardWebTransport) Publish(model.Starboard, *discord.Message, starboardsvc.Votes, string) (snowflake.ID, error) {
 	return 0, errors.New("unused")
 }
-func (*starboardWebTransport) Recover(model.Starboard, string, time.Time) (snowflake.ID, error) {
-	return 0, errors.New("unused")
+func (*starboardWebTransport) Recover(model.Starboard, string, time.Time, snowflake.ID) (snowflake.ID, snowflake.ID, error) {
+	return 0, 0, errors.New("unused")
 }
 func (*starboardWebTransport) Update(model.Starboard, *discord.Message, snowflake.ID, starboardsvc.Votes) error {
 	return errors.New("unused")

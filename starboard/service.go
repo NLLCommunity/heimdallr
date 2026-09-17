@@ -316,9 +316,16 @@ func (s *Service) reconcileEntry(b model.Starboard, e *model.StarboardEntry, sou
 		if e.SendStartedAt == nil {
 			return ErrAmbiguousSend
 		}
-		id, err := s.transport.Recover(recoveryBoard, e.SendNonce, *e.SendStartedAt)
-		if errors.Is(err, ErrNotSent) {
+		id, before, err := s.transport.Recover(recoveryBoard, e.SendNonce, *e.SendStartedAt, e.RecoveryBefore)
+		if before != e.RecoveryBefore {
+			e.RecoveryBefore = before
+			if saveErr := s.db.Model(e).Update("recovery_before", before).Error; saveErr != nil {
+				return saveErr
+			}
+		}
+		if errors.Is(err, ErrNotSent) || errors.Is(err, ErrNotFound) {
 			e.SendNonce = ""
+			e.RecoveryBefore = 0
 			e.SendStartedAt = nil
 			e.CopyChannelID = 0
 			if saveErr := s.db.Save(e).Error; saveErr != nil {
@@ -336,6 +343,7 @@ func (s *Service) reconcileEntry(b model.Starboard, e *model.StarboardEntry, sou
 		}
 		e.CopyMessageID = id
 		e.SendNonce = ""
+		e.RecoveryBefore = 0
 		e.SendStartedAt = nil
 		if err = s.db.Save(e).Error; err != nil {
 			return err
@@ -405,6 +413,7 @@ func (s *Service) reconcileEntry(b model.Starboard, e *model.StarboardEntry, sou
 		return s.db.Save(e).Error
 	}
 	// Persist the nonce before attempting the nontransactional Discord create.
+	e.RecoveryBefore = 0
 	e.SendNonce = strings.ReplaceAll(uuid.NewString(), "-", "")[:25]
 	now := time.Now().UTC()
 	e.SendStartedAt = &now
@@ -417,11 +426,13 @@ func (s *Service) reconcileEntry(b model.Starboard, e *model.StarboardEntry, sou
 		// Creation is confirmed even if adding seed reactions failed.
 		e.CopyMessageID = id
 		e.SendNonce = ""
+		e.RecoveryBefore = 0
 		e.SendStartedAt = nil
 		return errors.Join(err, s.db.Save(e).Error)
 	}
 	if errors.Is(err, ErrNotSent) {
 		e.SendNonce = ""
+		e.RecoveryBefore = 0
 		e.SendStartedAt = nil
 		e.CopyChannelID = 0
 		return errors.Join(err, s.db.Save(e).Error)

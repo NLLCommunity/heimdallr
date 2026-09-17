@@ -21,7 +21,8 @@ type Transport interface {
 	Eligible(model.Starboard, *discord.Message) (bool, snowflake.ID, error)
 	Votes(channel, message snowflake.ID, emoji string) (Votes, error)
 	Publish(model.Starboard, *discord.Message, Votes, string) (snowflake.ID, error)
-	Recover(model.Starboard, string, time.Time) (snowflake.ID, error)
+	// Recover returns a known copy ID, or a cursor to persist before retrying.
+	Recover(model.Starboard, string, time.Time, snowflake.ID) (snowflake.ID, snowflake.ID, error)
 	Update(model.Starboard, *discord.Message, snowflake.ID, Votes) error
 	Delete(channel, message snowflake.ID) error
 }

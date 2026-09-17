@@ -38,6 +38,7 @@ type StarboardEntry struct {
 	Negative        int
 	SendNonce       string
 	SendStartedAt   *time.Time
+	RecoveryBefore  snowflake.ID
 }
 
 // BoardID zero applies an exclusion to every board in the guild.

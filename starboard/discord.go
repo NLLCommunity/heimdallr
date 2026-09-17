@@ -185,6 +185,9 @@ func memberPermissions(guild *discord.RestGuild, member *discord.Member, channel
 
 func (t *discordTransport) Source(guild, channel, message snowflake.ID) (*discord.Message, error) {
 	sourceChannel, err := t.rest.GetChannel(channel)
+	if rest.IsJSONErrorCode(err, rest.JSONErrorCodeUnknownChannel) {
+		return nil, ErrNotFound
+	}
 	if err != nil {
 		return nil, fmt.Errorf("fetch source channel: %w", err)
 	}
@@ -195,7 +198,7 @@ func (t *discordTransport) Source(guild, channel, message snowflake.ID) (*discor
 
 	source, err := t.rest.GetMessage(channel, message)
 	if err != nil {
-		if rest.IsJSONErrorCode(err, rest.JSONErrorCodeUnknownMessage) {
+		if messageNoLongerExists(err) {
 			return nil, ErrNotFound
 		}
 		return nil, fmt.Errorf("fetch source message: %w", err)
@@ -252,6 +255,9 @@ func (t *discordTransport) Eligible(board model.Starboard, message *discord.Mess
 	}
 
 	destination, err := t.rest.GetChannel(board.ChannelID)
+	if rest.IsJSONErrorCode(err, rest.JSONErrorCodeUnknownChannel) {
+		return false, parentID, nil
+	}
 	if err != nil {
 		return false, parentID, fmt.Errorf("fetch starboard destination: %w", err)
 	}
@@ -343,7 +349,7 @@ func (t *discordTransport) Update(board model.Starboard, source *discord.Message
 		WithComponents(components...).
 		WithAllowedMentions(&discord.AllowedMentions{})
 	if _, err := t.rest.UpdateMessage(board.ChannelID, copyID, update); err != nil {
-		if rest.IsJSONErrorCode(err, rest.JSONErrorCodeUnknownMessage) {
+		if messageNoLongerExists(err) {
 			return ErrNotFound
 		}
 		return fmt.Errorf("update starboard message: %w", err)
@@ -353,7 +359,7 @@ func (t *discordTransport) Update(board model.Starboard, source *discord.Message
 
 func (t *discordTransport) Delete(channel, message snowflake.ID) error {
 	err := t.rest.DeleteMessage(channel, message)
-	if rest.IsJSONErrorCode(err, rest.JSONErrorCodeUnknownMessage) {
+	if messageNoLongerExists(err) {
 		return nil
 	}
 	if err != nil {
@@ -362,18 +368,31 @@ func (t *discordTransport) Delete(channel, message snowflake.ID) error {
 	return nil
 }
 
-func (t *discordTransport) Recover(board model.Starboard, nonce string, since time.Time) (snowflake.ID, error) {
+// Recover advances through a bounded portion of destination history. The
+// caller persists nextBefore so a restart or a busy channel cannot force the
+// search to repeat the newest page forever.
+func (t *discordTransport) Recover(board model.Starboard, nonce string, since time.Time, before snowflake.ID) (messageID, nextBefore snowflake.ID, err error) {
 	startID := snowflake.New(since)
 	botID := t.selfID()
 	if botID == 0 {
-		return 0, fmt.Errorf("cannot determine bot user ID")
+		return 0, before, fmt.Errorf("cannot determine bot user ID")
 	}
-	var before snowflake.ID
+	// Recent sends may still be in flight. Until the safety interval has passed,
+	// restart from the top so a late result cannot appear in an already-scanned
+	// range. Only aged operations retain progress across attempts.
+	aged := time.Since(since) >= recoverySafetyDelay
+	if !aged {
+		before = 0
+	}
+	initialBefore := before
 	complete := false
 	for range maxRecoveryPages {
 		messages, err := t.rest.GetMessages(board.ChannelID, 0, before, 0, recoveryPageSize)
+		if rest.IsJSONErrorCode(err, rest.JSONErrorCodeUnknownChannel) {
+			return 0, 0, ErrNotFound
+		}
 		if err != nil {
-			return 0, fmt.Errorf("search starboard destination for nonce: %w", err)
+			return 0, initialBefore, fmt.Errorf("search starboard destination for nonce: %w", err)
 		}
 		oldest := snowflake.ID(^uint64(0))
 		for _, message := range messages {
@@ -381,7 +400,7 @@ func (t *discordTransport) Recover(board model.Starboard, nonce string, since ti
 				oldest = message.ID
 			}
 			if message.ID >= startID && message.Author.ID == botID && (string(message.Nonce) == nonce || messageHasRecoveryMarker(message, nonce)) {
-				return message.ID, nil
+				return message.ID, 0, nil
 			}
 		}
 		if len(messages) < recoveryPageSize || oldest <= startID {
@@ -389,20 +408,29 @@ func (t *discordTransport) Recover(board model.Starboard, nonce string, since ti
 			break
 		}
 		if before != 0 && oldest >= before {
-			break
+			return 0, initialBefore, fmt.Errorf("starboard recovery history cursor did not advance")
 		}
 		before = oldest
 	}
-	if complete && time.Since(since) >= recoverySafetyDelay {
+	if complete && aged {
 		canReadHistory, err := t.canReadDestinationHistory(board)
+		if errors.Is(err, ErrNotFound) {
+			return 0, 0, ErrNotFound
+		}
 		if err != nil {
-			return 0, err
+			return 0, initialBefore, err
 		}
 		if canReadHistory {
-			return 0, ErrNotSent
+			return 0, 0, ErrNotSent
 		}
+		// Discord may return an empty page without history permission. Keep the
+		// original cursor so restoring access retries precisely that unread range.
+		return 0, initialBefore, nil
 	}
-	return 0, nil
+	if !aged || complete {
+		return 0, 0, nil
+	}
+	return 0, before, nil
 }
 
 const recoveryQueryParameter = "heimdallr_starboard"
@@ -430,6 +458,9 @@ func messageHasRecoveryMarker(message discord.Message, nonce string) bool {
 
 func (t *discordTransport) canReadDestinationHistory(board model.Starboard) (bool, error) {
 	channel, err := t.rest.GetChannel(board.ChannelID)
+	if rest.IsJSONErrorCode(err, rest.JSONErrorCodeUnknownChannel) {
+		return false, ErrNotFound
+	}
 	if err != nil {
 		return false, fmt.Errorf("verify starboard destination history access: %w", err)
 	}
@@ -520,7 +551,7 @@ func (t *discordTransport) reactionUsers(channel, message snowflake.ID, emoji st
 		for {
 			page, err := t.rest.GetReactions(channel, message, emoji, reactionType, after, reactionPageSize)
 			if err != nil {
-				if rest.IsJSONErrorCode(err, rest.JSONErrorCodeUnknownMessage) {
+				if messageNoLongerExists(err) {
 					return nil, ErrNotFound
 				}
 				return nil, err
@@ -542,4 +573,10 @@ func (t *discordTransport) reactionUsers(channel, message snowflake.ID, emoji st
 		result = append(result, userID)
 	}
 	return result, nil
+}
+
+// A deleted channel also definitively removes its messages. Permission errors
+// and transient failures do not establish absence and must remain retryable.
+func messageNoLongerExists(err error) bool {
+	return rest.IsJSONErrorCode(err, rest.JSONErrorCodeUnknownMessage) || rest.IsJSONErrorCode(err, rest.JSONErrorCodeUnknownChannel)
 }

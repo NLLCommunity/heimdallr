@@ -321,7 +321,7 @@ func TestDiscordTransportRecoverSearchesHistoryByNonceWithoutSending(t *testing.
 	transport := newDiscordTransportWithREST(nil, fake)
 	transport.selfID = func() snowflake.ID { return 30 }
 
-	messageID, err := transport.Recover(model.Starboard{ChannelID: 20}, "recover-me", since)
+	messageID, _, err := transport.Recover(model.Starboard{ChannelID: 20}, "recover-me", since, 0)
 	require.NoError(t, err)
 	require.Equal(t, start+100, messageID)
 	require.Equal(t, 2, calls)
@@ -332,11 +332,11 @@ func TestDiscordTransportRecoverDistinguishesRecentAmbiguityFromAgedExhaustiveMi
 	transport := newDiscordTransportWithREST(nil, fake)
 	transport.selfID = func() snowflake.ID { return 30 }
 
-	messageID, err := transport.Recover(model.Starboard{GuildID: 10, ChannelID: 20}, "missing", time.Now().Add(-time.Minute))
+	messageID, _, err := transport.Recover(model.Starboard{GuildID: 10, ChannelID: 20}, "missing", time.Now().Add(-time.Minute), 0)
 	require.NoError(t, err)
 	require.Zero(t, messageID)
 
-	messageID, err = transport.Recover(model.Starboard{GuildID: 10, ChannelID: 20}, "missing", time.Now().Add(-15*time.Minute))
+	messageID, _, err = transport.Recover(model.Starboard{GuildID: 10, ChannelID: 20}, "missing", time.Now().Add(-15*time.Minute), 0)
 	require.ErrorIs(t, err, ErrNotSent)
 	require.Zero(t, messageID)
 }
@@ -345,7 +345,7 @@ func TestDiscordTransportRecoverCannotConcludeNotSentWithoutHistoryPermission(t 
 	fake := recoveryPermissionFake(t, discord.PermissionViewChannel)
 	transport := newDiscordTransportWithREST(nil, fake)
 	transport.selfID = func() snowflake.ID { return 30 }
-	messageID, err := transport.Recover(model.Starboard{GuildID: 10, ChannelID: 20}, "missing", time.Now().Add(-15*time.Minute))
+	messageID, _, err := transport.Recover(model.Starboard{GuildID: 10, ChannelID: 20}, "missing", time.Now().Add(-15*time.Minute), 0)
 	require.NoError(t, err)
 	require.Zero(t, messageID)
 }
@@ -364,7 +364,7 @@ func TestDiscordTransportRecoverKeepsAgedMissAmbiguousWhenSearchBoundIsReached(t
 	}}
 	transport := newDiscordTransportWithREST(nil, fake)
 	transport.selfID = func() snowflake.ID { return 30 }
-	messageID, err := transport.Recover(model.Starboard{ChannelID: 20}, "missing", time.Now().Add(-15*time.Minute))
+	messageID, _, err := transport.Recover(model.Starboard{ChannelID: 20}, "missing", time.Now().Add(-15*time.Minute), 0)
 	require.NoError(t, err)
 	require.Zero(t, messageID)
 }

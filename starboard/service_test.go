@@ -65,8 +65,8 @@ func (f *fakeTransport) Publish(b model.Starboard, m *discord.Message, v Votes, 
 	}
 	return f.next, nil
 }
-func (f *fakeTransport) Recover(model.Starboard, string, time.Time) (snowflake.ID, error) {
-	return f.recovered, nil
+func (f *fakeTransport) Recover(model.Starboard, string, time.Time, snowflake.ID) (snowflake.ID, snowflake.ID, error) {
+	return f.recovered, 0, nil
 }
 func (f *fakeTransport) Update(b model.Starboard, m *discord.Message, id snowflake.ID, v Votes) error {
 	f.updated = append(f.updated, id)
