@@ -25,7 +25,7 @@ VOLUME /var/lib/heimdallr
 
 RUN apk add --no-cache ca-certificates fuse3 sqlite tini
 
-COPY --from=litestream/litestream:0.5.16 /usr/local/bin/litestream /bin/litestream
+COPY --from=litestream/litestream:0.5.17 /usr/local/bin/litestream /bin/litestream
 COPY --from=builder /usr/src/app/heimdallrbot /usr/src/app/bin/heimdallr
 COPY --from=builder /usr/src/app/litestream.yml /usr/src/app/start.sh ./
 
