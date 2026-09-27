@@ -25,6 +25,13 @@ func InitDB(path string) (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+	// SQLite has one writer at a time. Sharing one connection avoids
+	// contention between this process's concurrent readers and writers.
+	sqlDB.SetMaxOpenConns(1)
 
 	err = db.AutoMigrate(
 		&Infraction{},

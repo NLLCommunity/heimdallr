@@ -32,9 +32,12 @@ func setupTestDB(t *testing.T) {
 	t.Helper()
 	dir := t.TempDir()
 	dbPath := filepath.Join(dir, "test.db")
-	if _, err := model.InitDB(dbPath); err != nil {
+	if _, err := model.InitDB(dbPath + "?_pragma=journal_mode(WAL)"); err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
+	var journalMode string
+	require.NoError(t, model.DB.Raw("PRAGMA journal_mode").Scan(&journalMode).Error)
+	require.Equal(t, "wal", journalMode)
 	// Tests share the package-level shouldLog cache; reset it so a prior
 	// test's enabled-toggle value can't leak into one that runs against a
 	// fresh DB with the same guild_id.
@@ -685,6 +688,7 @@ func TestPendingBuffer_Stress(t *testing.T) {
 		t.Skip("stress test skipped under -short")
 	}
 	setupTestDB(t)
+	writeFailuresBefore := CommitFailureTotal()
 	guildID := snowflake.ID(2_000_001)
 	guildEnabled(t, guildID)
 
@@ -778,6 +782,8 @@ func TestPendingBuffer_Stress(t *testing.T) {
 	// match the number of LogPending submissions. Each goroutine made one
 	// LogPending per iteration.
 	assert.Equal(t, producers*perGoro, len(rows), "every LogPending submission must produce exactly one row")
+	assert.EqualValues(t, 0, CommitFailureTotal()-writeFailuresBefore,
+		"the stress test must not lose audit rows to database write errors")
 
 	matched := 0
 	for _, row := range rows {
