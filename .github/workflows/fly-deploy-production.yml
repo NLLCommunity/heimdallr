@@ -1,0 +1,31 @@
+name: Fly Production Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to deploy
+        required: true
+        default: main
+        type: string
+
+jobs:
+  deploy:
+    name: Deploy app to production
+    runs-on: ubuntu-latest
+    concurrency: fly-production-deploy
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout deployment branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.branch }}
+
+      - name: Set up flyctl
+        uses: superfly/flyctl-actions/setup-flyctl@master
+
+      - name: Deploy to Fly Production
+        run: flyctl deploy --remote-only -c .fly/prod.toml
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN_PROD }}
