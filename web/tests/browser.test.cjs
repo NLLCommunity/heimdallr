@@ -104,6 +104,22 @@ test('settings synchronize hidden inputs and dirty state through an HTMX replace
   } finally {await page.close();}
 });
 
+test('invalid V2 settings drafts cannot submit until corrected', async () => {
+  const {page,submissions,errors} = await open('settings');
+  try {
+    await ready(page,2);
+    const gate = page.locator('#gatekeep');
+    const content = gate.locator('discord-message-editor textarea');
+    await content.fill('');
+    await gate.getByRole('button',{name:'Save',exact:true}).click();
+    assert.equal(submissions.filter(x=>x.path.endsWith('/gatekeep')).length,0);
+    await content.fill('Corrected message');
+    await gate.getByRole('button',{name:'Save',exact:true}).click();
+    await expect.poll(()=>submissions.filter(x=>x.path.endsWith('/gatekeep')).length).toBe(1);
+    assert.deepEqual(errors,[]);
+  } finally {await page.close();}
+});
+
 test('failed bundle blocks V2 saves but does not block V2-off settings', async () => {
   const {page,submissions,errors} = await open('settings',{failBundle:true});
   try {

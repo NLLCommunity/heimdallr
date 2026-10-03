@@ -18,12 +18,22 @@
     const form = event.target;
     const root = form.hasAttribute('data-editor-submit')
       ? form.closest('[data-editor-scope]') : form;
-    if (root && !window.HeimdallrEditors.ready(root)) {
+    if (!root) return;
+    const editors = activeEditors(root);
+    const pending = editors.find(el => el.dataset.editorState !== 'ready');
+    if (pending) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      const status = activeEditors(root).find(el => el.dataset.editorState !== 'ready')
-        ?.querySelector('[data-editor-status]');
-      status?.focus();
+      pending.querySelector('[data-editor-status]')?.focus();
+      return;
+    }
+    let valid = true;
+    for (const el of editors) {
+      if (!el.querySelector('discord-message-editor').reportValidity()) valid = false;
+    }
+    if (!valid) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
     }
   }, true);
 
