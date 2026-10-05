@@ -16,7 +16,6 @@ import (
 
 	"github.com/NLLCommunity/heimdallr/audit"
 	"github.com/NLLCommunity/heimdallr/model"
-	"github.com/NLLCommunity/heimdallr/utils"
 	"github.com/NLLCommunity/heimdallr/web/posts"
 	"github.com/NLLCommunity/heimdallr/web/templates/layouts"
 	"github.com/NLLCommunity/heimdallr/web/templates/pages"
@@ -54,34 +53,23 @@ func modGate(w http.ResponseWriter, r *http.Request, client *bot.Client) (guildI
 	return checkGuildPostMod(w, r, client, guildIDStr)
 }
 
-// validatePostComponents runs the editor's components_json payload through
-// every check we'd otherwise only run at publish, so a bad payload can't
-// sit in the DB and only blow up later:
-//
-//   - JSON parses, top level is an array.
-//   - posts.Plan() — type allowlist (top-level + nested), per-message size
-//     limits, and the splitter logic itself.
-//   - utils.ValidateV2Components — the disgo unmarshal pipeline used at
-//     send time, which rejects field-level schema mismatches the splitter
-//     can't see (e.g. text_display.content is a number, or a button is
-//     missing required fields).
-//
-// Emoji name → ID resolution is intentionally not run here: the guild's
-// emoji cache may not be warm at save time, and unresolved custom emojis
-// don't break parsing — they just don't render. That's a publish-time
-// concern.
 func validatePostComponents(componentsJSON string) error {
-	var arr []any
-	if err := json.Unmarshal([]byte(componentsJSON), &arr); err != nil {
-		return fmt.Errorf("invalid components JSON: %w", err)
+	_, _, err := canonicalPostComponents(componentsJSON)
+	return err
+}
+
+// canonicalPostComponents validates both the versioned post format and
+// legacy arrays, returning the exact envelope persisted by create/save.
+func canonicalPostComponents(raw string) (string, posts.Document, error) {
+	doc, err := posts.ParseDocument(raw)
+	if err != nil {
+		return "", posts.Document{}, fmt.Errorf("invalid components JSON: %w", err)
 	}
-	if _, err := posts.Plan(arr); err != nil {
-		return err
+	canonical, err := doc.JSON()
+	if err != nil {
+		return "", posts.Document{}, err
 	}
-	if err := utils.ValidateV2Components(arr); err != nil {
-		return fmt.Errorf("components fail Discord schema check: %w", err)
-	}
-	return nil
+	return canonical, doc, nil
 }
 
 // channelInGuild reports whether channelID resolves to a known message channel
@@ -144,9 +132,14 @@ func handlePostsNew(client *bot.Client) http.HandlerFunc {
 			IsPostMod:    true,
 			ExtraScripts: []string{"post-editor.js"},
 		}
+		initial, err := posts.NewDocument().JSON()
+		if err != nil {
+			http.Error(w, "failed to initialize post editor", http.StatusInternalServerError)
+			return
+		}
 		renderSafe(w, r, pages.PostEditor(nav, pages.PostEditorData{
 			GuildID:  guildID.String(),
-			Post:     model.Post{ComponentsJSON: "[]"},
+			Post:     model.Post{ComponentsJSON: initial},
 			Channels: guildChannels(client, guildID),
 		}))
 	}
@@ -170,9 +163,10 @@ func handlePostsCreate(client *bot.Client) http.HandlerFunc {
 		}
 		componentsJSON := r.FormValue("components_json")
 		if componentsJSON == "" {
-			componentsJSON = "[]"
+			componentsJSON, _ = posts.NewDocument().JSON()
 		}
-		if err := validatePostComponents(componentsJSON); err != nil {
+		componentsJSON, _, err := canonicalPostComponents(componentsJSON)
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -224,6 +218,12 @@ func handlePostEditor(client *bot.Client) http.HandlerFunc {
 			http.Error(w, "post not found", http.StatusNotFound)
 			return
 		}
+		canonical, _, err := canonicalPostComponents(post.ComponentsJSON)
+		if err != nil {
+			http.Error(w, "stored components are invalid; re-save the post", http.StatusUnprocessableEntity)
+			return
+		}
+		post.ComponentsJSON = canonical
 
 		guild, _ := client.Caches.Guild(guildID)
 		nav := layouts.NavData{
@@ -271,7 +271,8 @@ func handlePostSave(client *bot.Client) http.HandlerFunc {
 			name = "Untitled post"
 		}
 		componentsJSON := r.FormValue("components_json")
-		if err := validatePostComponents(componentsJSON); err != nil {
+		componentsJSON, _, err = canonicalPostComponents(componentsJSON)
+		if err != nil {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -323,27 +324,33 @@ func handlePostPreview(client *bot.Client) http.HandlerFunc {
 			return
 		}
 		raw := r.FormValue("components_json")
-		var arr []any
-		if err := json.Unmarshal([]byte(raw), &arr); err != nil {
-			renderSafe(w, r, partials.PostSplitPreview(partials.PostSplitPreviewData{Error: "Invalid components JSON."}))
-			return
-		}
-		chunks, err := posts.Plan(arr)
+		strs, err := postPreviewChunks(raw)
 		if err != nil {
 			renderSafe(w, r, partials.PostSplitPreview(partials.PostSplitPreviewData{Error: err.Error()}))
 			return
 		}
-		strs := make([]string, len(chunks))
-		for i, c := range chunks {
-			b, err := json.MarshalIndent(c, "", "  ")
-			if err != nil {
-				renderSafe(w, r, partials.PostSplitPreview(partials.PostSplitPreviewData{Error: "Failed to render preview chunk: " + err.Error()}))
-				return
-			}
-			strs[i] = string(b)
-		}
 		renderSafe(w, r, partials.PostSplitPreview(partials.PostSplitPreviewData{Chunks: strs}))
 	}
+}
+
+func postPreviewChunks(raw string) ([]string, error) {
+	_, doc, err := canonicalPostComponents(raw)
+	if err != nil {
+		return nil, err
+	}
+	chunks, err := doc.PublishChunks()
+	if err != nil {
+		return nil, err
+	}
+	strs := make([]string, len(chunks))
+	for i, chunk := range chunks {
+		b, err := json.MarshalIndent(chunk, "", "  ")
+		if err != nil {
+			return nil, fmt.Errorf("failed to render preview chunk: %w", err)
+		}
+		strs[i] = string(b)
+	}
+	return strs, nil
 }
 
 func handlePostPublish(client *bot.Client, limiter *keyedRateLimiter) http.HandlerFunc {
@@ -387,18 +394,14 @@ func handlePostPublish(client *bot.Client, limiter *keyedRateLimiter) http.Handl
 			return
 		}
 
-		var arr []any
-		if err := json.Unmarshal([]byte(post.ComponentsJSON), &arr); err != nil {
+		doc, err := posts.ParseDocument(post.ComponentsJSON)
+		if err != nil {
 			http.Error(w, "stored components are invalid; re-save the post", http.StatusUnprocessableEntity)
 			return
 		}
-		chunks, err := posts.Plan(arr)
+		chunks, err := doc.PublishChunks()
 		if err != nil {
 			http.Error(w, fmt.Sprintf("cannot publish: %v", err), http.StatusBadRequest)
-			return
-		}
-		if len(chunks) == 0 {
-			http.Error(w, "post has no content to publish; add a component, or use Unpublish to remove existing messages", http.StatusBadRequest)
 			return
 		}
 

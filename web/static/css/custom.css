@@ -1,6 +1,44 @@
 /* Hide Alpine.js content until initialized */
 [x-cloak] { display: none !important; }
 
+/* Editor layout and the Lit component's supported theme tokens. */
+.message-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(16rem, 1fr);
+  align-items: start;
+  gap: 2rem;
+}
+.message-workspace > * { min-width: 0; }
+.message-editor { min-width: 0; }
+.message-editor [data-editor-status] { color: var(--pico-muted-color); }
+.message-editor[data-editor-state="error"] [data-editor-status] { color: #f87171; }
+.message-preview { margin-top: 1rem; }
+.message-preview summary { margin-bottom: .75rem; }
+discord-message-editor {
+  --dme-color-surface: #181c25;
+  --dme-color-surface-subtle: #202632;
+  --dme-color-text: #e0e3e7;
+  --dme-color-muted: #aab3c2;
+  --dme-color-border: #465268;
+  --dme-color-danger: #ff7a85;
+  --dme-color-accent: #5865f2;
+  color-scheme: dark;
+}
+.post-message { margin-block: 1.25rem; }
+.post-message-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+}
+.post-message-header h3 { margin: 0; font-size: 1rem; }
+.post-message-actions { display: flex; gap: .5rem; }
+.post-message-actions button { width: auto; margin: 0; padding: .35rem .65rem; }
+@media (max-width: 900px) {
+  .message-workspace { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* Top navbar. Pico lays <nav> out as a single non-wrapping flex row
    with space-between, which overflows the viewport on narrow screens.
    Desktop keeps the original look (brand + links left, user right);

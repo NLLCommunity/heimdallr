@@ -31,6 +31,7 @@ templ Base(title string, nav NavData) {
 			<link rel="stylesheet" href="/static/css/custom.css"/>
 			<script src="/static/js/htmx.min.js"></script>
 			<script src="/static/js/htmx-config.js"></script>
+			<script src="/static/js/component-editor.js"></script>
 			<script src="/static/js/message-builder.js"></script>
 			for _, src := range nav.ExtraScripts {
 				<script src={ "/static/js/" + src }></script>
