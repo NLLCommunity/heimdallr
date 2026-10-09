@@ -43,12 +43,12 @@ func TestValidatePostComponents(t *testing.T) {
 		wantErr string // substring; "" means no error expected
 	}{
 		{
-			name: "empty array is valid",
+			name: "empty legacy array is valid",
 			in:   "[]",
 		},
 		{
-			name: "single text_display is valid",
-			in:   `[{"type":10,"content":"hello"}]`,
+			name: "document with single text_display is valid",
+			in:   `{"version":1,"messages":[{"components":[{"type":10,"content":"hello"}]}]}`,
 		},
 		{
 			name: "container with children is valid",
@@ -101,4 +101,37 @@ func TestValidatePostComponents(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCanonicalPostComponentsConvertsLegacyAndRoundTripsExplicitBoundaries(t *testing.T) {
+	legacy, _, err := canonicalPostComponents(`[{"type":10,"content":"hello"}]`)
+	assert.NoError(t, err)
+	assert.Equal(t, `{"version":1,"messages":[{"components":[{"content":"hello","type":10}]}]}`, legacy)
+
+	explicit := `{"version":1,"messages":[{"components":[{"type":10,"content":"a"}]},{"components":[{"type":10,"content":"b"}]}]}`
+	canonical, doc, err := canonicalPostComponents(explicit)
+	assert.NoError(t, err)
+	assert.JSONEq(t, explicit, canonical)
+	assert.Len(t, doc.Messages, 2)
+}
+
+func TestPostPreviewChunksRejectsDraftOnlyEmptyMessages(t *testing.T) {
+	for _, raw := range []string{
+		`{"version":1,"messages":[]}`,
+		`{"version":1,"messages":[{"components":[]}]}`,
+	} {
+		chunks, err := postPreviewChunks(raw)
+		assert.Nil(t, chunks)
+		if assert.Error(t, err) {
+			assert.Contains(t, err.Error(), "no content")
+		}
+	}
+}
+
+func TestPostPreviewChunksRendersExplicitMessages(t *testing.T) {
+	chunks, err := postPreviewChunks(`{"version":1,"messages":[{"components":[{"type":10,"content":"a"}]},{"components":[{"type":10,"content":"b"}]}]}`)
+	assert.NoError(t, err)
+	assert.Len(t, chunks, 2)
+	assert.JSONEq(t, `[{"type":10,"content":"a"}]`, chunks[0])
+	assert.JSONEq(t, `[{"type":10,"content":"b"}]`, chunks[1])
 }

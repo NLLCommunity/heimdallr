@@ -15,6 +15,7 @@ templ Sandbox(nav layouts.NavData, data SandboxData) {
 		<h2>Message Sandbox</h2>
 		<div
 			x-data="messageBuilder()"
+			data-editor-scope
 			data-initial="[]"
 			data-load-url={ "/guild/" + data.GuildID + "/sandbox/load" }
 		>
@@ -42,20 +43,21 @@ templ Sandbox(nav layouts.NavData, data SandboxData) {
 					</div>
 				</form>
 			</article>
-			<div class="grid" style="grid-template-columns: 1fr 1fr;">
+			<div class="message-workspace">
 				<div>
 					<h3>Editor</h3>
 					<div x-show="mode === 'edit-v1'">
 						<textarea x-model="v1Content" rows="12" placeholder="Message content"></textarea>
 					</div>
-					<div x-show="mode !== 'edit-v1'">
-						@components.MessageEditor()
+					<div x-show="mode !== 'edit-v1'" x-bind:data-editor-enabled="mode !== 'edit-v1' ? 'true' : 'false'">
+						@components.MessageEditor("components")
 					</div>
 				</div>
 				<div>
 					<h3 x-text="mode === 'create' ? 'Send to Channel' : 'Update Message'"></h3>
 					<form
 						x-show="mode === 'create'"
+						data-editor-submit
 						method="POST"
 						action={ templ.SafeURL("/guild/" + data.GuildID + "/sandbox/send") }
 						hx-post={ "/guild/" + data.GuildID + "/sandbox/send" }
@@ -64,10 +66,11 @@ templ Sandbox(nav layouts.NavData, data SandboxData) {
 					>
 						@components.ChannelSelect("channel_id", "Channel", data.Channels, "")
 						<input type="hidden" name="components_json" x-bind:value="JSON.stringify(serialize())"/>
-						<button type="submit">Send Message</button>
+						<button type="submit" :disabled="loading">Send Message</button>
 					</form>
 					<form
 						x-show="mode !== 'create'"
+						data-editor-submit
 						method="POST"
 						action={ templ.SafeURL("/guild/" + data.GuildID + "/sandbox/edit") }
 						hx-post={ "/guild/" + data.GuildID + "/sandbox/edit" }
@@ -79,7 +82,7 @@ templ Sandbox(nav layouts.NavData, data SandboxData) {
 						<input type="hidden" name="is_v2" x-bind:value="mode === 'edit-v2' ? 'true' : 'false'"/>
 						<input type="hidden" name="components_json" x-bind:value="JSON.stringify(serialize())"/>
 						<input type="hidden" name="content" x-bind:value="v1Content"/>
-						<button type="submit">Update Message</button>
+						<button type="submit" :disabled="loading">Update Message</button>
 					</form>
 					<div id="send-result"></div>
 				</div>

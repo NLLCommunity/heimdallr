@@ -70,7 +70,7 @@ templ PlaceholderHelp(placeholders []utils.MessageTemplatePlaceholder) {
 }
 
 templ V2MessageToggle(prefix string, plainText string, v2Enabled bool, v2Json string) {
-	<div x-data={ "{ v2: " + boolStr(v2Enabled) + " }" }>
+	<div x-data={ "{ v2: " + boolStr(v2Enabled) + " }" } x-bind:data-editor-enabled="v2 ? 'true' : 'false'">
 		<label>
 			<input type="checkbox" role="switch" x-model="v2" name={ prefix + "_v2" } value="true"/>
 			Use V2 components
@@ -81,7 +81,7 @@ templ V2MessageToggle(prefix string, plainText string, v2Enabled bool, v2Json st
 		</div>
 		<div x-show="v2" x-cloak>
 			<div x-data="messageBuilder()" data-initial={ initialV2Json(v2Json) }>
-				@components.MessageEditor()
+				@components.MessageEditor("components")
 				<input type="hidden" name={ prefix + "_v2_json" } x-bind:value="JSON.stringify(serialize())"/>
 			</div>
 		</div>

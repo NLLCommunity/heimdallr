@@ -81,6 +81,8 @@ func (suite *ModelTestSuite) TestInitDB() {
 	sqlDB, err := db.DB()
 	require.NoError(suite.T(), err)
 	defer sqlDB.Close()
+	assert.Equal(suite.T(), 1, sqlDB.Stats().MaxOpenConnections,
+		"SQLite access should use one connection per process")
 }
 
 func (suite *ModelTestSuite) TestCreateInfraction() {
