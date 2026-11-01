@@ -221,7 +221,6 @@ func BanHandlerDataFromString(s string) (data BanHandlerData) {
 		key = strings.ToLower(key)
 
 		value := strings.Trim(parts[1], " ")
-		value = strings.ToLower(value)
 
 		switch key {
 		case "duration":
