@@ -4,7 +4,7 @@ go 1.26.0
 
 require (
 	github.com/a-h/templ v0.3.1070
-	github.com/agnivade/levenshtein v1.2.1
+	github.com/agnivade/levenshtein v1.2.2
 	github.com/cbroglie/mustache v1.4.2
 	github.com/disgoorg/disgo v0.19.6
 	github.com/disgoorg/omit v1.0.0
