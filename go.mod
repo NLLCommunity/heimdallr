@@ -3,7 +3,7 @@ module github.com/NLLCommunity/heimdallr
 go 1.26.0
 
 require (
-	github.com/a-h/templ v0.3.1070
+	github.com/a-h/templ v0.3.1118
 	github.com/agnivade/levenshtein v1.2.1
 	github.com/cbroglie/mustache v1.4.2
 	github.com/disgoorg/disgo v0.19.6
@@ -22,7 +22,7 @@ require (
 
 require (
 	github.com/robfig/cron/v3 v3.0.1
-	golang.org/x/sync v0.24.0
+	golang.org/x/sync v0.25.0
 	golang.org/x/term v0.46.0
 )
 
@@ -52,7 +52,7 @@ require (
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/crypto v0.48.0 // indirect
 	golang.org/x/exp v0.0.0-20260212183809-81e46e3db34a // indirect
-	golang.org/x/sys v0.48.0 // indirect
+	golang.org/x/sys v0.50.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
 	modernc.org/libc v1.67.7 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
